@@ -1,15 +1,12 @@
-use ducky_app::{AppState, NoticeLevel, ProfilePicker};
+use ducky_app::{AppState, ProfilePicker};
 use ratatui::Frame;
-use ratatui::layout::{Constraint, Layout, Rect};
-use ratatui::style::Style;
-use ratatui::text::{Line, Span};
-use ratatui::widgets::{Block, Paragraph, Wrap};
+use ratatui::layout::Rect;
+use ratatui::text::Span;
+use ratatui::widgets::{Block, Clear};
 
-use crate::theme::{kind_badge, palette};
+use crate::theme::{Palette, palette};
 use crate::tui_state::TuiState;
-use crate::widgets::loading::{LoadSlot, render_message};
-
-const LIST_WIDTH: u16 = 60;
+use crate::views::profile_picker;
 
 pub fn render(
     frame: &mut Frame,
@@ -19,56 +16,51 @@ pub fn render(
     tui: &mut TuiState,
 ) {
     let neutral_palette = palette(None);
-    let list_height = u16::try_from(state.profiles.len())
-        .unwrap_or(u16::MAX)
-        .saturating_add(2);
-    let column = area.centered_horizontally(Constraint::Length(LIST_WIDTH.min(area.width)));
-    let [list_area, info_area] = column.layout(&Layout::vertical([
-        Constraint::Length(list_height.min(column.height.saturating_sub(3))),
-        Constraint::Min(0),
-    ]));
-    let rows: Vec<Line> = state
-        .profiles
-        .iter()
-        .enumerate()
-        .map(|(profile_index, profile)| {
-            let badge_style = Style::new().fg(palette(Some(profile.kind)).accent);
-            let line = Line::from(vec![
-                Span::raw(" "),
-                Span::styled(kind_badge(profile.kind), badge_style),
-                Span::raw(" "),
-                Span::raw(profile.label.clone()),
-            ]);
-            match profile_index == picker.selected_profile_index {
-                true => line.style(neutral_palette.selected(true)),
-                false => line,
-            }
-        })
-        .collect();
+    let container = Rect {
+        height: area.height.saturating_sub(2),
+        y: area.y.saturating_add(1),
+        ..area
+    };
+    let picker_area = profile_picker::fitted_area(container, &state.profiles, picker);
     let block = Block::bordered()
-        .title(Span::styled(" Profiles ", neutral_palette.title()))
+        .title(Span::styled(" Connect ", neutral_palette.title()))
         .border_style(neutral_palette.border(true));
-    let scroll = u16::try_from(
-        picker
-            .selected_profile_index
-            .saturating_sub(usize::from(list_area.height.saturating_sub(3))),
-    )
-    .unwrap_or(0);
-    frame.render_widget(
-        Paragraph::new(rows).block(block).scroll((scroll, 0)),
-        list_area,
+    let inner_area = block.inner(picker_area);
+    frame.render_widget(block, picker_area);
+    profile_picker::render(
+        frame,
+        inner_area,
+        &state.profiles,
+        picker,
+        None,
+        tui,
+        &neutral_palette,
     );
-    let [message_area, _] = info_area.layout(&Layout::vertical([
-        Constraint::Length(3),
-        Constraint::Min(0),
-    ]));
-    if picker.connecting_profile_index.is_some() {
-        render_message(frame, message_area, "Connecting…", &neutral_palette);
-        tui.effects.mark_loading(LoadSlot::Main, message_area);
-    } else if let Some(connection_error) = &picker.connection_error {
-        let paragraph = Paragraph::new(connection_error.clone())
-            .style(neutral_palette.notice(NoticeLevel::Error))
-            .wrap(Wrap { trim: false });
-        frame.render_widget(paragraph, info_area);
-    }
+}
+
+pub fn render_switch_popup(
+    frame: &mut Frame,
+    screen: Rect,
+    state: &AppState,
+    picker: &ProfilePicker,
+    tui: &mut TuiState,
+    workspace_palette: &Palette,
+) -> Rect {
+    let area = profile_picker::fitted_area(screen, &state.profiles, picker);
+    frame.render_widget(Clear, area);
+    let block = Block::bordered()
+        .title(Span::styled(" Switch profile ", workspace_palette.title()))
+        .border_style(workspace_palette.border(true));
+    let inner_area = block.inner(area);
+    frame.render_widget(block, area);
+    profile_picker::render(
+        frame,
+        inner_area,
+        &state.profiles,
+        picker,
+        state.workspace().map(|workspace| workspace.profile_index),
+        tui,
+        &palette(None),
+    );
+    area
 }

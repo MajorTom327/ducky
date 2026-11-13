@@ -17,7 +17,7 @@ pub use jobs::{DumpView, JobKind, JobState, RestoreView};
 pub use modal::{Confirm, ConfirmKind, Modal, Prompt, PromptKind, RowDetail};
 pub use palette::{CommandPalette, PaletteAction, PaletteItem};
 pub use parameters::{ParameterField, ParameterForm};
-pub use profiles::ProfilePicker;
+pub use profiles::{PickerMode, ProfilePicker, ProfileRow, profile_kind_name, profile_rows};
 pub use query::{Document, PendingSave, QueryPane, QueryView, RunState};
 pub use sidebar::{Sidebar, SidebarItem};
 pub use table::{GridCursor, TableTab, TableView};
@@ -39,11 +39,12 @@ pub struct AppState {
 
 impl AppState {
     pub fn new(profiles: Vec<Profile>, storage: StoragePaths) -> AppState {
+        let profile_picker = ProfilePicker::new(&profiles, None);
         AppState {
             profiles,
             storage,
             page_size: DEFAULT_PAGE_SIZE,
-            screen: Screen::Profiles(ProfilePicker::default()),
+            screen: Screen::Profiles(profile_picker),
             modal: None,
             notice: None,
             should_quit: false,
@@ -62,7 +63,7 @@ impl AppState {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone)]
 pub enum Screen {
     Profiles(ProfilePicker),
     Workspace(Box<Workspace>),

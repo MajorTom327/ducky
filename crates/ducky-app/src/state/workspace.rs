@@ -98,8 +98,8 @@ impl Workspace {
             .collect()
     }
 
-    pub fn palette_items(&self, profiles: &[Profile], query: &str) -> Vec<PaletteItem> {
-        palette_items(self, profiles, query)
+    pub fn palette_items(&self, query: &str) -> Vec<PaletteItem> {
+        palette_items(self, query)
     }
 
     pub fn schema_names(&self) -> Vec<String> {

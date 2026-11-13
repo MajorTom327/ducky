@@ -1,8 +1,31 @@
-use ducky_app::{AppState, Focus, Modal, QueryPane, Screen, TabContent, TableTab};
+use ducky_app::{AppState, Focus, Modal, PickerMode, QueryPane, Screen, TabContent, TableTab};
 
 use crate::keys::help::KeyHint;
 
-const PROFILES_HINTS: &[KeyHint] = &[("j/k", "select"), ("Enter", "connect"), ("q", "quit")];
+const PICKER_FILTER_HINTS: &[KeyHint] = &[
+    ("type", "filter"),
+    ("↑↓", "move"),
+    ("Enter", "connect"),
+    ("Esc", "list"),
+];
+const PICKER_LIST_HINTS: &[KeyHint] = &[
+    ("j/k", "move"),
+    ("/", "filter"),
+    ("Enter", "connect"),
+    ("q", "quit"),
+];
+const SWITCH_FILTER_HINTS: &[KeyHint] = &[
+    ("type", "filter"),
+    ("↑↓", "move"),
+    ("Enter", "switch"),
+    ("Esc", "list"),
+];
+const SWITCH_LIST_HINTS: &[KeyHint] = &[
+    ("j/k", "move"),
+    ("/", "filter"),
+    ("Enter", "switch"),
+    ("Esc", "close"),
+];
 const SIDEBAR_HINTS: &[KeyHint] = &[
     ("Ctrl+p", "go to"),
     ("Enter", "open"),
@@ -85,7 +108,12 @@ pub fn hints(state: &AppState) -> &'static [KeyHint] {
         return modal_hints(modal);
     }
     let workspace = match &state.screen {
-        Screen::Profiles(_) => return PROFILES_HINTS,
+        Screen::Profiles(picker) => {
+            return match picker.mode {
+                PickerMode::Filter => PICKER_FILTER_HINTS,
+                PickerMode::Navigate => PICKER_LIST_HINTS,
+            };
+        }
         Screen::Workspace(workspace) => workspace,
     };
     if workspace.focus == Focus::Sidebar {
@@ -127,6 +155,10 @@ fn modal_hints(modal: &Modal) -> &'static [KeyHint] {
             ("Esc", "close"),
         ],
         Modal::Palette(_) => &[("Enter", "open"), ("↑↓", "move"), ("Esc", "close")],
+        Modal::ProfilePicker(picker) => match picker.mode {
+            PickerMode::Filter => SWITCH_FILTER_HINTS,
+            PickerMode::Navigate => SWITCH_LIST_HINTS,
+        },
         Modal::Parameters(_) => &[
             ("Tab/S-Tab", "field"),
             ("Ctrl+r", "raw SQL"),

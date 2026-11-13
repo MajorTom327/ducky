@@ -32,6 +32,9 @@ struct RawProfile {
     url: String,
     #[serde(rename = "type")]
     kind: RawProfileKind,
+    project: Option<String>,
+    #[serde(default)]
+    tags: Vec<String>,
 }
 
 #[derive(Deserialize, Clone, Copy)]
@@ -79,10 +82,17 @@ pub fn load(config_path: &Path) -> Result<Config, ConfigError> {
             return Err(ConfigError::DuplicateLabel { label });
         }
         validate_url(&label, &raw_profile.url)?;
+        let tags = normalize_tags(&label, raw_profile.tags)?;
+        let project = raw_profile
+            .project
+            .map(|raw_project| raw_project.trim().to_owned())
+            .filter(|trimmed_project| !trimmed_project.is_empty());
         profiles.push(Profile {
             label,
             url: raw_profile.url,
             kind: raw_profile.kind.into(),
+            project,
+            tags,
         });
     }
     let page_size = raw_config.page_size.unwrap_or(DEFAULT_PAGE_SIZE);
@@ -104,6 +114,22 @@ pub fn load(config_path: &Path) -> Result<Config, ConfigError> {
         storage,
         page_size,
     })
+}
+
+fn normalize_tags(label: &str, raw_tags: Vec<String>) -> Result<Vec<String>, ConfigError> {
+    let mut normalized_tags: Vec<String> = Vec::with_capacity(raw_tags.len());
+    for raw_tag in raw_tags {
+        let normalized_tag = raw_tag.trim().to_lowercase();
+        if normalized_tag.is_empty() {
+            return Err(ConfigError::EmptyTag {
+                label: label.to_owned(),
+            });
+        }
+        if !normalized_tags.contains(&normalized_tag) {
+            normalized_tags.push(normalized_tag);
+        }
+    }
+    Ok(normalized_tags)
 }
 
 fn validate_url(label: &str, url: &str) -> Result<(), ConfigError> {

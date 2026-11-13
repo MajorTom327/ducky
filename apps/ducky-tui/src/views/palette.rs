@@ -1,12 +1,11 @@
 use ducky_app::{CommandPalette, PaletteAction, PaletteItem, Workspace};
-use ducky_core::Profile;
 use ratatui::Frame;
 use ratatui::layout::{Constraint, Layout, Rect};
 use ratatui::style::Style;
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Clear, Paragraph};
 
-use crate::theme::{Palette, palette as profile_palette};
+use crate::theme::Palette;
 use crate::views::sidebar::spread_line;
 
 const INPUT_PREFIX: &str = " › ";
@@ -17,12 +16,11 @@ pub fn render(
     frame: &mut Frame,
     screen: Rect,
     workspace: &Workspace,
-    profiles: &[Profile],
     command_palette: &CommandPalette,
     palette: &Palette,
 ) -> Rect {
     let query = command_palette.input.value();
-    let palette_items = workspace.palette_items(profiles, query);
+    let palette_items = workspace.palette_items(query);
     let area = popup_area(screen, palette_items.len());
     frame.render_widget(Clear, area);
     let block = Block::bordered()
@@ -49,7 +47,6 @@ pub fn render(
         list_area,
         &ItemList {
             palette_items: &palette_items,
-            profiles,
             selected_item_index: command_palette.selected_item_index,
         },
         palette,
@@ -107,7 +104,6 @@ fn render_input(
 
 struct ItemList<'a> {
     palette_items: &'a [PaletteItem],
-    profiles: &'a [Profile],
     selected_item_index: usize,
 }
 
@@ -133,7 +129,7 @@ fn render_items(frame: &mut Frame, area: Rect, item_list: &ItemList, palette: &P
             let is_selected = item_index == selected_item_index;
             let line = spread_line(
                 Span::raw(item.label.clone()),
-                item_trailer(item, item_list.profiles, is_selected, palette),
+                item_trailer(item, is_selected, palette),
                 row_width,
             );
             match is_selected {
@@ -145,18 +141,10 @@ fn render_items(frame: &mut Frame, area: Rect, item_list: &ItemList, palette: &P
     frame.render_widget(Paragraph::new(rows), area);
 }
 
-fn item_trailer(
-    item: &PaletteItem,
-    profiles: &[Profile],
-    is_selected: bool,
-    palette: &Palette,
-) -> Vec<Span<'static>> {
+fn item_trailer(item: &PaletteItem, is_selected: bool, palette: &Palette) -> Vec<Span<'static>> {
     let (detail_style, shortcut_style) = match is_selected {
         true => (Style::new(), Style::new()),
-        false => (
-            profile_detail_style(item, profiles, palette),
-            palette.title(),
-        ),
+        false => (palette.muted(), palette.title()),
     };
     let mut spans = Vec::new();
     if let Some(detail) = &item.detail {
@@ -171,17 +159,6 @@ fn item_trailer(
     spans
 }
 
-fn profile_detail_style(item: &PaletteItem, profiles: &[Profile], palette: &Palette) -> Style {
-    match item.action {
-        PaletteAction::SwitchProfile(profile_index) => profiles
-            .get(profile_index)
-            .map_or(palette.muted(), |profile| {
-                profile_palette(Some(profile.kind)).title()
-            }),
-        _ => palette.muted(),
-    }
-}
-
 pub fn action_shortcut(action: &PaletteAction) -> Option<&'static str> {
     match action {
         PaletteAction::NewQuery => Some("Ctrl+n"),
@@ -191,11 +168,11 @@ pub fn action_shortcut(action: &PaletteAction) -> Option<&'static str> {
         PaletteAction::Reconnect => Some("R"),
         PaletteAction::Disconnect => Some("D"),
         PaletteAction::Help => Some("?"),
+        PaletteAction::SwitchProfile => Some("Space p"),
         PaletteAction::SwitchTab(_)
         | PaletteAction::Dump
         | PaletteAction::Restore
         | PaletteAction::Quit
-        | PaletteAction::SwitchProfile(_)
         | PaletteAction::OpenRelation(_) => None,
     }
 }

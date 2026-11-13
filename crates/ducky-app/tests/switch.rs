@@ -1,7 +1,7 @@
 mod support;
 
 use ducky_app::{
-    AppState, Command, Connection, JobState, Loadable, ModalMsg, Msg, NoticeLevel, PaletteAction,
+    AppState, Command, Connection, JobState, Loadable, ModalMsg, Msg, NoticeLevel, ProfilesMsg,
     QueryMsg, RunState, TableTab,
 };
 use ducky_core::{SessionInfo, TransactionMode};
@@ -14,13 +14,20 @@ use tui_input::InputRequest;
 
 fn submit_switch_to_prod(state: &mut AppState) -> Vec<Command> {
     send(state, Msg::OpenPalette);
-    for typed_char in "Switch to Prod".chars() {
+    for typed_char in "switch profile".chars() {
         send(
             state,
             Msg::Modal(ModalMsg::Input(InputRequest::InsertChar(typed_char))),
         );
     }
-    send(state, Msg::Modal(ModalMsg::Submit))
+    send(state, Msg::Modal(ModalMsg::Submit));
+    for typed_char in "prod".chars() {
+        send(
+            state,
+            Msg::Profiles(ProfilesMsg::Filter(InputRequest::InsertChar(typed_char))),
+        );
+    }
+    send(state, Msg::Profiles(ProfilesMsg::Connect))
 }
 
 fn prod_connection() -> Connection {
@@ -92,18 +99,6 @@ fn switch_is_refused_while_a_dump_or_restore_runs() {
             )
         );
     }
-}
-
-#[test]
-fn the_connected_profile_is_never_offered() {
-    let state = workspace_state();
-    let switch_targets: Vec<PaletteAction> = workspace(&state)
-        .palette_items(&state.profiles, "")
-        .into_iter()
-        .map(|item| item.action)
-        .filter(|action| matches!(action, PaletteAction::SwitchProfile(_)))
-        .collect();
-    assert_eq!(switch_targets, [PaletteAction::SwitchProfile(1)]);
 }
 
 #[test]

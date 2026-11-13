@@ -8,7 +8,7 @@ use ratatui::widgets::{Block, Clear, Paragraph, Wrap};
 use crate::keys::help::HELP_ROWS;
 use crate::theme::Palette;
 use crate::tui_state::TuiState;
-use crate::views::{palette as palette_view, parameters, reference_picker, row_detail};
+use crate::views::{palette as palette_view, parameters, profiles, reference_picker, row_detail};
 
 const HELP_COLUMN_SPACING: u16 = 2;
 
@@ -28,16 +28,14 @@ pub fn render(
             selected_link_index,
         } => reference_picker::render(frame, screen, links, *selected_link_index, palette),
         Modal::Palette(command_palette) => match state.workspace() {
-            Some(workspace) => palette_view::render(
-                frame,
-                screen,
-                workspace,
-                &state.profiles,
-                command_palette,
-                palette,
-            ),
+            Some(workspace) => {
+                palette_view::render(frame, screen, workspace, command_palette, palette)
+            }
             None => return,
         },
+        Modal::ProfilePicker(picker) => {
+            profiles::render_switch_popup(frame, screen, state, picker, tui, palette)
+        }
         Modal::Prompt(prompt) => {
             let area = popup_area(screen, 60, Constraint::Length(3));
             frame.render_widget(Clear, area);

@@ -24,6 +24,7 @@ Source of truth: `apps/ducky-tui/src/keys/help.rs` (`HELP_ROWS`, shown with `F1`
 |---|---|
 |`[b / ]b`|previous / next tab|
 |`Space b d`|close the active tab|
+|`Space p`|switch profile|
 |`Space q q`|quit|
 |`:`|go to anything, starting with :|
 
@@ -43,19 +44,28 @@ Source of truth: `apps/ducky-tui/src/keys/help.rs` (`HELP_ROWS`, shown with `F1`
 |---|---|
 |`type`|filter tabs, actions, tables|
 |`:q`|quit|
-|`Switch to <profile>`|reconnect this workspace to another profile, tabs stay open|
+|`Switch profile…`|open the profile picker, tabs stay open|
 |`↓ / Ctrl+n / Tab`|next item|
 |`↑ / Ctrl+p`|previous item|
 |`Enter`|open the item|
 |`Ctrl+w / Ctrl+u`|delete a word / the query|
 |`Esc`|close|
 
-## Profiles
+## Profile picker
 
 |Key|Action|
 |---|---|
-|`j / k`|next / previous profile|
-|`Enter`|connect|
+|`type`|filter on project, label, type, tags, target|
+|`↓ / Ctrl+j / Ctrl+n / Tab`|next profile|
+|`↑ / Ctrl+k / Ctrl+p / S-Tab`|previous profile|
+|`Ctrl+w / Ctrl+u`|delete a word / the filter|
+|`Enter`|connect, or switch in the workspace|
+|`Esc`|leave the filter for the list|
+|`j / k`|next / previous profile (list)|
+|`g / G`|first / last profile (list)|
+|`/ or i`|back to the filter (list)|
+|`Esc (list)`|clear the filter, else close the switch|
+|`q (list)`|quit, or close the switch|
 
 ## Sidebar
 
@@ -227,11 +237,11 @@ Source of truth: `apps/ducky-tui/src/keys/help.rs` (`HELP_ROWS`, shown with `F1`
 ## Rules
 
 - Global keys work in every pane, including the editor in insert mode.
-- `[b`, `]b`, `Space b d` and `Space q q` are key sequences, accepted everywhere except in editor insert mode. The pending prefix is shown in the status bar; any other key cancels it.
+- `[b`, `]b`, `Space b d`, `Space p` and `Space q q` are key sequences, accepted everywhere except in editor insert mode. The pending prefix is shown in the status bar; any other key cancels it.
 - `gg`, `gd` and `gr` are `g` sequences of the table data tab (`gg` also in the results pane): `gd` (go to referenced row) opens the table referenced by the foreign key under the cursor in a new tab filtered on the referenced key, `gr` (find referencing rows) opens the rows of another table whose foreign key points at the current row, through a picker when several foreign keys do. Foreign-key columns end with a muted ` →` in the grid header.
 - Row selection works on the current page of the table data tab: `v` marks or unmarks the cursor row and moves down, `V` starts a visual range from the cursor row (the status bar shows `VISUAL`) and a second `V` keeps it, `Esc` clears the selection. Selected rows show a `▌` marker in the gutter and the bottom border counts them; any page change, reload, sort or filter clears the selection. `e` opens a new query tab with an `UPDATE` preset for the selected rows (the cursor row when nothing is selected), targeting them by primary key (or an `id` column) and setting the cursor column to `:<column>`; `F5` asks for the value through the query parameters form.
 - `:` opens go to anything with `:` already typed, everywhere except in editor insert mode (where it types `:`). A query starting with `:` lists only the items that have a command alias (`:q` quits); other queries match `Quit` by its label.
-- Go to anything lists `Switch to <profile>` for every profile except the connected one, with the profile type in its colour. Picking one reconnects the workspace: tabs, query text and results stay open, the catalog and every table tab reload from the new profile, and the results title shows the profile a script ran on (` 12 ms · one transaction · on Dev local `). Switching is refused while a script, a dump or a restore runs; if the connection fails, the current profile stays connected.
+- The profile picker opens at startup (` Connect `) and, in a workspace, as the ` Switch profile ` popup from `Space p` or `Switch profile…` in go to anything (shortcut `Space p`). It starts in filter mode: typing filters on project, label, type, tags and target (every space-separated word must match), `↓`/`↑`, `Tab`/`Shift+Tab`, `Ctrl+j`/`Ctrl+k`, `Ctrl+n`/`Ctrl+p` move over profiles (project headers are skipped), `Enter` connects. `Esc` switches to navigate mode: `j`/`k`/arrows, `g`/`G`, `/` or `i` back to the filter, `Esc` clears a non-empty filter and otherwise closes the popup (nothing on the start screen), `q` quits on the start screen and closes the popup. The popup marks the connected profile with `●`; picking it only closes the popup. Picking another one reconnects the workspace: tabs, query text and results stay open, the catalog and every table tab reload from the new profile, and the results title shows the profile a script ran on (` 12 ms · one transaction · on Dev local `). Switching is refused while a script, a dump or a restore runs; if the connection fails, the current profile stays connected.
 - `1`–`9`, `H` / `L`, `Tab`, `?` and `q` apply outside the SQL editor.
 - `Ctrl+h` focuses the sidebar, `Ctrl+l` the main pane, `Ctrl+k` the SQL editor and `Ctrl+j` the results of the active query tab.
 - The editor follows edtui vim mode (`i`, `a`, `o`, `v`, `Esc`, motions, `u` undo, `p` paste). Its bottom border shows the vim mode on the left and ` one transaction · Ctrl+t ` or ` autocommit · Ctrl+t ` on the right. The terminal cursor is a bar in insert mode and a block otherwise.

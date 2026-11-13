@@ -78,7 +78,7 @@ fn route_key(state: &AppState, tui: &mut TuiState, key: KeyEvent) -> Vec<Msg> {
         return modal::handle(modal, tui, key);
     }
     let workspace = match &state.screen {
-        Screen::Profiles(_) => return profiles::handle(key),
+        Screen::Profiles(picker) => return profiles::handle(picker, key, false),
         Screen::Workspace(workspace) => workspace,
     };
     let editor_tab_id = focused_editor_tab(workspace);

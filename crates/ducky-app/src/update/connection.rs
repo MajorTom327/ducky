@@ -89,11 +89,7 @@ pub(crate) fn disconnect(state: &mut AppState) -> Vec<Command> {
     let Some(profile_index) = state.workspace().map(|workspace| workspace.profile_index) else {
         return Vec::new();
     };
-    state.screen = Screen::Profiles(ProfilePicker {
-        selected_profile_index: profile_index,
-        connecting_profile_index: None,
-        connection_error: None,
-    });
+    state.screen = Screen::Profiles(ProfilePicker::new(&state.profiles, Some(profile_index)));
     state.modal = None;
     vec![Command::Disconnect]
 }

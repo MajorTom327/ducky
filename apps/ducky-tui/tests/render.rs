@@ -28,6 +28,8 @@ fn profile(label: &str, kind: ProfileKind) -> Profile {
         label: label.to_owned(),
         url: "postgres://ducky@localhost/ducky".to_owned(),
         kind,
+        project: None,
+        tags: Vec::new(),
     }
 }
 
@@ -167,9 +169,10 @@ fn profiles_screen_lists_every_label() {
     let terminal = render(&state, &mut tui, WIDTH, HEIGHT);
     let text = screen_text(&terminal);
     assert!(text.contains("Profiles"));
-    assert!(text.contains("[LOCAL] Dev local"));
-    assert!(text.contains("[STAGING] Shared staging"));
-    assert!(text.contains("[PROD] Production"));
+    assert!(text.contains("Connect"));
+    assert!(text.contains("LOCAL   Dev local"));
+    assert!(text.contains("STAGING Shared staging"));
+    assert!(text.contains("PROD    Production"));
     assert_eq!(terminal.backend().buffer()[(0, 0)].bg, palette(None).accent);
 }
 
@@ -423,7 +426,7 @@ fn profiles_keys_select_and_connect() {
     let mut tui = TuiState::new(false);
     let state = AppState::new(vec![profile("Dev local", ProfileKind::Local)], storage());
     assert_eq!(
-        handle_key(&state, &mut tui, key(KeyCode::Char('j'))),
+        handle_key(&state, &mut tui, key(KeyCode::Down)),
         vec![Msg::Profiles(ProfilesMsg::Next)]
     );
     assert_eq!(

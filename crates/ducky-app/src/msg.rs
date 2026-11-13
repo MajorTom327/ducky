@@ -18,6 +18,7 @@ pub enum Msg {
     RefreshCatalog,
     OpenSchemaPicker,
     OpenPalette,
+    OpenProfilePicker,
     Tabs(TabsMsg),
     Profiles(ProfilesMsg),
     Sidebar(SidebarMsg),
@@ -86,8 +87,13 @@ pub enum SaveFailure {
 pub enum ProfilesMsg {
     Next,
     Previous,
-    Select(usize),
+    First,
+    Last,
     Connect,
+    Filter(InputRequest),
+    ClearFilter,
+    FocusFilter,
+    FocusList,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

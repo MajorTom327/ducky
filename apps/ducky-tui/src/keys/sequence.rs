@@ -59,6 +59,7 @@ pub fn handle(tui: &mut TuiState, key: KeyEvent, grid_pane: Option<GridPane>) ->
             tui.pending_prefix = Some(KeyPrefix::LeaderQuit);
             return Some(Vec::new());
         }
+        (KeyPrefix::Leader, Some('p')) => Msg::OpenProfilePicker,
         (KeyPrefix::LeaderBuffer, Some('d')) => Msg::Tabs(TabsMsg::Close),
         (KeyPrefix::LeaderQuit, Some('q')) => Msg::Quit,
         (KeyPrefix::Go(GridPane::TableData), Some('g')) => {
@@ -81,6 +82,7 @@ pub fn pending_hints(prefix: KeyPrefix) -> &'static [KeyHint] {
         KeyPrefix::Leader => &[
             ("Space", "…"),
             ("b", "tabs"),
+            ("p", "profile"),
             ("q", "quit"),
             ("Esc", "cancel"),
         ],

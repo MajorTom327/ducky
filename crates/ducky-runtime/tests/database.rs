@@ -29,6 +29,8 @@ fn connected_runtime(directory: &tempfile::TempDir) -> (Runtime, UnboundedReceiv
             label: "Test".to_owned(),
             url: database_url(),
             kind: ProfileKind::Local,
+            project: None,
+            tags: Vec::new(),
         },
     });
     (runtime, receiver)
@@ -116,6 +118,8 @@ async fn connect_with_unknown_env_var_fails() {
             label: "Broken".to_owned(),
             url: "postgres://ducky:${DUCKY_RUNTIME_TEST_UNSET_VARIABLE}@localhost/ducky".to_owned(),
             kind: ProfileKind::Prod,
+            project: None,
+            tags: Vec::new(),
         },
     });
     match next_message(&mut receiver).await {

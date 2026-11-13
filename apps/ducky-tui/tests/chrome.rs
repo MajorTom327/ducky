@@ -39,6 +39,8 @@ fn workspace_state(tools: PgTools) -> AppState {
         label: "Dev local".to_owned(),
         url: "postgres://ducky@localhost/ducky".to_owned(),
         kind: ProfileKind::Local,
+        project: None,
+        tags: Vec::new(),
     };
     let storage = StoragePaths {
         sql_dir: PathBuf::from("/tmp/ducky/sql"),
@@ -477,40 +479,29 @@ fn colon_opens_the_palette_in_editor_normal_mode_and_types_in_insert_mode() {
 }
 
 #[test]
-fn palette_offers_other_profiles_and_the_quit_alias() {
+fn palette_offers_one_switch_profile_item_and_the_quit_alias() {
     let mut state = workspace_state(available_tools());
     state.profiles.push(Profile {
         label: "Dev as prod".to_owned(),
         url: "postgres://ducky@localhost/ducky".to_owned(),
         kind: ProfileKind::Prod,
+        project: None,
+        tags: Vec::new(),
     });
     send(&mut state, [Msg::OpenPalette]);
     let mut tui = TuiState::new(false);
-    let terminal = render(&state, &mut tui, WIDTH, HEIGHT);
-    let screen_rows = rows(&terminal);
+    let screen_rows = rows(&render(&state, &mut tui, WIDTH, HEIGHT));
     let quit_row = screen_rows
         .iter()
         .find(|row| row.contains("Quit"))
         .expect("the Quit item is listed");
     assert!(quit_row.contains(":q"), "{quit_row}");
-    let (switch_row_index, switch_row) = screen_rows
+    let switch_rows: Vec<&String> = screen_rows
         .iter()
-        .enumerate()
-        .find(|(_, row)| row.contains("Switch to Dev as prod"))
-        .expect("the other profile is listed");
-    assert!(
-        !screen_rows
-            .iter()
-            .any(|row| row.contains("Switch to Dev local"))
-    );
-    let label = "Switch to Dev as prod";
-    let label_end = switch_row.find(label).expect("label") + label.len();
-    let detail_byte_offset = label_end + switch_row[label_end..].find("prod").expect("kind detail");
-    let detail_column =
-        u16::try_from(switch_row[..detail_byte_offset].chars().count()).expect("column");
-    let detail_row = u16::try_from(switch_row_index).expect("row");
-    assert_eq!(
-        terminal.backend().buffer()[(detail_column, detail_row)].fg,
-        palette(Some(ProfileKind::Prod)).accent
-    );
+        .filter(|row| row.contains("Switch profile…"))
+        .collect();
+    assert_eq!(switch_rows.len(), 1);
+    assert!(switch_rows[0].contains("Dev local"), "{}", switch_rows[0]);
+    assert!(switch_rows[0].contains("Space p"), "{}", switch_rows[0]);
+    assert!(!screen_rows.iter().any(|row| row.contains("Switch to")));
 }

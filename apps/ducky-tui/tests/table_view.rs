@@ -106,6 +106,8 @@ fn workspace(table_view: TableView) -> Workspace {
             label: "Dev local".to_owned(),
             url: "postgres://ducky@localhost/ducky".to_owned(),
             kind: ProfileKind::Local,
+            project: None,
+            tags: Vec::new(),
         },
         Connection {
             session: SessionInfo {

@@ -12,6 +12,8 @@ fn connected_state() -> AppState {
         label: "Local".to_owned(),
         url: "postgres://localhost/a".to_owned(),
         kind: ProfileKind::Local,
+        project: None,
+        tags: Vec::new(),
     };
     let storage = StoragePaths {
         sql_dir: PathBuf::from("sql"),

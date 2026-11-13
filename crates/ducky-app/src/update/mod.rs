@@ -41,6 +41,7 @@ pub fn update(state: &mut AppState, msg: Msg) -> Vec<Command> {
         Msg::FocusPane(direction) => focus::move_towards(state, direction),
         Msg::OpenSchemaPicker => open_schema_picker(state),
         Msg::OpenPalette => palette::open(state),
+        Msg::OpenProfilePicker => profiles::open(state),
         Msg::Tabs(tabs_msg) => tabs::update(state, tabs_msg),
         Msg::RefreshCatalog => refresh_catalog(state),
         Msg::Reconnect => connection::reconnect(state),

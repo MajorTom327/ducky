@@ -19,11 +19,15 @@ pub fn profiles() -> Vec<Profile> {
             label: "Local".to_owned(),
             url: "postgres://localhost/a".to_owned(),
             kind: ProfileKind::Local,
+            project: None,
+            tags: Vec::new(),
         },
         Profile {
             label: "Prod".to_owned(),
             url: "postgres://localhost/b".to_owned(),
             kind: ProfileKind::Prod,
+            project: None,
+            tags: Vec::new(),
         },
     ]
 }

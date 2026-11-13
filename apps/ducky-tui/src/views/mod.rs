@@ -7,6 +7,7 @@ pub mod job_log;
 pub mod modal;
 pub mod palette;
 pub mod parameters;
+pub mod profile_picker;
 pub mod profiles;
 pub mod query;
 pub mod reference_picker;

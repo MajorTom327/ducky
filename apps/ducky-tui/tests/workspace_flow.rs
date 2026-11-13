@@ -73,11 +73,15 @@ async fn explore_query_and_save() {
             label: PROFILE_LABEL.to_owned(),
             url: database_url.clone(),
             kind: ProfileKind::Local,
+            project: Some("e2e".to_owned()),
+            tags: Vec::new(),
         },
         Profile {
             label: STAGING_PROFILE_LABEL.to_owned(),
             url: database_url.clone(),
             kind: ProfileKind::Staging,
+            project: Some("e2e".to_owned()),
+            tags: Vec::new(),
         },
     ]);
 
@@ -164,16 +168,12 @@ async fn explore_query_and_save() {
 
     let query_tab_id = harness.workspace().active_tab().expect("query tab").id;
     harness.press_ctrl('p');
-    harness.type_text("switch");
-    let switch_item_index = harness
-        .workspace()
-        .palette_items(&harness.state.profiles, "switch")
-        .iter()
-        .position(|item| item.label == format!("Switch to {STAGING_PROFILE_LABEL}"))
-        .expect("the staging profile is offered");
-    for _ in 0..switch_item_index {
-        harness.press_code(KeyCode::Down);
-    }
+    harness.type_text("Switch profile");
+    harness.press_code(KeyCode::Enter);
+    let screen = harness.screen();
+    assert!(screen.contains("Switch profile"), "{screen}");
+    assert!(screen.contains("e2e"), "{screen}");
+    harness.type_text("staging");
     harness.press_code(KeyCode::Enter);
     harness.settle().await;
     assert_eq!(harness.workspace().profile.label, STAGING_PROFILE_LABEL);
@@ -247,6 +247,8 @@ async fn follow_foreign_keys_between_tabs() {
         label: PROFILE_LABEL.to_owned(),
         url: database_url.clone(),
         kind: ProfileKind::Local,
+        project: Some("e2e".to_owned()),
+        tags: Vec::new(),
     }]);
     harness.press_code(KeyCode::Enter);
     harness.settle().await;
@@ -331,6 +333,8 @@ async fn edit_selected_rows_opens_an_update_preset() {
         label: PROFILE_LABEL.to_owned(),
         url: database_url.clone(),
         kind: ProfileKind::Local,
+        project: Some("e2e".to_owned()),
+        tags: Vec::new(),
     }]);
     harness.press_code(KeyCode::Enter);
     harness.settle().await;

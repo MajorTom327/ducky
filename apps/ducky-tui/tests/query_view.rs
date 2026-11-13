@@ -83,6 +83,8 @@ fn query_state() -> AppState {
         label: "Dev local".to_owned(),
         url: "postgres://ducky@localhost/ducky".to_owned(),
         kind: ProfileKind::Local,
+        project: None,
+        tags: Vec::new(),
     };
     let storage = StoragePaths {
         sql_dir: PathBuf::from("/tmp/ducky/sql"),

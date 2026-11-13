@@ -5,8 +5,11 @@ use clap::Parser;
 use crossterm::cursor::SetCursorStyle;
 use crossterm::event::{DisableBracketedPaste, EnableBracketedPaste};
 use crossterm::execute;
-use ducky_app::{AppState, Msg, ProfilesMsg};
+use ducky_app::{
+    AppState, Msg, ProfilePicker, ProfileRow, ProfilesMsg, Screen, profile_kind_name, profile_rows,
+};
 use ducky_config::{Config, ConfigError, SearchContext, load, resolve_config_path};
+use ducky_core::Profile;
 use ducky_runtime::Runtime;
 use ducky_tui::cli::Args;
 use ducky_tui::event_loop;
@@ -24,26 +27,27 @@ async fn main() -> anyhow::Result<ExitCode> {
             return Ok(ExitCode::from(1));
         }
     };
-    let startup_messages = match &args.profile {
-        None => Vec::new(),
-        Some(profile_label) => {
-            let Some(profile_index) = config
-                .profiles
-                .iter()
-                .position(|profile| &profile.label == profile_label)
-            else {
-                print_unknown_profile(profile_label, &config);
+    let startup_profile_index = match &args.profile {
+        None => None,
+        Some(requested_profile) => match find_profile(&config.profiles, requested_profile) {
+            Some(profile_index) => Some(profile_index),
+            None => {
+                print_unknown_profile(requested_profile, &config);
                 return Ok(ExitCode::from(2));
-            };
-            vec![
-                Msg::Profiles(ProfilesMsg::Select(profile_index)),
-                Msg::Profiles(ProfilesMsg::Connect),
-            ]
-        }
+            }
+        },
     };
     let (sender, receiver) = tokio::sync::mpsc::unbounded_channel();
     let runtime = Runtime::new(config.storage.clone(), sender);
-    let state = AppState::new(config.profiles, config.storage).with_page_size(config.page_size);
+    let mut state = AppState::new(config.profiles, config.storage).with_page_size(config.page_size);
+    let startup_messages = match startup_profile_index {
+        None => Vec::new(),
+        Some(profile_index) => {
+            let picker = ProfilePicker::new(&state.profiles, Some(profile_index));
+            state.screen = Screen::Profiles(picker);
+            vec![Msg::Profiles(ProfilesMsg::Connect)]
+        }
+    };
     let tui = TuiState::new(!args.no_effects);
     let mut terminal = ratatui::init();
     let outcome = match execute!(stdout(), EnableBracketedPaste) {
@@ -91,13 +95,41 @@ fn print_config_error(error: &ConfigError) {
     eprintln!("\nExample configuration (ducky.example.toml):\n\n{EXAMPLE_CONFIG}");
 }
 
-fn print_unknown_profile(profile_label: &str, config: &Config) {
+fn find_profile(profiles: &[Profile], requested_profile: &str) -> Option<usize> {
+    profiles
+        .iter()
+        .position(|profile| profile.label == requested_profile)
+        .or_else(|| {
+            let (project_name, label) = requested_profile.split_once('/')?;
+            profiles.iter().position(|profile| {
+                profile.label == label && profile.project.as_deref() == Some(project_name)
+            })
+        })
+}
+
+fn print_unknown_profile(requested_profile: &str, config: &Config) {
     eprintln!(
-        "ducky: no profile labelled `{profile_label}` in {}",
+        "ducky: no profile `{requested_profile}` in {} (use LABEL or PROJECT/LABEL)",
         config.source.display()
     );
     eprintln!("Available profiles:");
-    for profile in &config.profiles {
-        eprintln!("  {}", profile.label);
+    let rows = profile_rows(&config.profiles, "");
+    let has_project_headers = rows.iter().any(|row| matches!(row, ProfileRow::Project(_)));
+    for row in rows {
+        match row {
+            ProfileRow::Project(project_name) => eprintln!("  {project_name}"),
+            ProfileRow::Profile(profile_index) => {
+                let Some(profile) = config.profiles.get(profile_index) else {
+                    continue;
+                };
+                let indent = if has_project_headers { "    " } else { "  " };
+                eprintln!(
+                    "{indent}{} ({}, {})",
+                    profile.label,
+                    profile_kind_name(profile.kind),
+                    profile.target()
+                );
+            }
+        }
     }
 }

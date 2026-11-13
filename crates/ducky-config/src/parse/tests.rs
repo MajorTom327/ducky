@@ -140,3 +140,43 @@ fn relative_and_absolute_storage_dirs() {
     assert_eq!(config.storage.sql_dir, dir.path().join("../queries"));
     assert_eq!(config.storage.dump_dir, absolute.path());
 }
+
+#[test]
+fn project_and_tags_are_normalised() {
+    let text = format!(
+        "{}project = \"  soiltrackers \"\ntags = [\" EU \", \"readonly\", \"eu\", \"ReadOnly\"]\n",
+        profile("A", URL, "prod")
+    );
+    let (_dir, result) = load_text(&text);
+    let config = result.unwrap();
+    assert_eq!(config.profiles[0].project.as_deref(), Some("soiltrackers"));
+    assert_eq!(config.profiles[0].tags, ["eu", "readonly"]);
+}
+
+#[test]
+fn profiles_without_project_or_tags() {
+    let text = [
+        profile("A", URL, "local"),
+        "project = \"   \"\n".to_owned(),
+        profile("B", URL, "local"),
+    ]
+    .concat();
+    let (_dir, result) = load_text(&text);
+    let config = result.unwrap();
+    for loaded_profile in &config.profiles {
+        assert_eq!(loaded_profile.project, None);
+        assert!(loaded_profile.tags.is_empty());
+    }
+}
+
+#[test]
+fn empty_tag_is_rejected() {
+    let text = format!("{}tags = [\"eu\", \"  \"]\n", profile("A", URL, "local"));
+    let (_dir, result) = load_text(&text);
+    assert_eq!(
+        result.unwrap_err(),
+        ConfigError::EmptyTag {
+            label: "A".to_owned()
+        }
+    );
+}

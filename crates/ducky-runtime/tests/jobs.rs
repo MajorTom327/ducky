@@ -29,6 +29,8 @@ impl Harness {
                 label: "Roundtrip".to_owned(),
                 url: database_url.to_owned(),
                 kind: ProfileKind::Local,
+                project: None,
+                tags: Vec::new(),
             },
         });
         match self.next_message().await {

@@ -3,6 +3,7 @@ use tui_input::Input;
 
 use crate::state::palette::CommandPalette;
 use crate::state::parameters::ParameterForm;
+use crate::state::profiles::ProfilePicker;
 
 #[derive(Debug, Clone)]
 pub enum Modal {
@@ -15,6 +16,7 @@ pub enum Modal {
     Help,
     Palette(CommandPalette),
     Parameters(ParameterForm),
+    ProfilePicker(ProfilePicker),
     ReferencePicker {
         links: Vec<(RelationRef, ForeignKeyLink)>,
         selected_link_index: usize,

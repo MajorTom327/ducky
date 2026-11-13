@@ -2,13 +2,14 @@ use crossterm::event::{KeyCode, KeyEvent};
 use ducky_app::{Modal, ModalMsg, Msg};
 use tui_input::InputRequest;
 
-use crate::keys::{is_ctrl, is_plain_char};
+use crate::keys::{is_ctrl, is_plain_char, profiles};
 use crate::tui_state::TuiState;
 
 pub const HELP_HALF_PAGE: u16 = 10;
 
 pub fn handle(modal: &Modal, tui: &mut TuiState, key: KeyEvent) -> Vec<Msg> {
     let modal_message = match modal {
+        Modal::ProfilePicker(picker) => return profiles::handle(picker, key, true),
         Modal::Prompt(_) => prompt_message(key),
         Modal::Confirm(_) => confirm_message(key),
         Modal::RowDetail(_) => row_detail_message(key),
