@@ -1,6 +1,7 @@
 use crate::command::Command;
 use crate::msg::{Msg, TabsMsg};
 use crate::state::{AppState, CommandPalette, Focus, Modal, PaletteAction};
+use crate::update::switch::switch_profile;
 use crate::update::tabs::open_relation;
 use crate::update::{update, workspace_mut};
 
@@ -14,7 +15,7 @@ pub(crate) fn open(state: &mut AppState) -> Vec<Command> {
 pub(crate) fn submit(state: &mut AppState, command_palette: &CommandPalette) -> Vec<Command> {
     let Some(selected_action) = state.workspace().and_then(|workspace| {
         workspace
-            .palette_items(command_palette.input.value())
+            .palette_items(&state.profiles, command_palette.input.value())
             .into_iter()
             .nth(command_palette.selected_item_index)
             .map(|item| item.action)
@@ -51,6 +52,8 @@ pub(crate) fn submit(state: &mut AppState, command_palette: &CommandPalette) -> 
         PaletteAction::Reconnect => Msg::Reconnect,
         PaletteAction::Disconnect => Msg::Disconnect,
         PaletteAction::Help => Msg::OpenHelp,
+        PaletteAction::Quit => Msg::Quit,
+        PaletteAction::SwitchProfile(profile_index) => return switch_profile(state, profile_index),
     };
     update(state, msg)
 }

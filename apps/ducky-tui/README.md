@@ -23,7 +23,8 @@ A configuration error prints the error, the searched paths and an example config
 - `event_loop::run(terminal, state, tui, runtime, messages, startup_messages)`: the `Msg → update → Command → Runtime` loop.
 - `tui_state::TuiState`: view-only state: effects, one `EditorPanel` per query tab and grid viewports / structure scroll per tab (maps keyed by `TabId`), preview, log and help scroll, cursor shape (bar in insert mode, block otherwise) and the pending key sequence.
 - `views::draw(frame, state, tui)` and `views::ViewContext`; one module per view.
-- `keys::handle_key(state, tui, key)` and `keys::handle_paste(state, tui, text)`; `keys::help::{HELP_ROWS, hints}`; `keys::sequence` handles the `[b` / `]b` / `Space b d` sequences and their status-bar hints.
+- `keys::handle_key(state, tui, key)` and `keys::handle_paste(state, tui, text)`; `keys::help::{HELP_ROWS, hints}`; `keys::sequence` handles the `[b` / `]b` / `Space b d` / `Space q q` sequences and their status-bar hints, and `:` (outside insert mode), which opens the palette with `:` typed.
+- `views::palette::{render, action_shortcut}`: the go to anything popup; the shortcut column shows an item's command alias (`:q`) or its key, and `Switch to <profile>` details use that profile's accent.
 - `theme::{Palette, palette, token_style}`: accent colour per profile kind (`local` green, `staging` orange, `prod` red, cyan before connecting).
 - `layout::FrameAreas`: header, sidebar (32 columns), main area (tab bar and active tab) and status bar. Below 80x20 only a size warning is drawn.
 - `widgets::grid::{GridViewport, render_grid}`, `widgets::loading::{LoadSlot, render_loading, render_message, render_error, render_loadable}`, `widgets::sql_text::highlighted_sql`.
@@ -36,4 +37,4 @@ A configuration error prints the error, the searched paths and an example config
 cargo test -p ducky-tui
 ```
 
-`tests/render.rs` renders fabricated states on a 120x36 `TestBackend`: header colours per profile kind, profile list, sidebar content, missing tools, grid rendering, the size warning, the loading pulse lifecycle and key precedence.
+`tests/render.rs` renders fabricated states on a 120x36 `TestBackend`: header colours per profile kind, profile list, sidebar content, missing tools, grid rendering, the size warning, the loading pulse lifecycle and key precedence. `tests/chrome.rs` covers tabs, the palette (including `Switch to <profile>` and the `:q` hint), help and key sequences (`Space q q`, `:`); `tests/query_view.rs` covers the editor and results (including ` · on <profile> `); `tests/workspace_flow.rs` (ignored, needs `DUCKY_TEST_DATABASE_URL`) drives a full session including a profile switch.

@@ -1,3 +1,5 @@
+CREATE EXTENSION IF NOT EXISTS postgis;
+
 CREATE TABLE public.customers (
     id serial PRIMARY KEY,
     email text NOT NULL UNIQUE,
@@ -42,5 +44,17 @@ FROM generate_series(1, 500) AS n;
 INSERT INTO analytics.events (name, payload)
 SELECT 'event_' || n, jsonb_build_object('index', n)
 FROM generate_series(1, 20) AS n;
+
+CREATE TABLE public.places (
+    id serial PRIMARY KEY,
+    name text NOT NULL,
+    location geometry(Point, 4326) NOT NULL
+);
+
+INSERT INTO public.places (name, location) VALUES
+    ('Paris', ST_SetSRID(ST_MakePoint(2.3522, 48.8566), 4326)),
+    ('Lyon', ST_SetSRID(ST_MakePoint(4.8357, 45.764), 4326)),
+    ('Marseille', ST_SetSRID(ST_MakePoint(5.3698, 43.2965), 4326)),
+    ('Bordeaux', ST_SetSRID(ST_MakePoint(-0.5792, 44.8378), 4326));
 
 ANALYZE;

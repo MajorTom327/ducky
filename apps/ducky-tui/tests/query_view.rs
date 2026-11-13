@@ -435,6 +435,25 @@ fn results_view_renders_statement_tabs_and_timing() {
 }
 
 #[test]
+fn results_bottom_title_names_the_profile_it_ran_on() {
+    let mut state = query_state();
+    let query = active_query_mut(&mut state);
+    query.run = RunState::Finished(ScriptReport {
+        mode: TransactionMode::Transaction,
+        results: vec![rows_result("select 1", "1")],
+        failure: None,
+        elapsed: Duration::from_millis(5),
+    });
+    query.ran_on_profile_label = Some("Dev local".to_owned());
+    let mut tui = TuiState::new(false);
+    let text = screen_text(&state, &mut tui);
+    assert!(
+        text.contains(" 5 ms · one transaction · on Dev local "),
+        "{text}"
+    );
+}
+
+#[test]
 fn results_view_shows_the_affected_count() {
     let mut state = query_state();
     active_query_mut(&mut state).run = RunState::Finished(ScriptReport {

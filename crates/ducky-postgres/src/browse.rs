@@ -3,11 +3,36 @@ use ducky_sql::quote_identifier;
 use tokio_postgres::Client;
 
 use crate::error::{PgError, query_error};
+use crate::page_columns::{PageColumn, load_page_columns};
 use crate::rows::run_statement;
 
-pub fn build_page_sql(request: &PageRequest) -> String {
+fn select_list(columns: &[PageColumn]) -> String {
+    if columns
+        .iter()
+        .all(|column| column.geo_function_schema.is_none())
+    {
+        return "*".to_owned();
+    }
+    columns
+        .iter()
+        .map(|column| {
+            let quoted_name = quote_identifier(&column.name);
+            match &column.geo_function_schema {
+                Some(schema) => format!(
+                    "{}.st_asgeojson({quoted_name}) AS {quoted_name}",
+                    quote_identifier(schema)
+                ),
+                None => quoted_name,
+            }
+        })
+        .collect::<Vec<_>>()
+        .join(", ")
+}
+
+pub fn build_page_sql(request: &PageRequest, columns: &[PageColumn]) -> String {
     let mut page_sql = format!(
-        "SELECT * FROM {}.{}",
+        "SELECT {} FROM {}.{}",
+        select_list(columns),
         quote_identifier(&request.relation.schema),
         quote_identifier(&request.relation.name)
     );
@@ -33,7 +58,8 @@ pub fn build_page_sql(request: &PageRequest) -> String {
 }
 
 pub(crate) async fn load_page(client: &Client, request: &PageRequest) -> Result<Page, PgError> {
-    let outcome = run_statement(client, &build_page_sql(request))
+    let page_columns = load_page_columns(client, &request.relation).await?;
+    let outcome = run_statement(client, &build_page_sql(request, &page_columns))
         .await
         .map_err(query_error)?;
     let mut result_set = match outcome {
@@ -74,7 +100,7 @@ mod tests {
     #[test]
     fn plain_page_selects_first_page_with_one_extra_row() {
         assert_eq!(
-            build_page_sql(&request("public", "customers")),
+            build_page_sql(&request("public", "customers"), &[]),
             r#"SELECT * FROM "public"."customers" LIMIT 101 OFFSET 0"#
         );
     }
@@ -91,7 +117,7 @@ mod tests {
             ..request("public", "orders")
         };
         assert_eq!(
-            build_page_sql(&page_request),
+            build_page_sql(&page_request, &[]),
             r#"SELECT * FROM "public"."orders" WHERE (status = 'paid') ORDER BY "created_at" DESC LIMIT 101 OFFSET 200"#
         );
     }
@@ -105,7 +131,7 @@ mod tests {
             }),
             ..request("public", "orders")
         };
-        assert!(build_page_sql(&page_request).contains(r#"ORDER BY "id" ASC"#));
+        assert!(build_page_sql(&page_request, &[]).contains(r#"ORDER BY "id" ASC"#));
     }
 
     #[test]
@@ -118,8 +144,47 @@ mod tests {
             ..request(r#"my"schema"#, r#"odd "table""#)
         };
         assert_eq!(
-            build_page_sql(&page_request),
+            build_page_sql(&page_request, &[]),
             r#"SELECT * FROM "my""schema"."odd ""table""" ORDER BY "we""ird" ASC LIMIT 101 OFFSET 0"#
+        );
+    }
+
+    fn column(name: &str, geo_function_schema: Option<&str>) -> PageColumn {
+        PageColumn {
+            name: name.to_owned(),
+            geo_function_schema: geo_function_schema.map(str::to_owned),
+        }
+    }
+
+    #[test]
+    fn columns_without_geo_type_keep_select_star() {
+        let columns = [column("id", None), column("name", None)];
+        assert_eq!(
+            build_page_sql(&request("public", "customers"), &columns),
+            r#"SELECT * FROM "public"."customers" LIMIT 101 OFFSET 0"#
+        );
+    }
+
+    #[test]
+    fn geo_columns_are_wrapped_with_their_schema_and_others_quoted() {
+        let page_request = PageRequest {
+            page_index: 1,
+            sort: Some(Sort {
+                column: "name".to_owned(),
+                direction: SortDirection::Ascending,
+            }),
+            filter: Some("id > 1".to_owned()),
+            ..request("public", "places")
+        };
+        let columns = [
+            column("id", None),
+            column("Name", None),
+            column("location", Some("public")),
+            column("area", Some("gis")),
+        ];
+        assert_eq!(
+            build_page_sql(&page_request, &columns),
+            r#"SELECT "id", "Name", "public".st_asgeojson("location") AS "location", "gis".st_asgeojson("area") AS "area" FROM "public"."places" WHERE (id > 1) ORDER BY "name" ASC LIMIT 101 OFFSET 100"#
         );
     }
 }

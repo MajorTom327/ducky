@@ -25,8 +25,13 @@ pub fn render(frame: &mut Frame, area: Rect, context: &ViewContext, tui: &mut Tu
         .title(Span::styled(" Results ", palette.title()))
         .border_style(palette.border(is_focused));
     if let RunState::Finished(report) = &query.run {
+        let profile_suffix = query
+            .ran_on_profile_label
+            .as_ref()
+            .map(|profile_label| format!(" · on {profile_label}"))
+            .unwrap_or_default();
         let summary = format!(
-            " {} ms · {} ",
+            " {} ms · {}{profile_suffix} ",
             report.elapsed.as_millis(),
             transaction_label(report.mode)
         );

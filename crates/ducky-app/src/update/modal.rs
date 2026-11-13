@@ -75,9 +75,9 @@ pub(crate) fn update(state: &mut AppState, msg: ModalMsg) -> Vec<Command> {
                 .and_then(|workspace| workspace.catalog.ready())
                 .map_or(0, |catalog| catalog.schemas.len());
             let palette_item_count = match (&state.modal, state.workspace()) {
-                (Some(Modal::Palette(command_palette)), Some(workspace)) => {
-                    workspace.palette_items(command_palette.input.value()).len()
-                }
+                (Some(Modal::Palette(command_palette)), Some(workspace)) => workspace
+                    .palette_items(&state.profiles, command_palette.input.value())
+                    .len(),
                 _ => 0,
             };
             match &mut state.modal {

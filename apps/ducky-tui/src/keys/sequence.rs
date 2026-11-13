@@ -1,5 +1,6 @@
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
-use ducky_app::{Msg, TabsMsg};
+use ducky_app::{ModalMsg, Msg, TabsMsg};
+use tui_input::InputRequest;
 
 use crate::keys::help::KeyHint;
 use crate::tui_state::TuiState;
@@ -10,6 +11,7 @@ pub enum KeyPrefix {
     Next,
     Leader,
     LeaderBuffer,
+    LeaderQuit,
 }
 
 pub fn handle(tui: &mut TuiState, key: KeyEvent) -> Option<Vec<Msg>> {
@@ -28,6 +30,12 @@ pub fn handle(tui: &mut TuiState, key: KeyEvent) -> Option<Vec<Msg>> {
             '[' => Some(KeyPrefix::Previous),
             ']' => Some(KeyPrefix::Next),
             ' ' => Some(KeyPrefix::Leader),
+            ':' => {
+                return Some(vec![
+                    Msg::OpenPalette,
+                    Msg::Modal(ModalMsg::Input(InputRequest::InsertChar(':'))),
+                ]);
+            }
             _ => return None,
         };
         return Some(Vec::new());
@@ -39,7 +47,12 @@ pub fn handle(tui: &mut TuiState, key: KeyEvent) -> Option<Vec<Msg>> {
             tui.pending_prefix = Some(KeyPrefix::LeaderBuffer);
             return Some(Vec::new());
         }
+        (KeyPrefix::Leader, Some('q')) => {
+            tui.pending_prefix = Some(KeyPrefix::LeaderQuit);
+            return Some(Vec::new());
+        }
         (KeyPrefix::LeaderBuffer, Some('d')) => Msg::Tabs(TabsMsg::Close),
+        (KeyPrefix::LeaderQuit, Some('q')) => Msg::Quit,
         _ => return Some(Vec::new()),
     };
     Some(vec![message])
@@ -49,7 +62,13 @@ pub fn pending_hints(prefix: KeyPrefix) -> &'static [KeyHint] {
     match prefix {
         KeyPrefix::Previous => &[("[", "…"), ("b", "previous tab"), ("Esc", "cancel")],
         KeyPrefix::Next => &[("]", "…"), ("b", "next tab"), ("Esc", "cancel")],
-        KeyPrefix::Leader => &[("Space", "…"), ("b", "tabs"), ("Esc", "cancel")],
+        KeyPrefix::Leader => &[
+            ("Space", "…"),
+            ("b", "tabs"),
+            ("q", "quit"),
+            ("Esc", "cancel"),
+        ],
         KeyPrefix::LeaderBuffer => &[("Space b", "…"), ("d", "close tab"), ("Esc", "cancel")],
+        KeyPrefix::LeaderQuit => &[("Space q", "…"), ("q", "quit"), ("Esc", "cancel")],
     }
 }

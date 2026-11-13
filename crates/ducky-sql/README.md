@@ -15,6 +15,9 @@ View-agnostic SQL text services for ducky: positions, syntax highlighting, state
 - `quote_identifier_if_needed(identifier)`: bare when it matches `^[a-z_][a-z0-9_]*$`, quoted otherwise.
 - `CompletionKind`, `CompletionItem { label, kind, detail }`, `Completion { replace_start, items }`.
 - `complete(sql, cursor, catalog, default_schema) -> Completion`: candidates for the identifier ending at the byte offset `cursor`; the caller replaces `sql[replace_start..cursor]` with the chosen label.
+- `find_parameters(sql) -> Vec<String>`: query parameters of a script, unique, in first-appearance order. Named parameters are `:name` (a `:` directly followed by `[A-Za-z_][A-Za-z0-9_]*`) and keep their colon (`":id"`); positional ones are `$1`, `$2`, …. Casts (`::int`), strings, quoted identifiers, comments and dollar-quoted bodies are ignored. Inside `[ ]`, a `:` following a value (number, word, parameter, `)` or `]`) is an array-slice separator (`arr[1:n]`, `arr[lo:hi]`); after `[` or `,` it starts a parameter (`ARRAY[:a, :b]`).
+- `ParameterValue`: `Text(value)` binds a standard SQL string literal (`it's` → `'it''s'`, PostgreSQL coerces the unknown literal); `Raw(sql)` is inserted verbatim (`now()`, `NULL`, `(1, 2, 3)`).
+- `bind_parameters(sql, values) -> String`: replaces every occurrence of each parameter found by `find_parameters` with its value from `values` (`(name, value)` pairs keyed like `":id"` or `"$1"`), using token byte offsets; parameters without a value are left untouched.
 
 ## Completion rules
 

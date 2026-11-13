@@ -1,4 +1,4 @@
-use ducky_core::{Relation, RelationKind, RelationRef, ToolStatus};
+use ducky_core::{Profile, ProfileKind, Relation, RelationKind, RelationRef, ToolStatus};
 use tui_input::Input;
 
 use crate::state::tabs::TabId;
@@ -17,6 +17,7 @@ pub struct CommandPalette {
 pub struct PaletteItem {
     pub label: String,
     pub detail: Option<String>,
+    pub command_alias: Option<&'static str>,
     pub action: PaletteAction,
 }
 
@@ -32,11 +33,27 @@ pub enum PaletteAction {
     Reconnect,
     Disconnect,
     Help,
+    Quit,
+    SwitchProfile(usize),
     OpenRelation(RelationRef),
 }
 
-pub(crate) fn palette_items(workspace: &Workspace, query: &str) -> Vec<PaletteItem> {
-    let candidates = candidates(workspace);
+pub(crate) fn palette_items(
+    workspace: &Workspace,
+    profiles: &[Profile],
+    query: &str,
+) -> Vec<PaletteItem> {
+    let candidates = candidates(workspace, profiles);
+    let trimmed_query = query.trim();
+    if trimmed_query.starts_with(':') {
+        return candidates
+            .into_iter()
+            .filter(|item| {
+                item.command_alias
+                    .is_some_and(|command_alias| command_alias.starts_with(trimmed_query))
+            })
+            .collect();
+    }
     if query.is_empty() {
         return candidates.into_iter().take(MAX_UNFILTERED_ITEMS).collect();
     }
@@ -74,17 +91,19 @@ fn match_rank(label: &str, lowercase_query: &str) -> Option<u8> {
     }
 }
 
-fn candidates(workspace: &Workspace) -> Vec<PaletteItem> {
+fn candidates(workspace: &Workspace, profiles: &[Profile]) -> Vec<PaletteItem> {
     let mut items: Vec<PaletteItem> = workspace
         .tabs
         .iter()
         .map(|tab| PaletteItem {
             label: tab.title(),
             detail: Some("open tab".to_owned()),
+            command_alias: None,
             action: PaletteAction::SwitchTab(tab.id),
         })
         .collect();
     items.extend(action_items(workspace));
+    items.extend(switch_profile_items(workspace, profiles));
     let Some(catalog) = workspace.catalog.ready() else {
         return items;
     };
@@ -104,6 +123,7 @@ fn candidates(workspace: &Workspace) -> Vec<PaletteItem> {
                 format!("{}.{}", schema.name, relation.name)
             },
             detail: Some(relation_detail(relation)),
+            command_alias: None,
             action: PaletteAction::OpenRelation(RelationRef {
                 schema: schema.name.clone(),
                 name: relation.name.clone(),
@@ -141,9 +161,38 @@ fn action_items(workspace: &Workspace) -> Vec<PaletteItem> {
     .map(|(label, detail, action)| PaletteItem {
         label: label.to_owned(),
         detail,
+        command_alias: None,
         action,
     })
+    .chain([PaletteItem {
+        label: "Quit".to_owned(),
+        detail: None,
+        command_alias: Some(":q"),
+        action: PaletteAction::Quit,
+    }])
     .collect()
+}
+
+fn switch_profile_items(workspace: &Workspace, profiles: &[Profile]) -> Vec<PaletteItem> {
+    profiles
+        .iter()
+        .enumerate()
+        .filter(|(profile_index, _)| *profile_index != workspace.profile_index)
+        .map(|(profile_index, profile)| PaletteItem {
+            label: format!("Switch to {}", profile.label),
+            detail: Some(profile_kind_word(profile.kind).to_owned()),
+            command_alias: None,
+            action: PaletteAction::SwitchProfile(profile_index),
+        })
+        .collect()
+}
+
+fn profile_kind_word(kind: ProfileKind) -> &'static str {
+    match kind {
+        ProfileKind::Local => "local",
+        ProfileKind::Staging => "staging",
+        ProfileKind::Prod => "prod",
+    }
 }
 
 fn relation_detail(relation: &Relation) -> String {

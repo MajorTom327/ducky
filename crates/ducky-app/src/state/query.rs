@@ -41,6 +41,7 @@ pub struct QueryView {
     pub selected_result_index: usize,
     pub cursor: GridCursor,
     pub pane: QueryPane,
+    pub ran_on_profile_label: Option<String>,
 }
 
 impl QueryView {
@@ -53,6 +54,7 @@ impl QueryView {
             selected_result_index: 0,
             cursor: GridCursor::default(),
             pane: QueryPane::Editor,
+            ran_on_profile_label: None,
         }
     }
 

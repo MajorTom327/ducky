@@ -149,7 +149,7 @@ fn row_detail(table: &TableView) -> Option<RowDetail> {
     })
 }
 
-fn table_views_mut(workspace: &mut Workspace) -> impl Iterator<Item = &mut TableView> {
+pub(crate) fn table_views_mut(workspace: &mut Workspace) -> impl Iterator<Item = &mut TableView> {
     workspace
         .tabs
         .iter_mut()

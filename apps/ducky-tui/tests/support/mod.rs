@@ -156,6 +156,7 @@ fn is_busy(state: &AppState) -> bool {
     workspace.catalog.is_loading()
         || is_tab_loading
         || workspace.running_script_tab_id.is_some()
+        || workspace.switching_profile_index.is_some()
         || workspace.files.entries.is_loading()
         || workspace.files.preview.is_loading()
         || workspace.restore.entries.is_loading()

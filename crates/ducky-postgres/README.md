@@ -16,7 +16,8 @@ Every query goes through the simple-query protocol, so values arrive as text (`O
 - `PgSession::load_page(request)` loads one page of a relation through `build_page_sql`; `has_next_page` is detected by fetching one extra row.
 - `PgSession::run_script(statements, mode)` runs already split statements in order and stops at the first failure. `TransactionMode::Transaction` wraps them in `BEGIN` / `COMMIT` and rolls back on failure (a failing `COMMIT` is reported with `statement_index == statements.len()`); `AutoCommit` sends them as they are. A result keeps at most `MAX_RESULT_ROWS` (10 000) rows and sets `is_truncated` beyond that.
 - `PgSession::cancel_script()` asks the server to cancel the statement running on the script connection.
-- `build_page_sql(request)` builds `SELECT * FROM "schema"."name" [WHERE (filter)] [ORDER BY "column" ASC|DESC] LIMIT page_size + 1 OFFSET page_index * page_size`. The filter is inserted verbatim: it is the user's own SQL.
+- `PageColumn { name, geo_function_schema }` describes one browsed column; `geo_function_schema` is the schema of a PostGIS `geometry` / `geography` type.
+- `build_page_sql(request, columns)` builds `SELECT <select list> FROM "schema"."name" [WHERE (filter)] [ORDER BY "column" ASC|DESC] LIMIT page_size + 1 OFFSET page_index * page_size`. The select list is `*` unless a column is `geometry` / `geography`; then every column is listed and geo columns become `"<type schema>".st_asgeojson("col") AS "col"`, so they read as GeoJSON. `load_page` reads the columns (attnum order, type and type schema) before each page. The filter is inserted verbatim: it is the user's own SQL.
 - `PgError` (`InvalidUrl`, `Connect`, `Query`) displays its inner text. Database errors read `<SEVERITY>: <message>` followed by `DETAIL:` and `HINT:` lines when present.
 
 ## Tests

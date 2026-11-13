@@ -128,10 +128,12 @@ pub(crate) fn run(state: &mut AppState, tab_id: TabId, sql: String) -> Vec<Comma
         state.notice = notice(NoticeLevel::Error, "Nothing to run");
         return Vec::new();
     }
+    let profile_label = workspace.profile.label.clone();
     let Some(query) = workspace.query_mut(tab_id) else {
         return Vec::new();
     };
     query.run = RunState::Running;
+    query.ran_on_profile_label = Some(profile_label);
     let mode = query.transaction_mode;
     workspace.running_script_tab_id = Some(tab_id);
     vec![Command::RunScript { tab_id, sql, mode }]

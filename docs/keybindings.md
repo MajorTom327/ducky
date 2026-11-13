@@ -24,6 +24,8 @@ Source of truth: `apps/ducky-tui/src/keys/help.rs` (`HELP_ROWS`, shown with `F1`
 |---|---|
 |`[b / ]b`|previous / next tab|
 |`Space b d`|close the active tab|
+|`Space q q`|quit|
+|`:`|go to anything, starting with :|
 
 ## Outside the editor
 
@@ -40,6 +42,8 @@ Source of truth: `apps/ducky-tui/src/keys/help.rs` (`HELP_ROWS`, shown with `F1`
 |Key|Action|
 |---|---|
 |`type`|filter tabs, actions, tables|
+|`:q`|quit|
+|`Switch to <profile>`|reconnect this workspace to another profile, tabs stay open|
 |`↓ / Ctrl+n / Tab`|next item|
 |`↑ / Ctrl+p`|previous item|
 |`Enter`|open the item|
@@ -198,8 +202,11 @@ Source of truth: `apps/ducky-tui/src/keys/help.rs` (`HELP_ROWS`, shown with `F1`
 ## Rules
 
 - Global keys work in every pane, including the editor in insert mode.
-- `[b`, `]b` and `Space b d` are key sequences, accepted everywhere except in editor insert mode. The pending prefix is shown in the status bar; any other key cancels it.
+- `[b`, `]b`, `Space b d` and `Space q q` are key sequences, accepted everywhere except in editor insert mode. The pending prefix is shown in the status bar; any other key cancels it.
+- `:` opens go to anything with `:` already typed, everywhere except in editor insert mode (where it types `:`). A query starting with `:` lists only the items that have a command alias (`:q` quits); other queries match `Quit` by its label.
+- Go to anything lists `Switch to <profile>` for every profile except the connected one, with the profile type in its colour. Picking one reconnects the workspace: tabs, query text and results stay open, the catalog and every table tab reload from the new profile, and the results title shows the profile a script ran on (` 12 ms · one transaction · on Dev local `). Switching is refused while a script, a dump or a restore runs; if the connection fails, the current profile stays connected.
 - `1`–`9`, `H` / `L`, `Tab`, `?` and `q` apply outside the SQL editor.
 - `Ctrl+h` focuses the sidebar, `Ctrl+l` the main pane, `Ctrl+k` the SQL editor and `Ctrl+j` the results of the active query tab.
 - The editor follows edtui vim mode (`i`, `a`, `o`, `v`, `Esc`, motions, `u` undo, `p` paste). Its bottom border shows the vim mode on the left and ` one transaction · Ctrl+t ` or ` autocommit · Ctrl+t ` on the right. The terminal cursor is a bar in insert mode and a block otherwise.
 - Prompts also accept `Backspace`, `Delete`, `←`/`→`, `Home`/`End`. Pasting into the editor in any mode inserts the text.
+- The help popup uses two columns only when the terminal is wide enough to show every row untruncated.

@@ -48,7 +48,11 @@ Dump and restore need `pg_dump` and `pg_restore` in `PATH` (macOS: `brew install
 
 ## Usage
 
-Every main view opens in a tab: one tab per opened relation (reused when reopened), numbered `Query N` SQL tabs (`Ctrl+n`), and single `SQL files`, `Dump` and `Restore` tabs. The sidebar lists the relations of the current schema with their estimated row count or kind. `Ctrl+p` opens "go to anything": open tabs, actions and the relations of every schema. Only one script runs at a time across all query tabs. See [key bindings](docs/keybindings.md).
+Every main view opens in a tab: one tab per opened relation (reused when reopened), numbered `Query N` SQL tabs (`Ctrl+n`), and single `SQL files`, `Dump` and `Restore` tabs. The sidebar lists the relations of the current schema with their estimated row count or kind. `Ctrl+p` opens "go to anything": open tabs, actions, the other profiles and the relations of every schema. Only one script runs at a time across all query tabs. See [key bindings](docs/keybindings.md).
+
+Quit with `Ctrl+q` anywhere, `q` outside the editor, the `Space q q` sequence, or `:q` (`:` opens go to anything with `:` typed, outside editor insert mode).
+
+To run the same query on another database, pick `Switch to <profile>` in go to anything: the workspace reconnects to that profile and keeps every tab, query text and result; the catalog and table tabs reload, and the results title shows the profile each script ran on (` · on Dev local `). Switching waits for running scripts, dumps and restores to finish; a failed connection keeps the current profile.
 
 ## Development
 

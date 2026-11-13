@@ -45,10 +45,10 @@ fn open_palette_requires_a_workspace() {
 }
 
 #[test]
-fn empty_query_lists_tabs_then_actions_then_relations() {
+fn empty_query_lists_tabs_then_actions_then_profiles_then_relations() {
     let mut state = workspace_state();
     activate_relation(&mut state, "customers");
-    let items = workspace(&state).palette_items("");
+    let items = workspace(&state).palette_items(&state.profiles, "");
     assert_eq!(
         labels(&items),
         [
@@ -62,6 +62,8 @@ fn empty_query_lists_tabs_then_actions_then_relations() {
             "Reconnect",
             "Disconnect",
             "Help",
+            "Quit",
+            "Switch to Prod",
             "customers",
             "order_totals",
             "orders",
@@ -71,10 +73,13 @@ fn empty_query_lists_tabs_then_actions_then_relations() {
     assert_eq!(items[0].detail.as_deref(), Some("open tab"));
     assert_eq!(items[0].action, PaletteAction::SwitchTab(1));
     assert_eq!(items[3].detail, None);
-    assert_eq!(items[10].detail.as_deref(), Some("table · ~10 rows"));
-    assert_eq!(items[11].detail.as_deref(), Some("view"));
+    assert_eq!(items[10].command_alias, Some(":q"));
+    assert_eq!(items[11].detail.as_deref(), Some("prod"));
+    assert_eq!(items[11].action, PaletteAction::SwitchProfile(1));
+    assert_eq!(items[12].detail.as_deref(), Some("table · ~10 rows"));
+    assert_eq!(items[13].detail.as_deref(), Some("view"));
     assert_eq!(
-        items[13].action,
+        items[15].action,
         PaletteAction::OpenRelation(RelationRef {
             schema: "analytics".to_owned(),
             name: "events".to_owned(),
@@ -83,10 +88,71 @@ fn empty_query_lists_tabs_then_actions_then_relations() {
 }
 
 #[test]
+fn colon_q_returns_only_quit() {
+    let state = workspace_state();
+    for query in [":q", " :q "] {
+        let items = workspace(&state).palette_items(&state.profiles, query);
+        assert_eq!(labels(&items), ["Quit"], "{query:?}");
+        assert_eq!(items[0].action, PaletteAction::Quit);
+        assert_eq!(items[0].command_alias, Some(":q"));
+    }
+    assert!(
+        workspace(&state)
+            .palette_items(&state.profiles, ":qx")
+            .is_empty()
+    );
+}
+
+#[test]
+fn colon_lists_every_aliased_item() {
+    let state = workspace_state();
+    let aliased_labels: Vec<String> = workspace(&state)
+        .palette_items(&state.profiles, "")
+        .into_iter()
+        .filter(|item| item.command_alias.is_some())
+        .map(|item| item.label)
+        .collect();
+    let colon_items = workspace(&state).palette_items(&state.profiles, ":");
+    assert_eq!(labels(&colon_items), aliased_labels);
+    assert_eq!(labels(&colon_items), ["Quit"]);
+}
+
+#[test]
+fn quit_is_matched_by_label_without_colon() {
+    let state = workspace_state();
+    let items = workspace(&state).palette_items(&state.profiles, "qui");
+    assert_eq!(items[0].action, PaletteAction::Quit);
+}
+
+#[test]
+fn quit_submit_sets_should_quit() {
+    let mut state = workspace_state();
+    send(&mut state, Msg::OpenPalette);
+    type_query(&mut state, ":q");
+    assert!(send(&mut state, Msg::Modal(ModalMsg::Submit)).is_empty());
+    assert!(state.should_quit);
+    assert!(state.modal.is_none());
+}
+
+#[test]
+fn switch_profile_items_exclude_the_connected_profile() {
+    let state = workspace_state();
+    let items = workspace(&state).palette_items(&state.profiles, "switch to");
+    let switch_items: Vec<&PaletteItem> = items
+        .iter()
+        .filter(|item| matches!(item.action, PaletteAction::SwitchProfile(_)))
+        .collect();
+    assert_eq!(switch_items.len(), 1);
+    assert_eq!(switch_items[0].label, "Switch to Prod");
+    assert_eq!(switch_items[0].detail.as_deref(), Some("prod"));
+    assert_eq!(switch_items[0].action, PaletteAction::SwitchProfile(1));
+}
+
+#[test]
 fn missing_tools_mark_actions_unavailable() {
     let mut state = connected_state(tools_missing());
     send(&mut state, Msg::CatalogLoaded(Ok(support::catalog())));
-    let items = workspace(&state).palette_items("");
+    let items = workspace(&state).palette_items(&state.profiles, "");
     let unavailable_labels: Vec<&str> = items
         .iter()
         .filter(|item| item.detail.as_deref() == Some("unavailable"))
@@ -112,9 +178,9 @@ fn relation_details_cover_every_kind() {
     };
     send(&mut state, Msg::CatalogLoaded(Ok(catalog)));
     let details: Vec<Option<String>> = workspace(&state)
-        .palette_items("")
+        .palette_items(&state.profiles, "")
         .into_iter()
-        .skip(9)
+        .skip(11)
         .map(|item| item.detail)
         .collect();
     assert_eq!(
@@ -148,12 +214,13 @@ fn ranking_puts_prefix_before_substring_before_subsequence() {
     };
     send(&mut state, Msg::CatalogLoaded(Ok(catalog)));
     assert_eq!(
-        labels(&workspace(&state).palette_items("ORD")),
+        labels(&workspace(&state).palette_items(&state.profiles, "ORD")),
         [
             "order_lines",
             "analytics.orders_archive",
             "back_orders",
             "Restore dump",
+            "Switch to Prod",
             "ok_round_data",
         ]
     );
@@ -168,7 +235,7 @@ fn input_resets_selection_and_navigation_clamps() {
     for _ in 0..20 {
         send(&mut state, Msg::Modal(ModalMsg::Next));
     }
-    assert_eq!(selected_palette_index(&state), 12);
+    assert_eq!(selected_palette_index(&state), 14);
     type_query(&mut state, "o");
     assert_eq!(selected_palette_index(&state), 0);
 }

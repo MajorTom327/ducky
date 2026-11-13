@@ -366,3 +366,55 @@ async fn empty_select_returns_column_names() {
     assert!(!result_set.is_truncated);
     schema.drop_schema().await;
 }
+
+#[tokio::test]
+#[ignore]
+async fn load_page_reads_geometry_columns_as_geojson() {
+    let database_url =
+        std::env::var("DUCKY_TEST_DATABASE_URL").expect("DUCKY_TEST_DATABASE_URL is set");
+    let probe_session = PgSession::connect(&database_url)
+        .await
+        .expect("connects to the test database");
+    let availability = probe_session
+        .run_script(
+            &["SELECT count(*) FROM pg_available_extensions WHERE name = 'postgis'".to_owned()],
+            TransactionMode::AutoCommit,
+        )
+        .await;
+    if rows_of(&availability, 0).rows[0][0].as_deref() != Some("1") {
+        return;
+    }
+    let extension_report = probe_session
+        .run_script(
+            &["CREATE EXTENSION IF NOT EXISTS postgis".to_owned()],
+            TransactionMode::AutoCommit,
+        )
+        .await;
+    assert_eq!(extension_report.failure, None, "postgis extension created");
+    let schema = TestSchema::create(&[
+        "CREATE TABLE {schema}.places (id serial PRIMARY KEY, name text NOT NULL, location geometry(Point, 4326) NOT NULL)",
+        "INSERT INTO {schema}.places (name, location) VALUES ('Paris', ST_SetSRID(ST_MakePoint(2.35, 48.85), 4326))",
+    ])
+    .await;
+    let page = schema
+        .session
+        .load_page(&PageRequest {
+            relation: schema.relation("places"),
+            page_index: 0,
+            page_size: 100,
+            sort: None,
+            filter: None,
+        })
+        .await
+        .expect("page loads");
+    assert_eq!(page.result_set.columns, ["id", "name", "location"]);
+    assert_eq!(
+        page.result_set.rows,
+        [vec![
+            Some("1".to_owned()),
+            Some("Paris".to_owned()),
+            Some(r#"{"type":"Point","coordinates":[2.35,48.85]}"#.to_owned()),
+        ]]
+    );
+    schema.drop_schema().await;
+}

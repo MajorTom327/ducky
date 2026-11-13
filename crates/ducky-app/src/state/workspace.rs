@@ -32,6 +32,7 @@ pub struct Workspace {
     pub next_query_number: usize,
     pub pending_save: Option<PendingSave>,
     pub running_script_tab_id: Option<TabId>,
+    pub switching_profile_index: Option<usize>,
     pub files: FilesView,
     pub dump: DumpView,
     pub restore: RestoreView,
@@ -54,6 +55,7 @@ impl Workspace {
             next_query_number: 1,
             pending_save: None,
             running_script_tab_id: None,
+            switching_profile_index: None,
             files: FilesView::default(),
             dump: DumpView::default(),
             restore: RestoreView::default(),
@@ -96,8 +98,8 @@ impl Workspace {
             .collect()
     }
 
-    pub fn palette_items(&self, query: &str) -> Vec<PaletteItem> {
-        palette_items(self, query)
+    pub fn palette_items(&self, profiles: &[Profile], query: &str) -> Vec<PaletteItem> {
+        palette_items(self, profiles, query)
     }
 
     pub fn schema_names(&self) -> Vec<String> {

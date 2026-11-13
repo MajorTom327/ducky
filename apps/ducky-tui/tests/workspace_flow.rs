@@ -17,6 +17,7 @@ fn active_query(harness: &Harness) -> &QueryView {
 }
 
 const PROFILE_LABEL: &str = "E2E local";
+const STAGING_PROFILE_LABEL: &str = "E2E staging";
 
 async fn run_setup(session: &PgSession, statements: Vec<String>) {
     let report = session
@@ -50,11 +51,18 @@ async fn explore_query_and_save() {
     )
     .await;
 
-    let mut harness = Harness::new(vec![Profile {
-        label: PROFILE_LABEL.to_owned(),
-        url: database_url.clone(),
-        kind: ProfileKind::Local,
-    }]);
+    let mut harness = Harness::new(vec![
+        Profile {
+            label: PROFILE_LABEL.to_owned(),
+            url: database_url.clone(),
+            kind: ProfileKind::Local,
+        },
+        Profile {
+            label: STAGING_PROFILE_LABEL.to_owned(),
+            url: database_url.clone(),
+            kind: ProfileKind::Staging,
+        },
+    ]);
 
     harness.press_code(KeyCode::Enter);
     harness.settle().await;
@@ -132,6 +140,50 @@ async fn explore_query_and_save() {
     );
     let screen = harness.screen();
     assert!(screen.contains("e2e.sql"), "{screen}");
+    assert_eq!(
+        active_query(&harness).ran_on_profile_label.as_deref(),
+        Some(PROFILE_LABEL)
+    );
+
+    let query_tab_id = harness.workspace().active_tab().expect("query tab").id;
+    harness.press_ctrl('p');
+    harness.type_text("switch");
+    let switch_item_index = harness
+        .workspace()
+        .palette_items(&harness.state.profiles, "switch")
+        .iter()
+        .position(|item| item.label == format!("Switch to {STAGING_PROFILE_LABEL}"))
+        .expect("the staging profile is offered");
+    for _ in 0..switch_item_index {
+        harness.press_code(KeyCode::Down);
+    }
+    harness.press_code(KeyCode::Enter);
+    harness.settle().await;
+    assert_eq!(harness.workspace().profile.label, STAGING_PROFILE_LABEL);
+    let screen = harness.screen();
+    let header = screen.lines().next().unwrap_or_default();
+    assert!(header.contains(STAGING_PROFILE_LABEL), "{screen}");
+    assert_eq!(harness.workspace().tabs.len(), 2);
+    assert_eq!(
+        harness.workspace().active_tab().map(|tab| tab.id),
+        Some(query_tab_id)
+    );
+    assert_eq!(
+        harness.tui.editor(query_tab_id).text(),
+        "select 1; select nope;"
+    );
+
+    harness.press_code(KeyCode::F(5));
+    harness.settle().await;
+    assert_eq!(
+        active_query(&harness).ran_on_profile_label.as_deref(),
+        Some(STAGING_PROFILE_LABEL)
+    );
+    let screen = harness.screen();
+    assert!(
+        screen.contains(&format!("· on {STAGING_PROFILE_LABEL} ")),
+        "{screen}"
+    );
 
     harness.press_ctrl('w');
     assert_eq!(harness.workspace().tabs.len(), 1);

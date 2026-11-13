@@ -10,7 +10,7 @@ use crate::theme::Palette;
 use crate::tui_state::TuiState;
 use crate::views::{palette as palette_view, row_detail};
 
-const TWO_COLUMN_MIN_WIDTH: u16 = 110;
+const HELP_COLUMN_SPACING: u16 = 2;
 
 pub fn render(
     frame: &mut Frame,
@@ -23,9 +23,14 @@ pub fn render(
     let area = match modal {
         Modal::RowDetail(detail) => row_detail::render(frame, screen, detail, palette),
         Modal::Palette(command_palette) => match state.workspace() {
-            Some(workspace) => {
-                palette_view::render(frame, screen, workspace, command_palette, palette)
-            }
+            Some(workspace) => palette_view::render(
+                frame,
+                screen,
+                workspace,
+                &state.profiles,
+                command_palette,
+                palette,
+            ),
             None => return,
         },
         Modal::Prompt(prompt) => {
@@ -143,13 +148,19 @@ fn render_help(frame: &mut Frame, area: Rect, tui: &mut TuiState, palette: &Pale
         .map(|(keys, _)| keys.chars().count())
         .max()
         .unwrap_or(0);
-    let column_count = match area.width >= TWO_COLUMN_MIN_WIDTH {
+    let row_width = HELP_ROWS
+        .iter()
+        .map(|(_, description)| key_width + 2 + description.chars().count())
+        .max()
+        .unwrap_or(0);
+    let two_column_width = 2 * row_width + usize::from(HELP_COLUMN_SPACING);
+    let column_count = match usize::from(inner_area.width) >= two_column_width {
         true => 2,
         false => 1,
     };
     let columns = split_groups(&help_groups, column_count);
     let column_areas = Layout::horizontal(vec![Constraint::Fill(1); columns.len()])
-        .spacing(2)
+        .spacing(HELP_COLUMN_SPACING)
         .split(inner_area);
     let column_lines: Vec<Vec<Line>> = columns
         .iter()

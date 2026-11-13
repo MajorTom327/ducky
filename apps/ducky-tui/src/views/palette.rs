@@ -1,11 +1,12 @@
 use ducky_app::{CommandPalette, PaletteAction, PaletteItem, Workspace};
+use ducky_core::Profile;
 use ratatui::Frame;
 use ratatui::layout::{Constraint, Layout, Rect};
 use ratatui::style::Style;
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Clear, Paragraph};
 
-use crate::theme::Palette;
+use crate::theme::{Palette, palette as profile_palette};
 use crate::views::sidebar::spread_line;
 
 const INPUT_PREFIX: &str = " › ";
@@ -16,11 +17,12 @@ pub fn render(
     frame: &mut Frame,
     screen: Rect,
     workspace: &Workspace,
+    profiles: &[Profile],
     command_palette: &CommandPalette,
     palette: &Palette,
 ) -> Rect {
     let query = command_palette.input.value();
-    let palette_items = workspace.palette_items(query);
+    let palette_items = workspace.palette_items(profiles, query);
     let area = popup_area(screen, palette_items.len());
     frame.render_widget(Clear, area);
     let block = Block::bordered()
@@ -45,8 +47,11 @@ pub fn render(
     render_items(
         frame,
         list_area,
-        &palette_items,
-        command_palette.selected_item_index,
+        &ItemList {
+            palette_items: &palette_items,
+            profiles,
+            selected_item_index: command_palette.selected_item_index,
+        },
         palette,
     );
     frame.render_widget(
@@ -100,13 +105,14 @@ fn render_input(
     frame.set_cursor_position((cursor_x.min(area.right().saturating_sub(1)), area.y));
 }
 
-fn render_items(
-    frame: &mut Frame,
-    area: Rect,
-    palette_items: &[PaletteItem],
+struct ItemList<'a> {
+    palette_items: &'a [PaletteItem],
+    profiles: &'a [Profile],
     selected_item_index: usize,
-    palette: &Palette,
-) {
+}
+
+fn render_items(frame: &mut Frame, area: Rect, item_list: &ItemList, palette: &Palette) {
+    let palette_items = item_list.palette_items;
     if palette_items.is_empty() {
         frame.render_widget(
             Paragraph::new(Line::styled(" No matches", palette.muted())),
@@ -114,7 +120,7 @@ fn render_items(
         );
         return;
     }
-    let selected_item_index = selected_item_index.min(palette_items.len() - 1);
+    let selected_item_index = item_list.selected_item_index.min(palette_items.len() - 1);
     let visible_row_count = usize::from(area.height).max(1);
     let first_item_index = (selected_item_index + 1).saturating_sub(visible_row_count);
     let row_width = usize::from(area.width);
@@ -127,7 +133,7 @@ fn render_items(
             let is_selected = item_index == selected_item_index;
             let line = spread_line(
                 Span::raw(item.label.clone()),
-                item_trailer(item, is_selected, palette),
+                item_trailer(item, item_list.profiles, is_selected, palette),
                 row_width,
             );
             match is_selected {
@@ -139,22 +145,41 @@ fn render_items(
     frame.render_widget(Paragraph::new(rows), area);
 }
 
-fn item_trailer(item: &PaletteItem, is_selected: bool, palette: &Palette) -> Vec<Span<'static>> {
+fn item_trailer(
+    item: &PaletteItem,
+    profiles: &[Profile],
+    is_selected: bool,
+    palette: &Palette,
+) -> Vec<Span<'static>> {
     let (detail_style, shortcut_style) = match is_selected {
         true => (Style::new(), Style::new()),
-        false => (palette.muted(), palette.title()),
+        false => (
+            profile_detail_style(item, profiles, palette),
+            palette.title(),
+        ),
     };
     let mut spans = Vec::new();
     if let Some(detail) = &item.detail {
         spans.push(Span::styled(detail.clone(), detail_style));
     }
-    if let Some(shortcut) = action_shortcut(&item.action) {
+    if let Some(shortcut) = item.command_alias.or_else(|| action_shortcut(&item.action)) {
         if !spans.is_empty() {
             spans.push(Span::raw("  "));
         }
         spans.push(Span::styled(shortcut, shortcut_style));
     }
     spans
+}
+
+fn profile_detail_style(item: &PaletteItem, profiles: &[Profile], palette: &Palette) -> Style {
+    match item.action {
+        PaletteAction::SwitchProfile(profile_index) => profiles
+            .get(profile_index)
+            .map_or(palette.muted(), |profile| {
+                profile_palette(Some(profile.kind)).title()
+            }),
+        _ => palette.muted(),
+    }
 }
 
 pub fn action_shortcut(action: &PaletteAction) -> Option<&'static str> {
@@ -169,6 +194,8 @@ pub fn action_shortcut(action: &PaletteAction) -> Option<&'static str> {
         PaletteAction::SwitchTab(_)
         | PaletteAction::Dump
         | PaletteAction::Restore
+        | PaletteAction::Quit
+        | PaletteAction::SwitchProfile(_)
         | PaletteAction::OpenRelation(_) => None,
     }
 }

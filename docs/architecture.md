@@ -43,7 +43,11 @@ Responses carry their request (`PageLoaded { request }`, `DetailsLoaded { relati
 
 `Workspace` holds `tabs: Vec<Tab>` and `active_tab_index`. A `Tab` has a `TabId` and a `TabContent`: `Table(TableView)` (one per relation, reused when reopened), `Query(QueryView)` (numbered `Query N` unless named after a file), or the singletons `Files`, `Dump`, `Restore`. Per-tab state (page, cursor, document, run state) lives in the tab; `TabsMsg` opens, switches and closes tabs. The sidebar lists only the relations of `schema_name`.
 
-`Msg::OpenPalette` opens `Modal::Palette(CommandPalette)`; `Workspace::palette_items(query)` lists `PaletteItem`s whose `PaletteAction` switches to a tab, runs an action (new query, SQL files, dump, restore, schema, refresh, reconnect, disconnect, help) or opens a relation of any schema. `Msg::FocusPane(PaneDirection)` moves focus between sidebar, main pane, editor and results.
+`Msg::OpenPalette` opens `Modal::Palette(CommandPalette)`; `Workspace::palette_items(profiles, query)` lists `PaletteItem`s whose `PaletteAction` switches to a tab, runs an action (new query, SQL files, dump, restore, schema, refresh, reconnect, disconnect, help, quit), switches to another profile or opens a relation of any schema. An item may carry a `command_alias` (`Quit` has `:q`): a query starting with `:` lists only the items whose alias starts with it. `Msg::FocusPane(PaneDirection)` moves focus between sidebar, main pane, editor and results.
+
+## Switching profile
+
+`PaletteAction::SwitchProfile(index)` keeps the workspace and its tabs and emits `Command::Connect` for the other profile, recording `Workspace::switching_profile_index`; it is refused while a script, a dump or a restore runs. `Msg::Connected { profile_index, .. }` in a workspace is a reconnect when `profile_index` is the workspace's, a switch when it matches `switching_profile_index` (success: profile, session and tools replaced, catalog and every table tab page reloaded, details reset; failure: error notice, the runtime keeps the old connection), and is ignored otherwise. `QueryView::ran_on_profile_label` records the profile a script was started on.
 
 Only one script runs at a time: `running_script_tab_id` records the query tab that issued `Command::RunScript { tab_id, .. }`; `Run` from any tab is refused while it is set, and `ScriptFinished { tab_id, .. }` clears it and stores the report in that tab (if still open).
 

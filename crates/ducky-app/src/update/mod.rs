@@ -8,6 +8,7 @@ mod palette;
 mod profiles;
 mod query;
 mod sidebar;
+mod switch;
 mod table;
 mod tabs;
 

@@ -8,7 +8,7 @@ jobs:
     runs-on: ubuntu-latest
     services:
       postgres:
-        image: postgres:18-alpine
+        image: imresamu/postgis:18-3.6-alpine
         env:
           POSTGRES_USER: ducky
           POSTGRES_PASSWORD: ducky

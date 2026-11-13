@@ -4,6 +4,7 @@ use crate::command::Command;
 use crate::loadable::Loadable;
 use crate::msg::Connection;
 use crate::state::{AppState, Focus, NoticeLevel, ProfilePicker, Screen, TabContent, Workspace};
+use crate::update::switch::switched;
 use crate::update::table::reload_all_pages;
 use crate::update::{clamp_index, notice, workspace_mut};
 
@@ -12,44 +13,63 @@ pub(crate) fn connected(
     profile_index: usize,
     result: Result<Connection, String>,
 ) -> Vec<Command> {
-    match &mut state.screen {
-        Screen::Profiles(picker) => {
-            if picker.connecting_profile_index != Some(profile_index) {
-                return Vec::new();
-            }
-            picker.connecting_profile_index = None;
-            match result {
-                Err(message) => {
-                    picker.connection_error = Some(message);
-                    Vec::new()
-                }
-                Ok(connection) => {
-                    let Some(profile) = state.profiles.get(profile_index) else {
-                        return Vec::new();
-                    };
-                    let workspace = Workspace::new(profile_index, profile.clone(), connection);
-                    state.screen = Screen::Workspace(Box::new(workspace));
-                    vec![Command::LoadCatalog]
-                }
-            }
+    let Some(workspace) = state.workspace() else {
+        return picker_connected(state, profile_index, result);
+    };
+    if workspace.profile_index == profile_index {
+        reconnected(state, result)
+    } else if workspace.switching_profile_index == Some(profile_index) {
+        switched(state, profile_index, result)
+    } else {
+        Vec::new()
+    }
+}
+
+fn picker_connected(
+    state: &mut AppState,
+    profile_index: usize,
+    result: Result<Connection, String>,
+) -> Vec<Command> {
+    let Screen::Profiles(picker) = &mut state.screen else {
+        return Vec::new();
+    };
+    if picker.connecting_profile_index != Some(profile_index) {
+        return Vec::new();
+    }
+    picker.connecting_profile_index = None;
+    match result {
+        Err(message) => {
+            picker.connection_error = Some(message);
+            Vec::new()
         }
-        Screen::Workspace(workspace) => match result {
-            Err(message) => {
-                state.notice = notice(NoticeLevel::Error, message);
-                Vec::new()
-            }
-            Ok(connection) => {
-                if workspace.profile_index != profile_index {
-                    return Vec::new();
-                }
-                workspace.session = connection.session;
-                workspace.tools = connection.tools;
-                state.notice = notice(NoticeLevel::Success, "Reconnected");
-                let mut commands = vec![Command::LoadCatalog];
-                commands.extend(reload_all_pages(workspace));
-                commands
-            }
-        },
+        Ok(connection) => {
+            let Some(profile) = state.profiles.get(profile_index) else {
+                return Vec::new();
+            };
+            let workspace = Workspace::new(profile_index, profile.clone(), connection);
+            state.screen = Screen::Workspace(Box::new(workspace));
+            vec![Command::LoadCatalog]
+        }
+    }
+}
+
+fn reconnected(state: &mut AppState, result: Result<Connection, String>) -> Vec<Command> {
+    let Some(workspace) = workspace_mut(&mut state.screen) else {
+        return Vec::new();
+    };
+    match result {
+        Err(message) => {
+            state.notice = notice(NoticeLevel::Error, message);
+            Vec::new()
+        }
+        Ok(connection) => {
+            workspace.session = connection.session;
+            workspace.tools = connection.tools;
+            state.notice = notice(NoticeLevel::Success, "Reconnected");
+            let mut commands = vec![Command::LoadCatalog];
+            commands.extend(reload_all_pages(workspace));
+            commands
+        }
     }
 }
 
