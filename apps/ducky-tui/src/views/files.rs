@@ -19,9 +19,9 @@ pub fn render(frame: &mut Frame, area: Rect, context: &ViewContext, tui: &mut Tu
     let palette = context.palette;
     let list_block = Block::default()
         .borders(Borders::ALL)
-        .border_style(palette.border(true))
+        .border_style(palette.border(context.workspace.focus == ducky_app::Focus::Main))
         .title(Line::styled(
-            format!("SQL files — {}", context.storage.sql_dir.display()),
+            format!(" SQL files — {} ", context.storage.sql_dir.display()),
             palette.title(),
         ));
     let list_inner = list_block.inner(list_area);
@@ -54,7 +54,7 @@ pub fn render(frame: &mut Frame, area: Rect, context: &ViewContext, tui: &mut Tu
     let preview_block = Block::default()
         .borders(Borders::ALL)
         .border_style(palette.border(false))
-        .title(Line::styled("Preview", palette.title()));
+        .title(Line::styled(" Preview ", palette.title()));
     let preview_inner = preview_block.inner(preview_area);
     frame.render_widget(preview_block, preview_area);
     if let Some(preview) = render_loadable(

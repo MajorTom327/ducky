@@ -13,8 +13,8 @@ pub fn render(frame: &mut Frame, area: Rect, context: &ViewContext, tui: &mut Tu
     let palette = context.palette;
     let block = Block::default()
         .borders(Borders::ALL)
-        .border_style(palette.border(true))
-        .title(Line::styled("Dump database", palette.title()));
+        .border_style(palette.border(context.workspace.focus == ducky_app::Focus::Main))
+        .title(Line::styled(" Dump database ", palette.title()));
     let inner = block.inner(area);
     frame.render_widget(block, area);
     let tool_path = match &workspace.tools.pg_dump {

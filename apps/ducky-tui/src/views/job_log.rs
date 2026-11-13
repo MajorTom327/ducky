@@ -18,7 +18,7 @@ pub fn render(
     let block = Block::default()
         .borders(Borders::ALL)
         .border_style(palette.border(false))
-        .title(Line::styled("Log", palette.title()));
+        .title(Line::styled(" Log ", palette.title()));
     let visible_height = usize::from(block.inner(area).height);
     let max_offset = log_lines.len().saturating_sub(visible_height);
     let first_line_index = match scroll {

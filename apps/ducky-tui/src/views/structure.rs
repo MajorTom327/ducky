@@ -81,14 +81,14 @@ fn column_lines(columns: &[Column], palette: &Palette) -> Vec<Line<'static>> {
             Span::raw(padded(&column.data_type, type_width)),
             Span::raw(padded(nullability, "NOT NULL".len())),
         ];
+        if column.is_primary_key {
+            spans.push(Span::styled("PK  ", palette.title()));
+        }
         if let Some(default_expression) = &column.default_expression {
             spans.push(Span::styled(
-                format!("default {default_expression}  "),
+                format!("default {default_expression}"),
                 palette.muted(),
             ));
-        }
-        if column.is_primary_key {
-            spans.push(Span::styled("PK", palette.title()));
         }
         Line::from(spans)
     }));

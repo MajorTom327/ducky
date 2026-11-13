@@ -17,9 +17,9 @@ pub fn render(frame: &mut Frame, area: Rect, context: &ViewContext, tui: &mut Tu
     let dump_dir = context.storage.dump_dir.display().to_string();
     let block = Block::default()
         .borders(Borders::ALL)
-        .border_style(palette.border(true))
+        .border_style(palette.border(context.workspace.focus == ducky_app::Focus::Main))
         .title(Line::styled(
-            format!("Restore dump — {dump_dir}"),
+            format!(" Restore dump — {dump_dir} "),
             palette.title(),
         ));
     let inner = block.inner(area);

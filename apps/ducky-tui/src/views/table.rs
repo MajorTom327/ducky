@@ -23,7 +23,10 @@ pub fn render(frame: &mut Frame, area: Rect, context: &ViewContext, tui: &mut Tu
     }
     let is_focused = context.workspace.focus == Focus::Main;
     let block = Block::bordered()
-        .title(format!("{}.{}", table.relation.schema, table.relation.name))
+        .title(Span::styled(
+            format!(" {}.{} ", table.relation.schema, table.relation.name),
+            context.palette.title(),
+        ))
         .border_style(context.palette.border(is_focused));
     let inner_area = block.inner(area);
     frame.render_widget(block, area);
