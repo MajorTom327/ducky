@@ -1,4 +1,5 @@
 use ducky_core::{ScriptReport, StatementResult, TransactionMode};
+use ducky_sql::ParameterValue;
 
 use crate::state::table::GridCursor;
 use crate::state::tabs::TabId;
@@ -42,6 +43,7 @@ pub struct QueryView {
     pub cursor: GridCursor,
     pub pane: QueryPane,
     pub ran_on_profile_label: Option<String>,
+    pub parameter_values: Vec<(String, ParameterValue)>,
 }
 
 impl QueryView {
@@ -55,6 +57,7 @@ impl QueryView {
             cursor: GridCursor::default(),
             pane: QueryPane::Editor,
             ran_on_profile_label: None,
+            parameter_values: Vec::new(),
         }
     }
 

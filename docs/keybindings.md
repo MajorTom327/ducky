@@ -167,6 +167,18 @@ Source of truth: `apps/ducky-tui/src/keys/help.rs` (`HELP_ROWS`, shown with `F1`
 |`Ctrl+w`|delete the previous word|
 |`Ctrl+u`|clear the line|
 
+## Query parameters
+
+|Key|Action|
+|---|---|
+|`type`|value of the selected parameter|
+|`Tab / ↓`|next parameter|
+|`Shift+Tab / ↑`|previous parameter|
+|`Ctrl+r`|insert as raw SQL / as a string literal|
+|`Ctrl+w / Ctrl+u`|delete a word / the value|
+|`Enter`|run with these values|
+|`Esc`|cancel|
+
 ## Confirm
 
 |Key|Action|
@@ -208,5 +220,5 @@ Source of truth: `apps/ducky-tui/src/keys/help.rs` (`HELP_ROWS`, shown with `F1`
 - `1`–`9`, `H` / `L`, `Tab`, `?` and `q` apply outside the SQL editor.
 - `Ctrl+h` focuses the sidebar, `Ctrl+l` the main pane, `Ctrl+k` the SQL editor and `Ctrl+j` the results of the active query tab.
 - The editor follows edtui vim mode (`i`, `a`, `o`, `v`, `Esc`, motions, `u` undo, `p` paste). Its bottom border shows the vim mode on the left and ` one transaction · Ctrl+t ` or ` autocommit · Ctrl+t ` on the right. The terminal cursor is a bar in insert mode and a block otherwise.
-- Prompts also accept `Backspace`, `Delete`, `←`/`→`, `Home`/`End`. Pasting into the editor in any mode inserts the text.
+- Prompts and the query parameters form also accept `Backspace`, `Delete`, `←`/`→`, `Home`/`End`. Pasting into the editor in any mode inserts the text.
 - The help popup uses two columns only when the terminal is wide enough to show every row untruncated.

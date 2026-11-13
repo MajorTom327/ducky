@@ -8,8 +8,10 @@ use ratatui::widgets::Paragraph;
 
 use crate::theme::Palette;
 
+mod columns;
 mod viewport;
 
+use columns::{GridColumn, expand_truncated_columns, grid_column};
 pub use viewport::GridViewport;
 use viewport::{scroll_columns, scroll_rows};
 
@@ -25,12 +27,6 @@ pub struct GridOptions<'a> {
     pub sort: Option<&'a Sort>,
     pub first_row_number: usize,
     pub is_focused: bool,
-}
-
-struct GridColumn {
-    header: String,
-    width: usize,
-    is_numeric: bool,
 }
 
 pub fn render_grid(
@@ -74,7 +70,9 @@ pub fn render_grid(
         grid_width,
         COLUMN_GAP.len(),
     );
-    let shown_columns = &columns[viewport.first_column_index.min(columns.len())..];
+    let mut shown_columns = columns[viewport.first_column_index.min(columns.len())..].to_vec();
+    expand_truncated_columns(&mut shown_columns, grid_width);
+    let shown_columns = shown_columns.as_slice();
 
     let mut lines = vec![
         header_line(shown_columns, gutter_width, palette),
@@ -123,35 +121,6 @@ pub fn render_grid(
         ));
     }
     frame.render_widget(Paragraph::new(lines), area);
-}
-
-fn grid_column(
-    name: &str,
-    column_index: usize,
-    sort: Option<&Sort>,
-    visible_rows: &[&Vec<Cell>],
-) -> GridColumn {
-    let header = header_text(name, sort);
-    let visible_cells = visible_rows
-        .iter()
-        .map(|row| row.get(column_index).unwrap_or(&NULL_CELL));
-    let widest_cell = visible_cells
-        .clone()
-        .map(|cell| cell_text(cell).chars().count())
-        .max()
-        .unwrap_or(0);
-    let mut values = visible_cells.flatten().peekable();
-    let has_value = values.peek().is_some();
-    let is_numeric = has_value && values.all(|value| value.trim().parse::<f64>().is_ok());
-    GridColumn {
-        width: header
-            .chars()
-            .count()
-            .max(widest_cell)
-            .min(MAX_COLUMN_WIDTH),
-        header,
-        is_numeric,
-    }
 }
 
 fn header_line(columns: &[GridColumn], gutter_width: usize, palette: &Palette) -> Line<'static> {

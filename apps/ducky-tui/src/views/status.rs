@@ -4,7 +4,8 @@ use ratatui::layout::{Constraint, Layout, Rect};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::Paragraph;
 
-use crate::keys::help::{KeyHint, hints};
+use crate::keys::help::KeyHint;
+use crate::keys::hints::hints;
 use crate::keys::sequence::{KeyPrefix, pending_hints};
 use crate::theme::Palette;
 

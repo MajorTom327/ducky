@@ -2,6 +2,7 @@ use ducky_core::Cell;
 use tui_input::Input;
 
 use crate::state::palette::CommandPalette;
+use crate::state::parameters::ParameterForm;
 
 #[derive(Debug, Clone)]
 pub enum Modal {
@@ -11,6 +12,7 @@ pub enum Modal {
     SchemaPicker { selected_schema_index: usize },
     Help,
     Palette(CommandPalette),
+    Parameters(ParameterForm),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

@@ -1,6 +1,6 @@
 # ducky-app
 
-Pure, view-agnostic state machine of ducky. It owns the application state, the messages a front-end or the runtime can send, and the commands the runtime must execute. No IO, no async, no terminal code: a TUI or a Dioxus front-end renders `AppState` and turns user input into `Msg`.
+Pure, view-agnostic state machine of ducky (depends on `ducky-core` and, for query parameters, `ducky-sql`). It owns the application state, the messages a front-end or the runtime can send, and the commands the runtime must execute. No IO, no async, no terminal code: a TUI or a Dioxus front-end renders `AppState` and turns user input into `Msg`.
 
 ```text
 front-end input ──Msg──▶ update(&mut AppState, Msg) ──Vec<Command>──▶ runtime ──Msg──▶ update …
@@ -10,7 +10,7 @@ front-end input ──Msg──▶ update(&mut AppState, Msg) ──Vec<Command>
 
 - `update(state: &mut AppState, msg: Msg) -> Vec<Command>`: the only state transition. Messages addressed to a screen, tab kind or modal that is not active are ignored; responses for a request that is no longer current (`PageLoaded`, `DetailsLoaded`, `FilePreviewLoaded`, `Connected` without a pending connect) are dropped.
 - `Loadable<T>` (`Idle`, `Loading`, `Ready`, `Failed`) with `ready()` and `is_loading()`.
-- State: `AppState` (`new`, `workspace`), `Screen`, `ProfilePicker`, `Workspace` (`new`, `active_tab`, `tab_index`, `sidebar_items`, `palette_items`, `schema_names`), `Focus`, `Sidebar`, `SidebarItem` (relation, kind, estimated row count), `TabId`, `Tab` (`title`), `TabContent` (`Table`, `Query`, `Files`, `Dump`, `Restore`), `GridCursor`, `TableTab`, `TableView`, `Document`, `QueryPane`, `RunState`, `PendingSave` (tab id, name, content), `QueryView` (`new`, `selected_result`), `FilesView`, `JobKind`, `JobState`, `DumpView`, `RestoreView`, `NoticeLevel`, `Notice`, `Modal`, `PromptKind`, `Prompt`, `ConfirmKind`, `Confirm`, `RowDetail`, `CommandPalette`, `PaletteItem`, `PaletteAction`.
+- State: `AppState` (`new`, `workspace`), `Screen`, `ProfilePicker`, `Workspace` (`new`, `active_tab`, `tab_index`, `sidebar_items`, `palette_items`, `schema_names`), `Focus`, `Sidebar`, `SidebarItem` (relation, kind, estimated row count), `TabId`, `Tab` (`title`), `TabContent` (`Table`, `Query`, `Files`, `Dump`, `Restore`), `GridCursor`, `TableTab`, `TableView`, `Document`, `QueryPane`, `RunState`, `PendingSave` (tab id, name, content), `QueryView` (`new`, `selected_result`), `FilesView`, `JobKind`, `JobState`, `DumpView`, `RestoreView`, `NoticeLevel`, `Notice`, `Modal`, `PromptKind`, `Prompt`, `ConfirmKind`, `Confirm`, `RowDetail`, `ParameterForm` (`values`, `selected_field`), `ParameterField` (`value`), `CommandPalette`, `PaletteItem`, `PaletteAction`.
 - Constants: `PAGE_SIZE` (100 rows per table page), `MAX_JOB_LOG_LINES` (1000 lines kept per dump / restore log).
 - Messages: `Msg`, `Connection`, `SaveFailure`, `ProfilesMsg`, `TabsMsg`, `SidebarMsg`, `GridMove`, `TableMsg`, `QueryMsg`, `FilesMsg`, `DumpMsg`, `RestoreMsg`, `ModalMsg`.
 - Commands: `Command` (connect, catalog / page / details loading, scripts tagged with the tab that runs them and cancellation, SQL files, dumps, restores, clipboard).
@@ -25,6 +25,7 @@ front-end input ──Msg──▶ update(&mut AppState, Msg) ──Vec<Command>
 - Refreshing a ready catalog keeps it visible; after a reload the schema falls back to the current one, then `public`, then the first schema.
 - Table pages are read-only: pagination, a three-step sort cycle (ascending, descending, none), a raw `WHERE` filter, row detail and cell copy.
 - Scripts run in `Transaction` (default) or `AutoCommit` mode; a finished script selects its last result and reloads the catalog when a statement affected rows.
+- `Run` of a script containing `:name` or `$n` parameters (also when executing a SQL file) opens `Modal::Parameters` prefilled from the tab's `parameter_values`; `ToggleRaw` switches a field between a string literal and raw SQL, `Submit` stores the values on the tab and runs the bound SQL (guards re-checked), `Cancel` runs nothing.
 - Saving an unnamed document prompts for a name and asks before overwriting an existing file.
 - Dump and restore are refused with the tool's `Missing` reason when `pg_dump` / `pg_restore` are absent; a restore always asks for confirmation.
 

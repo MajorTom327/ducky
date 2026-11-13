@@ -705,6 +705,7 @@ name = "ducky-app"
 version = "0.1.0"
 dependencies = [
  "ducky-core",
+ "ducky-sql",
  "tui-input",
 ]
 

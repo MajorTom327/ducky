@@ -8,7 +8,7 @@ crates/ducky-config    TOML profiles, lookup, ${VAR} expansion     -> core
 crates/ducky-sql       highlight, statement split, completion       -> core
 crates/ducky-postgres  sessions, introspection, pages, scripts      -> core, sql
 crates/ducky-files     SQL file store, dump store, pg_dump/pg_restore -> core
-crates/ducky-app       pure state machine (AppState, Msg, Command, update) -> core
+crates/ducky-app       pure state machine (AppState, Msg, Command, update) -> core, sql
 crates/ducky-runtime   executes Command on tokio, answers with Msg  -> app, config, sql, postgres, files
 apps/ducky-tui         binary `ducky`: keys, rendering, effects     -> app, runtime, config, sql
 ```
@@ -50,6 +50,8 @@ Responses carry their request (`PageLoaded { request }`, `DetailsLoaded { relati
 `PaletteAction::SwitchProfile(index)` keeps the workspace and its tabs and emits `Command::Connect` for the other profile, recording `Workspace::switching_profile_index`; it is refused while a script, a dump or a restore runs. `Msg::Connected { profile_index, .. }` in a workspace is a reconnect when `profile_index` is the workspace's, a switch when it matches `switching_profile_index` (success: profile, session and tools replaced, catalog and every table tab page reloaded, details reset; failure: error notice, the runtime keeps the old connection), and is ignored otherwise. `QueryView::ran_on_profile_label` records the profile a script was started on.
 
 Only one script runs at a time: `running_script_tab_id` records the query tab that issued `Command::RunScript { tab_id, .. }`; `Run` from any tab is refused while it is set, and `ScriptFinished { tab_id, .. }` clears it and stores the report in that tab (if still open).
+
+`QueryMsg::Run` (and `FileOpened { run_after_open: true }`) first applies the running / blank guards, then `ducky_sql::find_parameters`: without parameters it emits `RunScript`; otherwise it opens `Modal::Parameters(ParameterForm { tab_id, sql, fields, selected_field_index })`, one `ParameterField { name, input, is_raw }` per parameter prefilled from the tab's `QueryView::parameter_values`. `ModalMsg::Input` / `Next` / `Previous` / `ToggleRaw` edit the form; `Submit` merges the values into `parameter_values`, closes the form and runs `ducky_sql::bind_parameters(sql, values)` through the same guarded path, so reports hold the bound SQL.
 
 Table pages use `AppState::page_size` (set with `AppState::with_page_size` from the config's `page_size`, default `DEFAULT_PAGE_SIZE`).
 

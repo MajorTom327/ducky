@@ -4,7 +4,7 @@ use crate::state::{
     AppState, Confirm, ConfirmKind, JobState, Modal, NoticeLevel, PendingSave, Prompt, PromptKind,
 };
 use crate::update::table::apply_filter;
-use crate::update::{notice, palette, step_index, workspace_mut};
+use crate::update::{notice, palette, parameters, step_index, workspace_mut};
 
 pub(crate) fn update(state: &mut AppState, msg: ModalMsg) -> Vec<Command> {
     match msg {
@@ -14,6 +14,10 @@ pub(crate) fn update(state: &mut AppState, msg: ModalMsg) -> Vec<Command> {
                 Some(Modal::Palette(command_palette)) => {
                     command_palette.input.handle(request);
                     command_palette.selected_item_index = 0;
+                    return Vec::new();
+                }
+                Some(Modal::Parameters(form)) => {
+                    parameters::input(form, request);
                     return Vec::new();
                 }
                 _ => return Vec::new(),
@@ -46,6 +50,7 @@ pub(crate) fn update(state: &mut AppState, msg: ModalMsg) -> Vec<Command> {
                 Vec::new()
             }
             Some(Modal::Palette(command_palette)) => palette::submit(state, &command_palette),
+            Some(Modal::Parameters(form)) => parameters::submit(state, form),
             Some(Modal::RowDetail(_) | Modal::Help) | None => Vec::new(),
         },
         ModalMsg::Cancel => {
@@ -94,6 +99,7 @@ pub(crate) fn update(state: &mut AppState, msg: ModalMsg) -> Vec<Command> {
                     *selected_schema_index =
                         step_index(*selected_schema_index, schema_count, is_forward);
                 }
+                Some(Modal::Parameters(form)) => parameters::step(form, is_forward),
                 Some(Modal::RowDetail(row_detail)) => {
                     row_detail.selected_field_index = step_index(
                         row_detail.selected_field_index,
@@ -102,6 +108,12 @@ pub(crate) fn update(state: &mut AppState, msg: ModalMsg) -> Vec<Command> {
                     );
                 }
                 _ => {}
+            }
+            Vec::new()
+        }
+        ModalMsg::ToggleRaw => {
+            if let Some(Modal::Parameters(form)) = &mut state.modal {
+                parameters::toggle_raw(form);
             }
             Vec::new()
         }

@@ -7,6 +7,7 @@ use crate::state::{
     PromptKind, RowDetail, RunState, TabId,
 };
 use crate::update::grid::{cell_text, move_cursor};
+use crate::update::parameters::request_run;
 use crate::update::{notice, step_index, workspace_mut};
 
 pub(crate) fn update(state: &mut AppState, msg: QueryMsg) -> Vec<Command> {
@@ -23,7 +24,7 @@ pub(crate) fn update(state: &mut AppState, msg: QueryMsg) -> Vec<Command> {
         return Vec::new();
     };
     match msg {
-        QueryMsg::Run { sql } => run(state, tab_id, sql),
+        QueryMsg::Run { sql } => request_run(state, tab_id, sql),
         QueryMsg::Cancel => Vec::new(),
         QueryMsg::ToggleTransactionMode => {
             query.transaction_mode = match query.transaction_mode {
@@ -116,18 +117,26 @@ fn open_save_as(
     Vec::new()
 }
 
+pub(crate) fn is_run_refused(state: &mut AppState, sql: &str) -> bool {
+    let Some(workspace) = state.workspace() else {
+        return true;
+    };
+    let refusal = match (workspace.running_script_tab_id, sql.trim().is_empty()) {
+        (Some(_), _) => "A script is already running",
+        (None, true) => "Nothing to run",
+        (None, false) => return false,
+    };
+    state.notice = notice(NoticeLevel::Error, refusal);
+    true
+}
+
 pub(crate) fn run(state: &mut AppState, tab_id: TabId, sql: String) -> Vec<Command> {
+    if is_run_refused(state, &sql) {
+        return Vec::new();
+    }
     let Some(workspace) = workspace_mut(&mut state.screen) else {
         return Vec::new();
     };
-    if workspace.running_script_tab_id.is_some() {
-        state.notice = notice(NoticeLevel::Error, "A script is already running");
-        return Vec::new();
-    }
-    if sql.trim().is_empty() {
-        state.notice = notice(NoticeLevel::Error, "Nothing to run");
-        return Vec::new();
-    }
     let profile_label = workspace.profile.label.clone();
     let Some(query) = workspace.query_mut(tab_id) else {
         return Vec::new();

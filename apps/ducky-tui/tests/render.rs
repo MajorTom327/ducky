@@ -253,8 +253,8 @@ fn render_result_set(
 }
 
 #[test]
-fn grid_renders_null_and_truncates_long_cells() {
-    let long_value = "x".repeat(60);
+fn grid_renders_null_and_lets_long_cells_use_the_spare_width() {
+    let long_value = "x".repeat(300);
     let result_set = ResultSet {
         columns: vec!["value".to_owned(), "note".to_owned()],
         rows: vec![vec![Some(long_value), None]],
@@ -267,7 +267,26 @@ fn grid_renders_null_and_truncates_long_cells() {
     );
     assert!(text.contains("NULL"));
     assert!(text.contains("x…"));
-    assert!(!text.contains(&"x".repeat(41)));
+    assert!(text.contains(&"x".repeat(80)));
+    assert!(!text.contains(&"x".repeat(usize::from(WIDTH))));
+}
+
+#[test]
+fn grid_caps_long_cells_when_columns_fill_the_width() {
+    let columns: Vec<String> = (0..4).map(|index| format!("column_{index}")).collect();
+    let row = columns.iter().map(|_| Some("y".repeat(60))).collect();
+    let result_set = ResultSet {
+        columns,
+        rows: vec![row],
+        is_truncated: false,
+    };
+    let text = render_result_set(
+        &result_set,
+        GridCursor::default(),
+        &mut GridViewport::default(),
+    );
+    assert!(text.contains("y…"));
+    assert!(!text.contains(&"y".repeat(41)));
 }
 
 #[test]

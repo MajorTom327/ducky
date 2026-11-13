@@ -54,6 +54,20 @@ Quit with `Ctrl+q` anywhere, `q` outside the editor, the `Space q q` sequence, o
 
 To run the same query on another database, pick `Switch to <profile>` in go to anything: the workspace reconnects to that profile and keeps every tab, query text and result; the catalog and table tabs reload, and the results title shows the profile each script ran on (` · on Dev local `). Switching waits for running scripts, dumps and restores to finish; a failed connection keeps the current profile.
 
+When browsing a table, PostGIS `geometry` and `geography` columns are shown as GeoJSON (`{"type":"Point","coordinates":[2.35,48.85]}`) in the grid, the row detail and copied values. Query tabs show exactly what your SQL returns; use `ST_AsGeoJSON` or `ST_AsText` there. Long values use the free width of the grid before being cut with `…`.
+
+## Query parameters
+
+A query may contain named parameters (`:name`) and positional ones (`$1`, `$2`, …):
+
+```sql
+select * from orders where status = :status and total > :min_total limit $1
+```
+
+Running it (`F5`, or executing a SQL file) opens a form with one field per parameter, in order of first appearance; the same name used twice is one field. A value is inserted as a string literal (`pending` → `'pending'`, quotes doubled; PostgreSQL coerces it, so `'100'` works for numbers and `limit '10'` too). `Ctrl+r` switches the selected field to raw SQL, inserted verbatim (`now()`, `NULL`, `(1, 2, 3)`); each row previews what will be inserted. `Enter` runs, `Esc` cancels. `::` casts, `arr[1:n]` slices, strings, quoted identifiers, comments and dollar-quoted bodies are not parameters.
+
+Each query tab remembers the last values, so after switching profile the same query reruns with the form prefilled. Results show the SQL that actually ran, with the values in place.
+
 ## Development
 
 |Recipe|Does|
@@ -62,11 +76,11 @@ To run the same query on another database, pick `Switch to <profile>` in go to a
 |`just fmt`|`cargo fmt --all`|
 |`just lint`|fmt check + clippy with `-D warnings`|
 |`just test`|`cargo test --workspace`|
-|`just db-up` / `just db-down`|start / remove the Postgres 18 compose database on port 5440 (seeded from `dev/seed.sql`)|
+|`just db-up` / `just db-down`|start / remove the PostgreSQL 18 + PostGIS compose database on port 5440 (seeded from `dev/seed.sql`)|
 |`just test-db`|`db-up`, then the ignored database tests with `DUCKY_TEST_DATABASE_URL`|
 |`just dev *args`|run ducky against `dev/ducky.dev.toml`|
 |`just ci`|lint, test, release|
 
-CI (`.gitea/workflows/ci.yml`) runs on pushes to `main` and pull requests: fmt check, clippy, tests, ignored database tests against a `postgres:18-alpine` service (skipping `dump_then_restore`, the runner has no PostgreSQL 18 client tools), release build.
+CI (`.gitea/workflows/ci.yml`) runs on pushes to `main` and pull requests: fmt check, clippy, tests, ignored database tests against an `imresamu/postgis:18-3.6-alpine` service (skipping `dump_then_restore`, the runner has no PostgreSQL 18 client tools), release build.
 
 Docs: [architecture](docs/architecture.md), [key bindings](docs/keybindings.md). Each crate has its own README.

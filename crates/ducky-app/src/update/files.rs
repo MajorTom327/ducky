@@ -4,7 +4,7 @@ use crate::command::Command;
 use crate::loadable::Loadable;
 use crate::msg::FilesMsg;
 use crate::state::{AppState, Confirm, ConfirmKind, FilesView, Modal, NoticeLevel, TabContent};
-use crate::update::query::run;
+use crate::update::parameters::request_run;
 use crate::update::tabs::open_document;
 use crate::update::{clamp_index, notice, step_index, workspace_mut};
 
@@ -118,7 +118,7 @@ pub(crate) fn opened(
     };
     let tab_id = open_document(workspace, name, text.clone());
     if run_after_open {
-        run(state, tab_id, text)
+        request_run(state, tab_id, text)
     } else {
         Vec::new()
     }

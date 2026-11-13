@@ -6,6 +6,7 @@ publish.workspace = true
 
 [dependencies]
 ducky-core.workspace = true
+ducky-sql.workspace = true
 tui-input.workspace = true
 
 [lints]

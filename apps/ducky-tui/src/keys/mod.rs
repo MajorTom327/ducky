@@ -1,5 +1,6 @@
 pub mod files;
 pub mod help;
+pub mod hints;
 pub mod jobs;
 pub mod modal;
 pub mod profiles;

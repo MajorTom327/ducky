@@ -194,4 +194,5 @@ pub enum ModalMsg {
     Next,
     Previous,
     CopyValue,
+    ToggleRaw,
 }

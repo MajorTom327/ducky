@@ -15,6 +15,7 @@ pub fn handle(modal: &Modal, tui: &mut TuiState, key: KeyEvent) -> Vec<Msg> {
         Modal::SchemaPicker { .. } => schema_picker_message(key),
         Modal::Help => help_message(tui, key),
         Modal::Palette(_) => palette_message(key),
+        Modal::Parameters(_) => parameters_message(key),
     };
     modal_message.map(Msg::Modal).into_iter().collect()
 }
@@ -49,6 +50,15 @@ fn palette_message(key: KeyEvent) -> Option<ModalMsg> {
         KeyCode::Up | KeyCode::BackTab => Some(ModalMsg::Previous),
         _ if is_ctrl(key, 'n') => Some(ModalMsg::Next),
         _ if is_ctrl(key, 'p') => Some(ModalMsg::Previous),
+        _ => prompt_message(key),
+    }
+}
+
+fn parameters_message(key: KeyEvent) -> Option<ModalMsg> {
+    match key.code {
+        KeyCode::Down | KeyCode::Tab => Some(ModalMsg::Next),
+        KeyCode::Up | KeyCode::BackTab => Some(ModalMsg::Previous),
+        _ if is_ctrl(key, 'r') => Some(ModalMsg::ToggleRaw),
         _ => prompt_message(key),
     }
 }

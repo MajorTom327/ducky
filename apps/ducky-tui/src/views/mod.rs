@@ -6,6 +6,7 @@ pub mod header;
 pub mod job_log;
 pub mod modal;
 pub mod palette;
+pub mod parameters;
 pub mod profiles;
 pub mod query;
 pub mod restore;

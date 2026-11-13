@@ -5,6 +5,7 @@ mod grid;
 mod jobs;
 mod modal;
 mod palette;
+mod parameters;
 mod profiles;
 mod query;
 mod sidebar;
