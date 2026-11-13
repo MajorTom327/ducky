@@ -2,19 +2,17 @@ mod support;
 
 use ducky_app::{
     AppState, Command, ConfirmKind, DumpMsg, JobKind, JobState, Loadable, MAX_JOB_LOG_LINES, Modal,
-    ModalMsg, Msg, NoticeLevel, RestoreMsg, SidebarAction, SidebarItem, SidebarMsg,
+    ModalMsg, Msg, NoticeLevel, RestoreMsg, TabsMsg,
 };
 use ducky_core::{PgTools, RestoreOptions};
 use support::{
-    connected_state, file_entry, select_sidebar_item, send, tools_available, tools_missing,
-    workspace, workspace_state,
+    connected_state, file_entry, send, tools_available, tools_missing, workspace, workspace_state,
 };
 
-fn state_on(action: SidebarAction, tools: PgTools) -> AppState {
+fn state_on(tabs_msg: TabsMsg, tools: PgTools) -> AppState {
     let mut state = connected_state(tools);
     send(&mut state, Msg::CatalogLoaded(Ok(support::catalog())));
-    select_sidebar_item(&mut state, |item| *item == SidebarItem::Action(action));
-    send(&mut state, Msg::Sidebar(SidebarMsg::Activate));
+    send(&mut state, Msg::Tabs(tabs_msg));
     state
 }
 
@@ -25,7 +23,7 @@ fn notice_text(state: &AppState) -> (NoticeLevel, String) {
 
 #[test]
 fn dump_with_missing_tool_emits_nothing() {
-    let mut state = state_on(SidebarAction::Dump, tools_missing());
+    let mut state = state_on(TabsMsg::OpenDump, tools_missing());
     assert!(send(&mut state, Msg::Dump(DumpMsg::Start)).is_empty());
     assert_eq!(
         notice_text(&state),
@@ -39,7 +37,7 @@ fn dump_with_missing_tool_emits_nothing() {
 
 #[test]
 fn dump_start_runs_once() {
-    let mut state = state_on(SidebarAction::Dump, tools_available());
+    let mut state = state_on(TabsMsg::OpenDump, tools_available());
     send(
         &mut state,
         Msg::JobLogged {
@@ -61,7 +59,7 @@ fn dump_start_runs_once() {
 
 #[test]
 fn dump_finished_lists_dumps() {
-    let mut state = state_on(SidebarAction::Dump, tools_available());
+    let mut state = state_on(TabsMsg::OpenDump, tools_available());
     send(&mut state, Msg::Dump(DumpMsg::Start));
     let commands = send(
         &mut state,
@@ -83,7 +81,7 @@ fn dump_finished_lists_dumps() {
 
 #[test]
 fn job_failure_is_reported() {
-    let mut state = state_on(SidebarAction::Dump, tools_available());
+    let mut state = state_on(TabsMsg::OpenDump, tools_available());
     send(&mut state, Msg::Dump(DumpMsg::Start));
     let commands = send(
         &mut state,
@@ -122,7 +120,7 @@ fn job_log_is_capped() {
 
 #[test]
 fn restore_with_missing_tool_emits_nothing() {
-    let mut state = state_on(SidebarAction::Restore, tools_missing());
+    let mut state = state_on(TabsMsg::OpenRestore, tools_missing());
     send(&mut state, Msg::DumpsListed(Ok(vec![file_entry("a.dump")])));
     assert!(send(&mut state, Msg::Restore(RestoreMsg::Start)).is_empty());
     assert!(state.modal.is_none());
@@ -131,7 +129,7 @@ fn restore_with_missing_tool_emits_nothing() {
 
 #[test]
 fn restore_without_entry_is_ignored() {
-    let mut state = state_on(SidebarAction::Restore, tools_available());
+    let mut state = state_on(TabsMsg::OpenRestore, tools_available());
     send(&mut state, Msg::DumpsListed(Ok(Vec::new())));
     assert!(send(&mut state, Msg::Restore(RestoreMsg::Start)).is_empty());
     assert!(state.modal.is_none());
@@ -139,7 +137,7 @@ fn restore_without_entry_is_ignored() {
 
 #[test]
 fn restore_confirm_flow() {
-    let mut state = state_on(SidebarAction::Restore, tools_available());
+    let mut state = state_on(TabsMsg::OpenRestore, tools_available());
     send(
         &mut state,
         Msg::DumpsListed(Ok(vec![file_entry("new.dump"), file_entry("old.dump")])),
@@ -188,7 +186,7 @@ fn restore_confirm_flow() {
 
 #[test]
 fn restore_reload_lists_dumps_and_listing_clamps() {
-    let mut state = state_on(SidebarAction::Restore, tools_available());
+    let mut state = state_on(TabsMsg::OpenRestore, tools_available());
     send(
         &mut state,
         Msg::DumpsListed(Ok(vec![file_entry("a.dump"), file_entry("b.dump")])),
@@ -205,4 +203,11 @@ fn restore_reload_lists_dumps_and_listing_clamps() {
         workspace(&state).restore.entries,
         Loadable::Failed("denied".to_owned())
     );
+}
+
+#[test]
+fn dump_messages_are_ignored_outside_the_dump_tab() {
+    let mut state = state_on(TabsMsg::OpenRestore, tools_available());
+    assert!(send(&mut state, Msg::Dump(DumpMsg::Start)).is_empty());
+    assert_eq!(workspace(&state).dump.job, JobState::Idle);
 }

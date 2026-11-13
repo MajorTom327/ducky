@@ -4,7 +4,8 @@ use crate::command::Command;
 use crate::loadable::Loadable;
 use crate::msg::TableMsg;
 use crate::state::{
-    AppState, MainView, Modal, NoticeLevel, Prompt, PromptKind, RowDetail, TableTab, TableView,
+    AppState, Modal, NoticeLevel, Prompt, PromptKind, RowDetail, TabContent, TableTab, TableView,
+    Workspace,
 };
 use crate::update::grid::{cell_text, clamp_cursor, move_cursor};
 use crate::update::{notice, workspace_mut};
@@ -13,10 +14,7 @@ pub(crate) fn update(state: &mut AppState, msg: TableMsg) -> Vec<Command> {
     let Some(workspace) = workspace_mut(&mut state.screen) else {
         return Vec::new();
     };
-    if workspace.view != MainView::Table {
-        return Vec::new();
-    }
-    let Some(table) = &mut workspace.table else {
+    let Some(table) = workspace.active_table_mut() else {
         return Vec::new();
     };
     match msg {
@@ -151,22 +149,29 @@ fn row_detail(table: &TableView) -> Option<RowDetail> {
     })
 }
 
+fn table_views_mut(workspace: &mut Workspace) -> impl Iterator<Item = &mut TableView> {
+    workspace
+        .tabs
+        .iter_mut()
+        .filter_map(|tab| match &mut tab.content {
+            TabContent::Table(table) => Some(table),
+            _ => None,
+        })
+}
+
 pub(crate) fn page_loaded(
     state: &mut AppState,
     request: PageRequest,
     result: Result<Page, String>,
 ) -> Vec<Command> {
-    let Some(table) =
-        workspace_mut(&mut state.screen).and_then(|workspace| workspace.table.as_mut())
-    else {
+    let Some(workspace) = workspace_mut(&mut state.screen) else {
         return Vec::new();
     };
-    if table.request != request {
-        return Vec::new();
-    }
-    table.page = Loadable::from_result(result);
-    if let Some(page) = table.page.ready() {
-        clamp_cursor(&mut table.cursor, &page.result_set);
+    for table in table_views_mut(workspace).filter(|table| table.request == request) {
+        table.page = Loadable::from_result(result.clone());
+        if let Some(page) = table.page.ready() {
+            clamp_cursor(&mut table.cursor, &page.result_set);
+        }
     }
     Vec::new()
 }
@@ -176,13 +181,15 @@ pub(crate) fn details_loaded(
     relation: RelationRef,
     result: Result<RelationDetails, String>,
 ) -> Vec<Command> {
-    let Some(table) =
-        workspace_mut(&mut state.screen).and_then(|workspace| workspace.table.as_mut())
-    else {
+    let Some(workspace) = workspace_mut(&mut state.screen) else {
         return Vec::new();
     };
-    if table.relation == relation {
-        table.details = Loadable::from_result(result);
+    for table in table_views_mut(workspace).filter(|table| table.relation == relation) {
+        table.details = Loadable::from_result(result.clone());
     }
     Vec::new()
+}
+
+pub(crate) fn reload_all_pages(workspace: &mut Workspace) -> Vec<Command> {
+    table_views_mut(workspace).map(reload_page).collect()
 }

@@ -3,8 +3,8 @@ use ducky_core::{FileEntry, ResultSet, ScriptReport, StatementOutcome, Transacti
 use crate::command::Command;
 use crate::msg::{QueryMsg, SaveFailure};
 use crate::state::{
-    AppState, Confirm, ConfirmKind, GridCursor, Modal, NoticeLevel, Prompt, PromptKind, RowDetail,
-    RunState,
+    AppState, Confirm, ConfirmKind, GridCursor, Modal, NoticeLevel, PendingSave, Prompt,
+    PromptKind, RowDetail, RunState, TabId,
 };
 use crate::update::grid::{cell_text, move_cursor};
 use crate::update::{notice, step_index, workspace_mut};
@@ -13,13 +13,18 @@ pub(crate) fn update(state: &mut AppState, msg: QueryMsg) -> Vec<Command> {
     let Some(workspace) = workspace_mut(&mut state.screen) else {
         return Vec::new();
     };
-    let query = &mut workspace.query;
+    if msg == QueryMsg::Cancel {
+        return match workspace.running_script_tab_id {
+            Some(_) => vec![Command::CancelScript],
+            None => Vec::new(),
+        };
+    }
+    let Some((tab_id, query)) = workspace.active_query_mut() else {
+        return Vec::new();
+    };
     match msg {
-        QueryMsg::Run { sql } => run(state, sql),
-        QueryMsg::Cancel => match query.run {
-            RunState::Running => vec![Command::CancelScript],
-            RunState::Idle | RunState::Finished(_) => Vec::new(),
-        },
+        QueryMsg::Run { sql } => run(state, tab_id, sql),
+        QueryMsg::Cancel => Vec::new(),
         QueryMsg::ToggleTransactionMode => {
             query.transaction_mode = match query.transaction_mode {
                 TransactionMode::Transaction => TransactionMode::AutoCommit,
@@ -67,14 +72,24 @@ pub(crate) fn update(state: &mut AppState, msg: QueryMsg) -> Vec<Command> {
             vec![Command::CopyToClipboard(value)]
         }
         QueryMsg::Save { content } => match query.document.name.clone() {
-            Some(name) => vec![Command::SaveFile {
-                name,
-                content,
-                overwrite: true,
-            }],
-            None => open_save_as(state, content),
+            Some(name) => {
+                workspace.pending_save = Some(PendingSave {
+                    tab_id,
+                    name: name.clone(),
+                    content: content.clone(),
+                });
+                vec![Command::SaveFile {
+                    name,
+                    content,
+                    overwrite: true,
+                }]
+            }
+            None => open_save_as(state, None, content),
         },
-        QueryMsg::SaveAs { content } => open_save_as(state, content),
+        QueryMsg::SaveAs { content } => {
+            let current_name = query.document.name.clone();
+            open_save_as(state, current_name, content)
+        }
     }
 }
 
@@ -88,25 +103,24 @@ fn selected_rows(run: &RunState, selected_result_index: usize) -> Option<&Result
     }
 }
 
-fn open_save_as(state: &mut AppState, content: String) -> Vec<Command> {
-    let current_name = state
-        .workspace()
-        .and_then(|workspace| workspace.query.document.name.clone())
-        .unwrap_or_default();
+fn open_save_as(
+    state: &mut AppState,
+    current_name: Option<String>,
+    content: String,
+) -> Vec<Command> {
     state.modal = Some(Modal::Prompt(Prompt::new(
         PromptKind::SaveFileAs { content },
         "Save as",
-        current_name,
+        current_name.unwrap_or_default(),
     )));
     Vec::new()
 }
 
-pub(crate) fn run(state: &mut AppState, sql: String) -> Vec<Command> {
+pub(crate) fn run(state: &mut AppState, tab_id: TabId, sql: String) -> Vec<Command> {
     let Some(workspace) = workspace_mut(&mut state.screen) else {
         return Vec::new();
     };
-    let query = &mut workspace.query;
-    if query.run == RunState::Running {
+    if workspace.running_script_tab_id.is_some() {
         state.notice = notice(NoticeLevel::Error, "A script is already running");
         return Vec::new();
     }
@@ -114,17 +128,24 @@ pub(crate) fn run(state: &mut AppState, sql: String) -> Vec<Command> {
         state.notice = notice(NoticeLevel::Error, "Nothing to run");
         return Vec::new();
     }
+    let Some(query) = workspace.query_mut(tab_id) else {
+        return Vec::new();
+    };
     query.run = RunState::Running;
-    vec![Command::RunScript {
-        sql,
-        mode: query.transaction_mode,
-    }]
+    let mode = query.transaction_mode;
+    workspace.running_script_tab_id = Some(tab_id);
+    vec![Command::RunScript { tab_id, sql, mode }]
 }
 
-pub(crate) fn script_finished(state: &mut AppState, report: ScriptReport) -> Vec<Command> {
+pub(crate) fn script_finished(
+    state: &mut AppState,
+    tab_id: TabId,
+    report: ScriptReport,
+) -> Vec<Command> {
     let Some(workspace) = workspace_mut(&mut state.screen) else {
         return Vec::new();
     };
+    workspace.running_script_tab_id = None;
     let report_notice = match (&report.failure, report.mode) {
         (None, _) => notice(
             NoticeLevel::Success,
@@ -153,10 +174,11 @@ pub(crate) fn script_finished(state: &mut AppState, report: ScriptReport) -> Vec
         .results
         .iter()
         .any(|statement_result| matches!(statement_result.outcome, StatementOutcome::Affected(_)));
-    let query = &mut workspace.query;
-    query.selected_result_index = report.results.len().saturating_sub(1);
-    query.cursor = GridCursor::default();
-    query.run = RunState::Finished(report);
+    if let Some(query) = workspace.query_mut(tab_id) {
+        query.selected_result_index = report.results.len().saturating_sub(1);
+        query.cursor = GridCursor::default();
+        query.run = RunState::Finished(report);
+    }
     state.notice = report_notice;
     if has_affected_result {
         vec![Command::LoadCatalog]
@@ -173,12 +195,15 @@ pub(crate) fn file_saved(
     let Some(workspace) = workspace_mut(&mut state.screen) else {
         return Vec::new();
     };
-    let query = &mut workspace.query;
     match result {
         Ok(entry) => {
             state.notice = notice(NoticeLevel::Success, format!("Saved {}", entry.name));
-            query.document.name = Some(entry.name);
-            query.pending_save = None;
+            if let Some(pending_save) = workspace.pending_save.take()
+                && let Some(query) = workspace.query_mut(pending_save.tab_id)
+            {
+                query.document.name = Some(entry.name);
+                query.document.text = pending_save.content;
+            }
             if workspace.files.entries.ready().is_some() {
                 vec![Command::ListSqlFiles]
             } else {
@@ -186,7 +211,7 @@ pub(crate) fn file_saved(
             }
         }
         Err(SaveFailure::AlreadyExists) => {
-            if query.pending_save.is_some() {
+            if workspace.pending_save.is_some() {
                 state.modal = Some(Modal::Confirm(Confirm {
                     kind: ConfirmKind::OverwriteFile,
                     message: format!("{name} already exists. Overwrite?"),
@@ -197,7 +222,7 @@ pub(crate) fn file_saved(
             Vec::new()
         }
         Err(SaveFailure::Other(message)) => {
-            query.pending_save = None;
+            workspace.pending_save = None;
             state.notice = notice(NoticeLevel::Error, message);
             Vec::new()
         }

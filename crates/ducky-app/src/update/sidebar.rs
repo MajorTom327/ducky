@@ -1,15 +1,11 @@
-use ducky_core::PageRequest;
-
 use crate::command::Command;
-use crate::loadable::Loadable;
 use crate::msg::SidebarMsg;
-use crate::state::{
-    AppState, Focus, GridCursor, MainView, Modal, PAGE_SIZE, Prompt, PromptKind, QueryPane,
-    SidebarAction, SidebarItem, TableTab, TableView, Workspace,
-};
+use crate::state::{AppState, Modal, Prompt, PromptKind, Workspace};
+use crate::update::tabs::open_relation;
 use crate::update::{clamp_index, step_index, workspace_mut};
 
 pub(crate) fn update(state: &mut AppState, msg: SidebarMsg) -> Vec<Command> {
+    let page_size = state.page_size;
     let Some(workspace) = workspace_mut(&mut state.screen) else {
         return Vec::new();
     };
@@ -45,11 +41,11 @@ pub(crate) fn update(state: &mut AppState, msg: SidebarMsg) -> Vec<Command> {
             sidebar.selected_item_index = 0;
             Vec::new()
         }
-        SidebarMsg::Activate => activate(workspace),
+        SidebarMsg::Activate => activate(workspace, page_size),
     }
 }
 
-fn activate(workspace: &mut Workspace) -> Vec<Command> {
+fn activate(workspace: &mut Workspace, page_size: usize) -> Vec<Command> {
     let Some(item) = workspace
         .sidebar_items()
         .into_iter()
@@ -57,45 +53,5 @@ fn activate(workspace: &mut Workspace) -> Vec<Command> {
     else {
         return Vec::new();
     };
-    workspace.focus = Focus::Main;
-    match item {
-        SidebarItem::Action(SidebarAction::SqlCommand) => {
-            workspace.view = MainView::Query;
-            workspace.query.pane = QueryPane::Editor;
-            Vec::new()
-        }
-        SidebarItem::Action(SidebarAction::SqlFiles) => {
-            workspace.view = MainView::Files;
-            workspace.files.entries = Loadable::Loading;
-            vec![Command::ListSqlFiles]
-        }
-        SidebarItem::Action(SidebarAction::Dump) => {
-            workspace.view = MainView::Dump;
-            Vec::new()
-        }
-        SidebarItem::Action(SidebarAction::Restore) => {
-            workspace.view = MainView::Restore;
-            workspace.restore.entries = Loadable::Loading;
-            vec![Command::ListDumps]
-        }
-        SidebarItem::Relation { relation, .. } => {
-            let request = PageRequest {
-                relation: relation.clone(),
-                page_index: 0,
-                page_size: PAGE_SIZE,
-                sort: None,
-                filter: None,
-            };
-            workspace.table = Some(TableView {
-                relation,
-                tab: TableTab::Data,
-                request: request.clone(),
-                page: Loadable::Loading,
-                cursor: GridCursor::default(),
-                details: Loadable::Idle,
-            });
-            workspace.view = MainView::Table;
-            vec![Command::LoadPage(request)]
-        }
-    }
+    open_relation(workspace, item.relation, page_size)
 }

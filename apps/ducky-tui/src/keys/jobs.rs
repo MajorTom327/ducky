@@ -1,5 +1,5 @@
 use crossterm::event::{KeyCode, KeyEvent};
-use ducky_app::{DumpMsg, MainView, Msg, RestoreMsg, Workspace};
+use ducky_app::{DumpMsg, Msg, RestoreMsg, TabContent, Workspace};
 
 use crate::keys::{is_ctrl, is_plain_char};
 use crate::tui_state::TuiState;
@@ -7,8 +7,9 @@ use crate::tui_state::TuiState;
 const LOG_SCROLL_STEP: u16 = 10;
 
 pub fn handle(workspace: &Workspace, tui: &mut TuiState, key: KeyEvent) -> Vec<Msg> {
-    let log_line_count = match workspace.view {
-        MainView::Restore => workspace.restore.log_lines.len(),
+    let active_content = workspace.active_tab().map(|tab| &tab.content);
+    let log_line_count = match active_content {
+        Some(TabContent::Restore) => workspace.restore.log_lines.len(),
         _ => workspace.dump.log_lines.len(),
     };
     let log_end = u16::try_from(log_line_count).unwrap_or(u16::MAX);
@@ -27,9 +28,9 @@ pub fn handle(workspace: &Workspace, tui: &mut TuiState, key: KeyEvent) -> Vec<M
     if key.code == KeyCode::Esc {
         return vec![Msg::ToggleFocus];
     }
-    let message = match workspace.view {
-        MainView::Dump => dump_message(key),
-        MainView::Restore => restore_message(key).map(Msg::Restore),
+    let message = match active_content {
+        Some(TabContent::Dump) => dump_message(key),
+        Some(TabContent::Restore) => restore_message(key).map(Msg::Restore),
         _ => None,
     };
     message.into_iter().collect()

@@ -23,3 +23,22 @@ pub struct TableView {
     pub cursor: GridCursor,
     pub details: Loadable<RelationDetails>,
 }
+
+impl TableView {
+    pub(crate) fn first_page(relation: RelationRef, page_size: usize) -> TableView {
+        TableView {
+            request: PageRequest {
+                relation: relation.clone(),
+                page_index: 0,
+                page_size,
+                sort: None,
+                filter: None,
+            },
+            relation,
+            tab: TableTab::Data,
+            page: Loadable::Loading,
+            cursor: GridCursor::default(),
+            details: Loadable::Idle,
+        }
+    }
+}

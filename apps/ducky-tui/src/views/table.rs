@@ -1,98 +1,110 @@
-use ducky_app::{Focus, Loadable, TableTab, TableView};
+use ducky_app::{Focus, Loadable, TabId, TableTab, TableView};
 use ducky_core::SortDirection;
 use ratatui::Frame;
 use ratatui::layout::{Constraint, Layout, Rect};
 use ratatui::text::{Line, Span};
-use ratatui::widgets::{Block, Paragraph};
+use ratatui::widgets::{Block, Padding, Paragraph};
 
+use crate::theme::Palette;
 use crate::tui_state::TuiState;
 use crate::views::{ViewContext, structure};
-use crate::widgets::grid::{GridViewport, render_grid};
+use crate::widgets::grid::{GridOptions, render_grid};
 use crate::widgets::loading::{LoadSlot, render_error, render_loadable};
 
 const FAILED_PAGE_HINT: &str = "/ edit filter · Esc clear filter · r reload";
 
 pub fn render(frame: &mut Frame, area: Rect, context: &ViewContext, tui: &mut TuiState) {
-    let Some(table) = &context.workspace.table else {
+    let Some((tab_id, table)) = context.active_table() else {
         return;
     };
-    if tui.shown_relation.as_ref() != Some(&table.relation) {
-        tui.table_viewport = GridViewport::default();
-        tui.structure_scroll = 0;
-        tui.shown_relation = Some(table.relation.clone());
-    }
+    let palette = context.palette;
     let is_focused = context.workspace.focus == Focus::Main;
-    let block = Block::bordered()
-        .title(Span::styled(
+    let mut block = Block::bordered()
+        .padding(Padding::horizontal(1))
+        .border_style(palette.border(is_focused))
+        .title_top(Line::styled(
             format!(" {}.{} ", table.relation.schema, table.relation.name),
-            context.palette.title(),
+            palette.title(),
         ))
-        .border_style(context.palette.border(is_focused));
+        .title_top(tabs_line(table, palette).right_aligned());
+    if table.tab == TableTab::Data {
+        if let Some(summary) = summary_text(table) {
+            block = block.title_bottom(Line::styled(summary, palette.muted()));
+        }
+        block = block.title_bottom(
+            Line::styled(
+                format!(" page {} ", table.request.page_index + 1),
+                palette.muted(),
+            )
+            .right_aligned(),
+        );
+    }
     let inner_area = block.inner(area);
     frame.render_widget(block, area);
-    let [tabs_area, content_area] =
-        Layout::vertical([Constraint::Length(1), Constraint::Min(0)]).areas(inner_area);
-    frame.render_widget(Paragraph::new(tabs_line(table, context)), tabs_area);
     match table.tab {
-        TableTab::Data => render_data(frame, content_area, table, context, tui, is_focused),
-        TableTab::Structure => structure::render(frame, content_area, context, tui),
+        TableTab::Data => render_data(frame, inner_area, tab_id, table, context, tui),
+        TableTab::Structure => structure::render(frame, inner_area, tab_id, table, context, tui),
     }
 }
 
-fn tabs_line(table: &TableView, context: &ViewContext) -> Line<'static> {
+fn tabs_line(table: &TableView, palette: &Palette) -> Line<'static> {
     let tab_style = |tab: TableTab| match table.tab == tab {
-        true => context.palette.title(),
-        false => context.palette.muted(),
+        true => palette.title(),
+        false => palette.muted(),
     };
     Line::from(vec![
+        Span::raw(" "),
         Span::styled("Data", tab_style(TableTab::Data)),
-        Span::raw(" │ "),
+        Span::styled(" · ", palette.muted()),
         Span::styled("Structure", tab_style(TableTab::Structure)),
+        Span::raw(" "),
     ])
 }
 
-fn summary_text(table: &TableView, context: &ViewContext) -> String {
-    let estimated_row_count = context
-        .workspace
-        .catalog
-        .ready()
-        .and_then(|catalog| catalog.relation(&table.relation))
-        .and_then(|relation| relation.estimated_row_count);
+fn summary_text(table: &TableView) -> Option<String> {
     let mut parts = Vec::new();
-    if let Some(row_count) = estimated_row_count {
-        parts.push(format!("~{row_count} rows"));
+    if let Some(page) = table.page.ready() {
+        let first_row_number = first_row_number(table);
+        let row_count = page.result_set.rows.len();
+        parts.push(match row_count {
+            0 => "no rows".to_owned(),
+            _ => format!(
+                "rows {first_row_number}–{}",
+                first_row_number + row_count - 1
+            ),
+        });
     }
-    parts.push(format!("page {}", table.request.page_index + 1));
     if let Some(sort) = &table.request.sort {
         let arrow = match sort.direction {
             SortDirection::Ascending => "↑",
             SortDirection::Descending => "↓",
         };
-        parts.push(format!("sort: {} {arrow}", sort.column));
+        parts.push(format!("sort {} {arrow}", sort.column));
     }
     if let Some(filter) = &table.request.filter {
-        parts.push(format!("where: {filter}"));
+        parts.push(format!("where {filter}"));
     }
-    parts.join(" · ")
+    match parts.is_empty() {
+        true => None,
+        false => Some(format!(" {} ", parts.join(" · "))),
+    }
+}
+
+fn first_row_number(table: &TableView) -> usize {
+    table.request.page_index * table.request.page_size + 1
 }
 
 fn render_data(
     frame: &mut Frame,
     area: Rect,
+    tab_id: TabId,
     table: &TableView,
     context: &ViewContext,
     tui: &mut TuiState,
-    is_focused: bool,
 ) {
-    let [summary_area, body_area] =
-        Layout::vertical([Constraint::Length(1), Constraint::Min(0)]).areas(area);
-    frame.render_widget(
-        Paragraph::new(summary_text(table, context)).style(context.palette.muted()),
-        summary_area,
-    );
     if let Loadable::Failed(message) = &table.page {
         let [error_area, hint_area] =
-            Layout::vertical([Constraint::Min(0), Constraint::Length(1)]).areas(body_area);
+            Layout::vertical([Constraint::Min(0), Constraint::Length(1)]).areas(area);
         render_error(frame, error_area, message, context.palette);
         frame.render_widget(
             Paragraph::new(FAILED_PAGE_HINT).style(context.palette.muted()),
@@ -102,7 +114,7 @@ fn render_data(
     }
     let Some(page) = render_loadable(
         frame,
-        body_area,
+        area,
         &table.page,
         "rows",
         LoadSlot::Main,
@@ -111,14 +123,18 @@ fn render_data(
     ) else {
         return;
     };
+    let options = GridOptions {
+        cursor: table.cursor,
+        sort: table.request.sort.as_ref(),
+        first_row_number: first_row_number(table),
+        is_focused: context.workspace.focus == Focus::Main,
+    };
     render_grid(
         frame,
-        body_area,
+        area,
         &page.result_set,
-        table.cursor,
-        &mut tui.table_viewport,
-        table.request.sort.as_ref(),
-        is_focused,
+        tui.table_viewports.entry(tab_id).or_default(),
+        options,
         context.palette,
     );
 }

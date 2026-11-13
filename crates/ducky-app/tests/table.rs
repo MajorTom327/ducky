@@ -2,14 +2,17 @@ mod support;
 
 use ducky_app::{
     AppState, Command, GridCursor, GridMove, Loadable, Modal, ModalMsg, Msg, NoticeLevel,
-    PromptKind, TableMsg, TableTab, TableView,
+    PromptKind, TableMsg, TableTab, TableView, TabsMsg,
 };
 use ducky_core::{RelationDetails, RelationRef, Sort, SortDirection};
-use support::{open_loaded_table, page, send, workspace, workspace_mut, workspace_state};
+use support::{
+    activate_relation, active_tab_id, active_table, open_loaded_table, page, send, table_tab,
+    table_tab_mut, workspace_state,
+};
 use tui_input::InputRequest;
 
 fn table(state: &AppState) -> &TableView {
-    workspace(state).table.as_ref().expect("table")
+    active_table(state)
 }
 
 fn load_current_page(state: &mut AppState, has_next_page: bool) {
@@ -44,11 +47,8 @@ fn stale_page_is_ignored() {
 fn page_loaded_clamps_cursor() {
     let mut state = workspace_state();
     open_loaded_table(&mut state, false);
-    workspace_mut(&mut state)
-        .table
-        .as_mut()
-        .expect("table")
-        .cursor = GridCursor {
+    let tab_id = active_tab_id(&state);
+    table_tab_mut(&mut state, tab_id).cursor = GridCursor {
         row_index: 9,
         column_index: 9,
     };
@@ -245,4 +245,61 @@ fn copy_cell_copies_null_as_empty() {
 fn table_messages_without_table_are_ignored() {
     let mut state = workspace_state();
     assert!(send(&mut state, Msg::Table(TableMsg::Reload)).is_empty());
+}
+
+#[test]
+fn table_messages_are_ignored_when_active_tab_is_not_a_table() {
+    let mut state = workspace_state();
+    open_loaded_table(&mut state, true);
+    send(&mut state, Msg::Tabs(TabsMsg::NewQuery));
+    assert!(send(&mut state, Msg::Table(TableMsg::NextPage)).is_empty());
+    assert!(send(&mut state, Msg::Table(TableMsg::Reload)).is_empty());
+}
+
+#[test]
+fn page_loaded_reaches_background_tab() {
+    let mut state = workspace_state();
+    let Some(Command::LoadPage(customers_request)) = activate_relation(&mut state, "customers")
+        .into_iter()
+        .next()
+    else {
+        panic!("expected LoadPage");
+    };
+    let customers_tab_id = active_tab_id(&state);
+    activate_relation(&mut state, "orders");
+    send(
+        &mut state,
+        Msg::PageLoaded {
+            request: customers_request,
+            result: Ok(page(3, false)),
+        },
+    );
+    assert!(table_tab(&state, customers_tab_id).page.ready().is_some());
+    assert!(table(&state).page.is_loading());
+}
+
+#[test]
+fn details_loaded_reaches_background_tab() {
+    let mut state = workspace_state();
+    open_loaded_table(&mut state, false);
+    let customers_tab_id = active_tab_id(&state);
+    send(&mut state, Msg::Table(TableMsg::ToggleTab));
+    let relation = table(&state).relation.clone();
+    activate_relation(&mut state, "orders");
+    let details = RelationDetails {
+        indexes: Vec::new(),
+        foreign_keys: Vec::new(),
+        view_definition: None,
+    };
+    send(
+        &mut state,
+        Msg::DetailsLoaded {
+            relation,
+            result: Ok(details.clone()),
+        },
+    );
+    assert_eq!(
+        table_tab(&state, customers_tab_id).details,
+        Loadable::Ready(details)
+    );
 }

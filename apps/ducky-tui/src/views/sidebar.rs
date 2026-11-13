@@ -1,125 +1,136 @@
-use ducky_app::{Focus, SidebarAction, SidebarItem, Workspace};
-use ducky_core::{RelationKind, ToolStatus};
+use ducky_app::{Focus, SidebarItem};
+use ducky_core::RelationKind;
 use ratatui::Frame;
-use ratatui::layout::{Constraint, Layout, Rect};
+use ratatui::layout::Rect;
 use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Paragraph};
 
-use crate::theme::Palette;
 use crate::tui_state::TuiState;
 use crate::views::ViewContext;
 use crate::widgets::loading::{LoadSlot, render_loadable};
-
-const ACTION_COUNT: usize = 4;
 
 pub fn render(frame: &mut Frame, area: Rect, context: &ViewContext, tui: &mut TuiState) {
     let workspace = context.workspace;
     let palette = context.palette;
     let is_focused = workspace.focus == Focus::Sidebar;
+    let bottom_title = match workspace.sidebar.filter.is_empty() {
+        true => Line::styled(" s schema ", palette.muted()),
+        false => Line::styled(format!(" /{} ", workspace.sidebar.filter), palette.title()),
+    };
     let block = Block::bordered()
         .title(Span::styled(
-            format!(" Schema: {} ", workspace.schema_name),
+            format!(" {} ", workspace.schema_name),
             palette.title(),
         ))
+        .title_bottom(bottom_title)
         .border_style(palette.border(is_focused));
     let inner_area = block.inner(area);
     frame.render_widget(block, area);
-    let has_filter = !workspace.sidebar.filter.is_empty();
-    let [rows_area, filter_area] = inner_area.layout(&Layout::vertical([
-        Constraint::Min(0),
-        Constraint::Length(u16::from(has_filter)),
-    ]));
-    if has_filter {
-        frame.render_widget(
-            Paragraph::new(Line::styled(
-                format!("/{}", workspace.sidebar.filter),
-                palette.title(),
-            )),
-            filter_area,
-        );
+    if render_loadable(
+        frame,
+        inner_area,
+        &workspace.catalog,
+        "tables",
+        LoadSlot::Sidebar,
+        tui,
+        palette,
+    )
+    .is_none()
+    {
+        return;
     }
     let sidebar_items = workspace.sidebar_items();
-    let mut display_rows: Vec<Line> = sidebar_items
+    if sidebar_items.is_empty() {
+        frame.render_widget(
+            Paragraph::new(Line::styled(" No tables", palette.muted())),
+            inner_area,
+        );
+        return;
+    }
+    let active_relation = context.active_table().map(|(_, table)| &table.relation);
+    let row_width = usize::from(inner_area.width);
+    let selected_item_index = workspace.sidebar.selected_item_index;
+    let visible_row_count = usize::from(inner_area.height).max(1);
+    let first_item_index = (selected_item_index + 1).saturating_sub(visible_row_count);
+    let rows: Vec<Line> = sidebar_items
         .iter()
         .enumerate()
+        .skip(first_item_index)
+        .take(visible_row_count)
         .map(|(item_index, item)| {
-            let line = item_line(item, workspace, palette);
-            match item_index == workspace.sidebar.selected_item_index {
+            let is_selected = item_index == selected_item_index;
+            let name_style = match active_relation == Some(&item.relation) {
+                true => Style::new().add_modifier(Modifier::BOLD),
+                false => Style::new(),
+            };
+            let meta_style = match is_selected {
+                true => Style::new(),
+                false => palette.muted(),
+            };
+            let line = spread_line(
+                Span::styled(item.relation.name.clone(), name_style),
+                vec![Span::styled(relation_meta(item), meta_style)],
+                row_width,
+            );
+            match is_selected {
                 true => line.style(palette.selected(is_focused)),
                 false => line,
             }
         })
         .collect();
-    let separator = Line::styled("── Tables & views ──", palette.muted());
-    display_rows.insert(ACTION_COUNT.min(display_rows.len()), separator);
-    let selected_row_index = match workspace.sidebar.selected_item_index < ACTION_COUNT {
-        true => workspace.sidebar.selected_item_index,
-        false => workspace.sidebar.selected_item_index + 1,
-    };
-    if workspace.catalog.ready().is_none() {
-        let [actions_area, catalog_area] = rows_area.layout(&Layout::vertical([
-            Constraint::Length(u16::try_from(display_rows.len()).unwrap_or(u16::MAX)),
-            Constraint::Min(0),
-        ]));
-        frame.render_widget(Paragraph::new(display_rows), actions_area);
-        render_loadable(
-            frame,
-            catalog_area,
-            &workspace.catalog,
-            "tables",
-            LoadSlot::Sidebar,
-            tui,
-            palette,
-        );
-        return;
+    frame.render_widget(Paragraph::new(rows), inner_area);
+}
+
+pub fn relation_meta(item: &SidebarItem) -> String {
+    match item.kind {
+        RelationKind::Table => item
+            .estimated_row_count
+            .map(compact_count)
+            .unwrap_or_default(),
+        RelationKind::View => "view".to_owned(),
+        RelationKind::MaterializedView => "mview".to_owned(),
+        RelationKind::ForeignTable => "foreign".to_owned(),
     }
-    let visible_row_count = usize::from(rows_area.height).max(1);
-    let first_row_index = (selected_row_index + 1).saturating_sub(visible_row_count);
-    let visible_rows: Vec<Line> = display_rows
-        .into_iter()
-        .skip(first_row_index)
-        .take(visible_row_count)
+}
+
+pub fn compact_count(count: i64) -> String {
+    let count = count.max(0);
+    match count {
+        0..1_000 => count.to_string(),
+        1_000..1_000_000 => scaled_count(count, 1_000, "k"),
+        1_000_000..1_000_000_000 => scaled_count(count, 1_000_000, "M"),
+        _ => scaled_count(count, 1_000_000_000, "G"),
+    }
+}
+
+fn scaled_count(count: i64, unit: i64, suffix: &str) -> String {
+    let tenths = count * 10 / unit;
+    match tenths < 100 {
+        true => format!("{}.{}{suffix}", tenths / 10, tenths % 10),
+        false => format!("{}{suffix}", count / unit),
+    }
+}
+
+pub fn spread_line<'a>(left: Span<'a>, right: Vec<Span<'a>>, width: usize) -> Line<'a> {
+    let right_width: usize = right.iter().map(Span::width).sum();
+    let left_budget = width.saturating_sub(right_width + 3);
+    let left = fit_span(left, left_budget);
+    let padding = width.saturating_sub(left.width() + right_width + 2);
+    let mut spans = vec![Span::raw(" "), left, Span::raw(" ".repeat(padding))];
+    spans.extend(right);
+    spans.push(Span::raw(" "));
+    Line::from(spans)
+}
+
+fn fit_span(span: Span<'_>, max_width: usize) -> Span<'_> {
+    if span.width() <= max_width {
+        return span;
+    }
+    let kept: String = span
+        .content
+        .chars()
+        .take(max_width.saturating_sub(1))
         .collect();
-    frame.render_widget(Paragraph::new(visible_rows), rows_area);
-}
-
-fn item_line(item: &SidebarItem, workspace: &Workspace, palette: &Palette) -> Line<'static> {
-    match item {
-        SidebarItem::Action(action) => {
-            let label = action_label(*action);
-            match action_tool(*action, workspace) {
-                Some(ToolStatus::Missing(_)) => {
-                    Line::styled(format!(" {label} (unavailable)"), palette.muted())
-                }
-                Some(ToolStatus::Available(_)) | None => Line::raw(format!(" {label}")),
-            }
-        }
-        SidebarItem::Relation { relation, kind } => {
-            let style = match kind {
-                RelationKind::View | RelationKind::MaterializedView => {
-                    Style::new().add_modifier(Modifier::ITALIC)
-                }
-                RelationKind::Table | RelationKind::ForeignTable => Style::new(),
-            };
-            Line::styled(format!(" {}", relation.name), style)
-        }
-    }
-}
-
-pub fn action_label(action: SidebarAction) -> &'static str {
-    match action {
-        SidebarAction::SqlCommand => "SQL command",
-        SidebarAction::SqlFiles => "SQL files",
-        SidebarAction::Dump => "Dump database",
-        SidebarAction::Restore => "Restore dump",
-    }
-}
-
-fn action_tool(action: SidebarAction, workspace: &Workspace) -> Option<&ToolStatus> {
-    match action {
-        SidebarAction::Dump => Some(&workspace.tools.pg_dump),
-        SidebarAction::Restore => Some(&workspace.tools.pg_restore),
-        SidebarAction::SqlCommand | SidebarAction::SqlFiles => None,
-    }
+    Span::styled(format!("{kept}…"), span.style)
 }

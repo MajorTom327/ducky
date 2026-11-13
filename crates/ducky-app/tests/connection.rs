@@ -1,10 +1,13 @@
 mod support;
 
-use ducky_app::{AppState, Command, Loadable, MainView, Msg, NoticeLevel, ProfilesMsg, Screen};
+use ducky_app::{
+    AppState, Command, Focus, Loadable, Msg, NoticeLevel, ProfilesMsg, Screen, TabsMsg,
+};
 use ducky_core::RelationKind;
 use support::{
-    catalog, connection, open_loaded_table, profiles, relation, schema, send, storage,
-    tools_available, tools_missing, workspace, workspace_mut, workspace_state,
+    activate_relation, active_tab_id, active_table, catalog, connection, open_loaded_table,
+    profiles, relation, schema, send, storage, tools_available, tools_missing, workspace,
+    workspace_mut, workspace_state,
 };
 
 #[test]
@@ -22,8 +25,13 @@ fn connect_success_opens_workspace_and_loads_catalog() {
     let workspace = workspace(&state);
     assert_eq!(workspace.profile.label, "Local");
     assert!(workspace.catalog.is_loading());
-    assert_eq!(workspace.view, MainView::Welcome);
-    assert_eq!(workspace.query.document.revision, 0);
+    assert!(workspace.tabs.is_empty());
+    assert_eq!(workspace.active_tab_index, 0);
+    assert_eq!(workspace.next_tab_id, 1);
+    assert_eq!(workspace.next_query_number, 1);
+    assert_eq!(workspace.focus, Focus::Sidebar);
+    assert_eq!(workspace.pending_save, None);
+    assert_eq!(workspace.running_script_tab_id, None);
 }
 
 #[test]
@@ -78,15 +86,13 @@ fn reconnect_emits_connect_with_notice() {
 }
 
 #[test]
-fn reconnect_reloads_open_page() {
+fn reconnect_reloads_every_table_tab() {
     let mut state = workspace_state();
     open_loaded_table(&mut state, false);
-    let request = workspace(&state)
-        .table
-        .as_ref()
-        .expect("table")
-        .request
-        .clone();
+    let customers_request = active_table(&state).request.clone();
+    activate_relation(&mut state, "orders");
+    let orders_request = active_table(&state).request.clone();
+    support::new_query(&mut state);
     let commands = send(
         &mut state,
         Msg::Connected {
@@ -96,17 +102,15 @@ fn reconnect_reloads_open_page() {
     );
     assert_eq!(
         commands,
-        vec![Command::LoadCatalog, Command::LoadPage(request)]
+        vec![
+            Command::LoadCatalog,
+            Command::LoadPage(customers_request),
+            Command::LoadPage(orders_request)
+        ]
     );
     assert_eq!(workspace(&state).tools, tools_missing());
-    assert!(
-        workspace(&state)
-            .table
-            .as_ref()
-            .expect("table")
-            .page
-            .is_loading()
-    );
+    send(&mut state, Msg::Tabs(TabsMsg::Select(0)));
+    assert!(active_table(&state).page.is_loading());
     assert_eq!(
         state.notice.as_ref().map(|notice| notice.text.as_str()),
         Some("Reconnected")
@@ -175,10 +179,13 @@ fn catalog_failure_is_reported() {
 }
 
 #[test]
-fn catalog_reload_clamps_sidebar_and_drops_vanished_table() {
+fn catalog_reload_clamps_sidebar_and_closes_vanished_table_tab() {
     let mut state = workspace_state();
     open_loaded_table(&mut state, false);
-    workspace_mut(&mut state).sidebar.selected_item_index = 6;
+    activate_relation(&mut state, "orders");
+    let orders_tab_id = active_tab_id(&state);
+    send(&mut state, Msg::Tabs(TabsMsg::Select(0)));
+    workspace_mut(&mut state).sidebar.selected_item_index = 2;
     let shrunk_catalog = ducky_core::Catalog {
         schemas: vec![schema(
             "public",
@@ -187,7 +194,36 @@ fn catalog_reload_clamps_sidebar_and_drops_vanished_table() {
     };
     send(&mut state, Msg::CatalogLoaded(Ok(shrunk_catalog)));
     let workspace = workspace(&state);
-    assert_eq!(workspace.sidebar.selected_item_index, 4);
-    assert!(workspace.table.is_none());
-    assert_eq!(workspace.view, MainView::Welcome);
+    assert_eq!(workspace.sidebar.selected_item_index, 0);
+    assert_eq!(workspace.tabs.len(), 1);
+    assert_eq!(workspace.tabs[0].id, orders_tab_id);
+    assert_eq!(workspace.active_tab_index, 0);
+    assert_eq!(workspace.focus, Focus::Main);
+}
+
+#[test]
+fn catalog_reload_keeps_active_tab_when_an_earlier_tab_vanishes() {
+    let mut state = workspace_state();
+    open_loaded_table(&mut state, false);
+    let query_tab_id = support::new_query(&mut state);
+    let shrunk_catalog = ducky_core::Catalog {
+        schemas: vec![schema("public", Vec::new())],
+    };
+    send(&mut state, Msg::CatalogLoaded(Ok(shrunk_catalog)));
+    assert_eq!(workspace(&state).tabs.len(), 1);
+    assert_eq!(active_tab_id(&state), query_tab_id);
+}
+
+#[test]
+fn catalog_reload_returns_focus_to_sidebar_when_last_tab_vanishes() {
+    let mut state = workspace_state();
+    open_loaded_table(&mut state, false);
+    send(
+        &mut state,
+        Msg::CatalogLoaded(Ok(ducky_core::Catalog {
+            schemas: Vec::new(),
+        })),
+    );
+    assert!(workspace(&state).tabs.is_empty());
+    assert_eq!(workspace(&state).focus, Focus::Sidebar);
 }

@@ -22,6 +22,7 @@ Lookup order:
 ```toml
 sql_dir = "sql"      # default "sql", relative to the config file
 dump_dir = "dumps"   # default "dumps", relative to the config file
+page_size = 50       # rows per table page, 1–5000, default 50
 
 [[profiles]]
 label = "Local"
@@ -36,14 +37,18 @@ type = "prod"
 
 - `type` is `local` (green), `staging` (orange) or `prod` (red); the header and focus colours follow it.
 - `${VAR}` in `url` is expanded from the environment at connect time; an unset variable fails the connection.
-- Labels must be non-empty and unique; urls start with `postgres://` or `postgresql://`. Unknown keys are rejected.
+- Labels must be non-empty and unique; urls start with `postgres://` or `postgresql://`. Unknown keys are rejected. `page_size` outside 1–5000 is rejected.
 - `sslmode`: `disable`; `prefer`/`allow`/absent; `require` (encrypted, unverified); `verify-ca`/`verify-full` (verified against native roots).
 
 See `ducky.example.toml`.
 
 ## Dumps
 
-Dump and restore need `pg_dump` and `pg_restore` in `PATH` (macOS: `brew install libpq`, Debian/Ubuntu: `apt install postgresql-client`). When missing, the sidebar entries show `(unavailable)` and the views explain why. Dumps use the custom format; the password is passed through `PGPASSWORD`, never on the command line.
+Dump and restore need `pg_dump` and `pg_restore` in `PATH` (macOS: `brew install libpq`, Debian/Ubuntu: `apt install postgresql-client`). When missing, the Dump / Restore tabs explain why and how to install them. Dumps use the custom format; the password is passed through `PGPASSWORD`, never on the command line.
+
+## Usage
+
+Every main view opens in a tab: one tab per opened relation (reused when reopened), numbered `Query N` SQL tabs (`Ctrl+n`), and single `SQL files`, `Dump` and `Restore` tabs. The sidebar lists the relations of the current schema with their estimated row count or kind. `Ctrl+p` opens "go to anything": open tabs, actions and the relations of every schema. Only one script runs at a time across all query tabs. See [key bindings](docs/keybindings.md).
 
 ## Development
 

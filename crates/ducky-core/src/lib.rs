@@ -9,7 +9,9 @@ pub use catalog::{
     Catalog, Column, ForeignKey, Index, Relation, RelationDetails, RelationKind, RelationRef,
     Schema,
 };
-pub use data::{Cell, Page, PageRequest, ResultSet, Sort, SortDirection};
+pub use data::{
+    Cell, DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE, Page, PageRequest, ResultSet, Sort, SortDirection,
+};
 pub use files::{FileEntry, PgTools, RestoreOptions, StoragePaths, ToolStatus};
 pub use profile::{Profile, ProfileKind};
 pub use script::{ScriptFailure, ScriptReport, StatementOutcome, StatementResult, TransactionMode};

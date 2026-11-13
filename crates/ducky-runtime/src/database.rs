@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use ducky_app::{Msg, Notice, NoticeLevel};
+use ducky_app::{Msg, Notice, NoticeLevel, TabId};
 use ducky_core::{PageRequest, RelationRef, ScriptFailure, ScriptReport, TransactionMode};
 use tokio::sync::mpsc::UnboundedSender;
 
@@ -62,6 +62,7 @@ pub(crate) fn spawn_load_details(
 pub(crate) fn spawn_run_script(
     active: &ActiveSlot,
     messages: UnboundedSender<Msg>,
+    tab_id: TabId,
     sql: String,
     mode: TransactionMode,
 ) {
@@ -83,7 +84,7 @@ pub(crate) fn spawn_run_script(
                 elapsed: Duration::ZERO,
             },
         };
-        let _ = messages.send(Msg::ScriptFinished(report));
+        let _ = messages.send(Msg::ScriptFinished { tab_id, report });
     });
 }
 

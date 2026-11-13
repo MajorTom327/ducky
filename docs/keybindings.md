@@ -6,28 +6,60 @@ Source of truth: `apps/ducky-tui/src/keys/help.rs` (`HELP_ROWS`, shown with `F1`
 
 |Key|Action|
 |---|---|
-|`Ctrl+q`|quit|
-|`q`|quit (outside the editor)|
-|`F1 / ?`|help|
-|`Tab / Shift+Tab`|switch focus|
+|`Ctrl+p`|go to anything|
+|`Ctrl+n`|new SQL query tab|
+|`Ctrl+w`|close the active tab|
+|`Ctrl+o`|open the SQL files tab|
+|`Ctrl+h / Ctrl+l`|focus the sidebar / the main pane|
+|`Ctrl+k / Ctrl+j`|focus the editor / the results|
+|`Ctrl+PgDn`|next tab|
+|`Ctrl+PgUp`|previous tab|
+|`F1`|help|
 |`Ctrl+c`|cancel the running script|
+|`Ctrl+q`|quit|
+
+## Outside insert mode
+
+|Key|Action|
+|---|---|
+|`[b / ]b`|previous / next tab|
+|`Space b d`|close the active tab|
+
+## Outside the editor
+
+|Key|Action|
+|---|---|
+|`1 … 9`|jump to tab N|
+|`H / L`|previous / next tab|
+|`Tab / Shift+Tab`|cycle the focus|
+|`?`|help|
+|`q`|quit|
+
+## Go to anything
+
+|Key|Action|
+|---|---|
+|`type`|filter tabs, actions, tables|
+|`↓ / Ctrl+n / Tab`|next item|
+|`↑ / Ctrl+p`|previous item|
+|`Enter`|open the item|
+|`Ctrl+w / Ctrl+u`|delete a word / the query|
+|`Esc`|close|
 
 ## Profiles
 
 |Key|Action|
 |---|---|
-|`j / ↓`|next profile|
-|`k / ↑`|previous profile|
+|`j / k`|next / previous profile|
 |`Enter`|connect|
 
 ## Sidebar
 
 |Key|Action|
 |---|---|
-|`j / ↓`|next item|
-|`k / ↑`|previous item|
-|`g / G`|first / last item|
-|`Enter / l / →`|open the item|
+|`j / k`|next / previous table|
+|`g / G`|first / last table|
+|`Enter / l / →`|open the table in a tab|
 |`/`|filter tables|
 |`Esc`|clear the filter|
 |`s`|choose the schema|
@@ -42,9 +74,9 @@ Source of truth: `apps/ducky-tui/src/keys/help.rs` (`HELP_ROWS`, shown with `F1`
 |`h j k l / arrows`|move the cursor|
 |`g / G`|first / last row|
 |`0 / $`|first / last column|
-|`n / ]`|next page|
-|`p / [`|previous page|
-|`o`|cycle the sort|
+|`n`|next page|
+|`p`|previous page|
+|`o`|cycle the sort of the column|
 |`/`|edit the WHERE filter|
 |`Esc`|clear the filter, then sidebar|
 |`Enter`|row detail|
@@ -57,7 +89,7 @@ Source of truth: `apps/ducky-tui/src/keys/help.rs` (`HELP_ROWS`, shown with `F1`
 |Key|Action|
 |---|---|
 |`j / k`|scroll|
-|`g`|back to top|
+|`g`|back to the top|
 |`t`|data tab|
 |`r`|reload|
 |`Esc`|sidebar|
@@ -69,10 +101,10 @@ Source of truth: `apps/ducky-tui/src/keys/help.rs` (`HELP_ROWS`, shown with `F1`
 |`F5 / Ctrl+e`|run the script|
 |`Ctrl+s`|save|
 |`F2`|save as|
-|`Ctrl+t`|toggle the transaction|
-|`Ctrl+Space`|open completion|
+|`Ctrl+t`|one transaction / autocommit|
+|`Ctrl+Space`|open the completion|
 |`Tab`|accept the completion|
-|`↓ ↑ / Ctrl+n Ctrl+p`|move in the completion|
+|`↓ ↑ / Ctrl+n p`|move in the completion|
 |`Esc`|close completion / normal mode|
 |`i / a / o`|insert mode (vim)|
 
@@ -81,10 +113,13 @@ Source of truth: `apps/ducky-tui/src/keys/help.rs` (`HELP_ROWS`, shown with `F1`
 |Key|Action|
 |---|---|
 |`h j k l / arrows`|move the cursor|
-|`g G 0 $`|first / last row / column|
-|`[ / ]`|previous / next result|
+|`g G 0 $`|first / last row or column|
+|`p / n`|previous / next statement|
 |`Enter`|row detail|
 |`y`|copy the cell|
+|`F5 / Ctrl+e`|run the editor content|
+|`Ctrl+s / F2`|save / save as|
+|`Ctrl+t`|one transaction / autocommit|
 |`Esc`|sidebar|
 
 ## SQL files
@@ -92,8 +127,8 @@ Source of truth: `apps/ducky-tui/src/keys/help.rs` (`HELP_ROWS`, shown with `F1`
 |Key|Action|
 |---|---|
 |`j / k`|select a file|
-|`Enter`|open in the editor|
-|`x`|execute|
+|`Enter`|open in a query tab|
+|`x`|execute the file|
 |`r`|reload|
 |`Ctrl+d / Ctrl+u`|scroll the preview|
 |`Esc`|sidebar|
@@ -155,6 +190,16 @@ Source of truth: `apps/ducky-tui/src/keys/help.rs` (`HELP_ROWS`, shown with `F1`
 
 |Key|Action|
 |---|---|
+|`j / k`|scroll|
+|`g`|back to the top|
+|`Ctrl+d / Ctrl+u`|half a page down / up|
 |`Esc / q / ?`|close|
 
-The editor otherwise follows edtui vim mode (`i`, `a`, `o`, `v`, `Esc`, motions, `u` undo, `p` paste). Prompts also accept `Backspace`, `Delete`, `←`/`→`, `Home`/`End`. Pasting into the editor in any mode inserts the text.
+## Rules
+
+- Global keys work in every pane, including the editor in insert mode.
+- `[b`, `]b` and `Space b d` are key sequences, accepted everywhere except in editor insert mode. The pending prefix is shown in the status bar; any other key cancels it.
+- `1`–`9`, `H` / `L`, `Tab`, `?` and `q` apply outside the SQL editor.
+- `Ctrl+h` focuses the sidebar, `Ctrl+l` the main pane, `Ctrl+k` the SQL editor and `Ctrl+j` the results of the active query tab.
+- The editor follows edtui vim mode (`i`, `a`, `o`, `v`, `Esc`, motions, `u` undo, `p` paste). Its bottom border shows the vim mode on the left and ` one transaction · Ctrl+t ` or ` autocommit · Ctrl+t ` on the right. The terminal cursor is a bar in insert mode and a block otherwise.
+- Prompts also accept `Backspace`, `Delete`, `←`/`→`, `Home`/`End`. Pasting into the editor in any mode inserts the text.

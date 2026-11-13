@@ -3,7 +3,8 @@ use ducky_core::Catalog;
 use crate::command::Command;
 use crate::loadable::Loadable;
 use crate::msg::Connection;
-use crate::state::{AppState, MainView, NoticeLevel, ProfilePicker, Screen, Workspace};
+use crate::state::{AppState, Focus, NoticeLevel, ProfilePicker, Screen, TabContent, Workspace};
+use crate::update::table::reload_all_pages;
 use crate::update::{clamp_index, notice, workspace_mut};
 
 pub(crate) fn connected(
@@ -45,10 +46,7 @@ pub(crate) fn connected(
                 workspace.tools = connection.tools;
                 state.notice = notice(NoticeLevel::Success, "Reconnected");
                 let mut commands = vec![Command::LoadCatalog];
-                if let Some(table) = &mut workspace.table {
-                    table.page = Loadable::Loading;
-                    commands.push(Command::LoadPage(table.request.clone()));
-                }
+                commands.extend(reload_all_pages(workspace));
                 commands
             }
         },
@@ -95,22 +93,27 @@ pub(crate) fn catalog_loaded(
         }
     };
     workspace.schema_name = fallback_schema_name(&catalog, &workspace.schema_name);
-    let is_open_relation_gone = workspace
-        .table
-        .as_ref()
-        .is_some_and(|table| catalog.relation(&table.relation).is_none());
-    if is_open_relation_gone {
-        workspace.table = None;
-        if workspace.view == MainView::Table {
-            workspace.view = MainView::Welcome;
-        }
-    }
+    close_vanished_tables(workspace, &catalog);
     workspace.catalog = Loadable::Ready(catalog);
     workspace.sidebar.selected_item_index = clamp_index(
         workspace.sidebar.selected_item_index,
         workspace.sidebar_items().len(),
     );
     Vec::new()
+}
+
+fn close_vanished_tables(workspace: &mut Workspace, catalog: &Catalog) {
+    let active_tab_id = workspace.active_tab_id();
+    workspace.tabs.retain(|tab| match &tab.content {
+        TabContent::Table(table) => catalog.relation(&table.relation).is_some(),
+        _ => true,
+    });
+    workspace.active_tab_index = active_tab_id
+        .and_then(|tab_id| workspace.tab_index(tab_id))
+        .unwrap_or_else(|| clamp_index(workspace.active_tab_index, workspace.tabs.len()));
+    if workspace.tabs.is_empty() {
+        workspace.focus = Focus::Sidebar;
+    }
 }
 
 fn fallback_schema_name(catalog: &Catalog, current_schema_name: &str) -> String {

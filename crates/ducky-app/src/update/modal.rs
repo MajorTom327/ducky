@@ -4,13 +4,19 @@ use crate::state::{
     AppState, Confirm, ConfirmKind, JobState, Modal, NoticeLevel, PendingSave, Prompt, PromptKind,
 };
 use crate::update::table::apply_filter;
-use crate::update::{notice, step_index, workspace_mut};
+use crate::update::{notice, palette, step_index, workspace_mut};
 
 pub(crate) fn update(state: &mut AppState, msg: ModalMsg) -> Vec<Command> {
     match msg {
         ModalMsg::Input(request) => {
-            let Some(Modal::Prompt(prompt)) = &mut state.modal else {
-                return Vec::new();
+            let prompt = match &mut state.modal {
+                Some(Modal::Prompt(prompt)) => prompt,
+                Some(Modal::Palette(command_palette)) => {
+                    command_palette.input.handle(request);
+                    command_palette.selected_item_index = 0;
+                    return Vec::new();
+                }
+                _ => return Vec::new(),
             };
             prompt.input.handle(request);
             if prompt.kind == PromptKind::SidebarFilter
@@ -39,6 +45,7 @@ pub(crate) fn update(state: &mut AppState, msg: ModalMsg) -> Vec<Command> {
                 }
                 Vec::new()
             }
+            Some(Modal::Palette(command_palette)) => palette::submit(state, &command_palette),
             Some(Modal::RowDetail(_) | Modal::Help) | None => Vec::new(),
         },
         ModalMsg::Cancel => {
@@ -54,7 +61,7 @@ pub(crate) fn update(state: &mut AppState, msg: ModalMsg) -> Vec<Command> {
                     ..
                 })) => {
                     if let Some(workspace) = workspace_mut(&mut state.screen) {
-                        workspace.query.pending_save = None;
+                        workspace.pending_save = None;
                     }
                 }
                 _ => {}
@@ -67,7 +74,20 @@ pub(crate) fn update(state: &mut AppState, msg: ModalMsg) -> Vec<Command> {
                 .workspace()
                 .and_then(|workspace| workspace.catalog.ready())
                 .map_or(0, |catalog| catalog.schemas.len());
+            let palette_item_count = match (&state.modal, state.workspace()) {
+                (Some(Modal::Palette(command_palette)), Some(workspace)) => {
+                    workspace.palette_items(command_palette.input.value()).len()
+                }
+                _ => 0,
+            };
             match &mut state.modal {
+                Some(Modal::Palette(command_palette)) => {
+                    command_palette.selected_item_index = step_index(
+                        command_palette.selected_item_index,
+                        palette_item_count,
+                        is_forward,
+                    );
+                }
                 Some(Modal::SchemaPicker {
                     selected_schema_index,
                 }) => {
@@ -107,7 +127,7 @@ fn submit_prompt(state: &mut AppState, prompt: Prompt) -> Vec<Command> {
     let optional_value = Some(trimmed_value.clone()).filter(|value| !value.is_empty());
     match prompt.kind {
         PromptKind::SidebarFilter => Vec::new(),
-        PromptKind::TableFilter => match &mut workspace.table {
+        PromptKind::TableFilter => match workspace.active_table_mut() {
             Some(table) => apply_filter(table, optional_value),
             None => Vec::new(),
         },
@@ -120,7 +140,11 @@ fn submit_prompt(state: &mut AppState, prompt: Prompt) -> Vec<Command> {
                 }));
                 return Vec::new();
             }
-            workspace.query.pending_save = Some(PendingSave {
+            let Some(tab_id) = workspace.active_tab_id() else {
+                return Vec::new();
+            };
+            workspace.pending_save = Some(PendingSave {
+                tab_id,
                 name: trimmed_value.clone(),
                 content: content.clone(),
             });
@@ -142,7 +166,7 @@ fn submit_confirm(state: &mut AppState, confirm: Confirm) -> Vec<Command> {
         return Vec::new();
     };
     match confirm.kind {
-        ConfirmKind::OverwriteFile => match &workspace.query.pending_save {
+        ConfirmKind::OverwriteFile => match &workspace.pending_save {
             Some(pending_save) => vec![Command::SaveFile {
                 name: pending_save.name.clone(),
                 content: pending_save.content.clone(),

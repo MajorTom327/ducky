@@ -5,24 +5,27 @@ pub mod files;
 pub mod header;
 pub mod job_log;
 pub mod modal;
+pub mod palette;
 pub mod profiles;
 pub mod query;
 pub mod restore;
 pub mod results;
+pub mod row_detail;
 pub mod sidebar;
 pub mod status;
 pub mod structure;
 pub mod table;
+pub mod tabs;
 pub mod welcome;
 
-use ducky_app::{AppState, MainView, Screen, Workspace};
+use ducky_app::{AppState, QueryView, Screen, TabContent, TabId, TableView, Workspace};
 use ducky_core::StoragePaths;
 use ratatui::Frame;
 use ratatui::layout::Rect;
 
 use crate::layout::{FrameAreas, is_too_small};
 use crate::theme::{Palette, palette};
-use crate::tui_state::TuiState;
+use crate::tui_state::{CursorShape, TuiState};
 use crate::widgets::loading::render_message;
 
 pub struct ViewContext<'a> {
@@ -31,8 +34,27 @@ pub struct ViewContext<'a> {
     pub palette: &'a Palette,
 }
 
+impl ViewContext<'_> {
+    pub fn active_table(&self) -> Option<(TabId, &TableView)> {
+        let tab = self.workspace.active_tab()?;
+        match &tab.content {
+            TabContent::Table(table) => Some((tab.id, table)),
+            _ => None,
+        }
+    }
+
+    pub fn active_query(&self) -> Option<(TabId, &QueryView)> {
+        let tab = self.workspace.active_tab()?;
+        match &tab.content {
+            TabContent::Query(query) => Some((tab.id, query)),
+            _ => None,
+        }
+    }
+}
+
 pub fn draw(frame: &mut Frame, state: &AppState, tui: &mut TuiState) {
     tui.effects.begin_frame();
+    tui.cursor_shape = CursorShape::Bar;
     let screen = frame.area();
     let workspace_palette = palette(state.workspace().map(|workspace| workspace.profile.kind));
     if is_too_small(screen) {
@@ -55,10 +77,17 @@ pub fn draw(frame: &mut Frame, state: &AppState, tui: &mut TuiState) {
                 palette: &workspace_palette,
             };
             sidebar::render(frame, areas.sidebar, &context, tui);
+            tabs::render(frame, areas.tab_bar, &context, tui);
             render_main(frame, areas.main, &context, tui);
         }
     }
-    status::render(frame, areas.status, state, &workspace_palette);
+    status::render(
+        frame,
+        areas.status,
+        state,
+        tui.pending_prefix,
+        &workspace_palette,
+    );
     if let Some(modal) = &state.modal {
         modal::render(frame, areas.screen, state, modal, tui, &workspace_palette);
     }
@@ -67,12 +96,15 @@ pub fn draw(frame: &mut Frame, state: &AppState, tui: &mut TuiState) {
 }
 
 fn render_main(frame: &mut Frame, area: Rect, context: &ViewContext, tui: &mut TuiState) {
-    match context.workspace.view {
-        MainView::Welcome => welcome::render(frame, area, context, tui),
-        MainView::Table => table::render(frame, area, context, tui),
-        MainView::Query => query::render(frame, area, context, tui),
-        MainView::Files => files::render(frame, area, context, tui),
-        MainView::Dump => dump::render(frame, area, context, tui),
-        MainView::Restore => restore::render(frame, area, context, tui),
+    let Some(tab) = context.workspace.active_tab() else {
+        welcome::render(frame, area, context, tui);
+        return;
+    };
+    match &tab.content {
+        TabContent::Table(_) => table::render(frame, area, context, tui),
+        TabContent::Query(_) => query::render(frame, area, context, tui),
+        TabContent::Files => files::render(frame, area, context, tui),
+        TabContent::Dump => dump::render(frame, area, context, tui),
+        TabContent::Restore => restore::render(frame, area, context, tui),
     }
 }

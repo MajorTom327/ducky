@@ -4,7 +4,7 @@ use std::path::PathBuf;
 use std::time::{Duration, Instant};
 
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
-use ducky_app::{AppState, JobState, Msg, RunState, Screen, Workspace, update};
+use ducky_app::{AppState, JobState, Msg, Screen, TabContent, Workspace, update};
 use ducky_core::{Profile, StoragePaths};
 use ducky_runtime::Runtime;
 use ducky_tui::keys::handle_key;
@@ -95,7 +95,12 @@ impl Harness {
 
     pub fn set_editor_text(&mut self, text: &str) {
         self.sync_editor();
-        self.tui.editor.state = EditorState::new(Lines::from(text));
+        let tab_id = self
+            .workspace()
+            .active_tab()
+            .expect("a query tab is active")
+            .id;
+        self.tui.editor(tab_id).state = EditorState::new(Lines::from(text));
     }
 
     pub async fn settle(&mut self) {
@@ -134,7 +139,7 @@ impl Harness {
 
     fn sync_editor(&mut self) {
         if let Some(workspace) = self.state.workspace() {
-            self.tui.editor.sync_document(&workspace.query.document);
+            self.tui.sync_workspace(workspace);
         }
     }
 }
@@ -144,13 +149,13 @@ fn is_busy(state: &AppState) -> bool {
         Screen::Profiles(picker) => return picker.connecting_profile_index.is_some(),
         Screen::Workspace(workspace) => workspace,
     };
-    let is_table_loading = workspace
-        .table
-        .as_ref()
-        .is_some_and(|table| table.page.is_loading() || table.details.is_loading());
+    let is_tab_loading = workspace.tabs.iter().any(|tab| match &tab.content {
+        TabContent::Table(table) => table.page.is_loading() || table.details.is_loading(),
+        TabContent::Query(_) | TabContent::Files | TabContent::Dump | TabContent::Restore => false,
+    });
     workspace.catalog.is_loading()
-        || is_table_loading
-        || matches!(workspace.query.run, RunState::Running)
+        || is_tab_loading
+        || workspace.running_script_tab_id.is_some()
         || workspace.files.entries.is_loading()
         || workspace.files.preview.is_loading()
         || workspace.restore.entries.is_loading()

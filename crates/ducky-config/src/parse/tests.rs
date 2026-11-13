@@ -35,6 +35,22 @@ fn valid_file_with_three_kinds() {
     assert_eq!(config.source, dir.path().join("ducky.toml"));
     assert_eq!(config.storage.sql_dir, dir.path().join("sql"));
     assert_eq!(config.storage.dump_dir, dir.path().join("dumps"));
+    assert_eq!(config.page_size, 50);
+}
+
+#[test]
+fn page_size_is_read_from_the_file() {
+    let (_dir, result) = load_text(&format!("page_size = 200\n{}", profile("A", URL, "local")));
+    assert_eq!(result.unwrap().page_size, 200);
+}
+
+#[test]
+fn page_size_outside_bounds_is_rejected() {
+    for page_size in [0, 5_001] {
+        let text = format!("page_size = {page_size}\n{}", profile("A", URL, "local"));
+        let (_dir, result) = load_text(&text);
+        assert_eq!(result, Err(ConfigError::InvalidPageSize { page_size }));
+    }
 }
 
 #[test]

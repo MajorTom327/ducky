@@ -47,4 +47,13 @@ impl EditorPanel {
     pub fn is_insert_mode(&self) -> bool {
         self.state.mode == EditorMode::Insert
     }
+
+    pub fn is_modified(&self, document: &Document) -> bool {
+        normalized_text(&self.text()) != normalized_text(&document.text)
+    }
+}
+
+fn normalized_text(text: &str) -> String {
+    let joined_lines = text.lines().collect::<Vec<_>>().join("\n");
+    joined_lines.trim_end_matches('\n').to_owned()
 }

@@ -1,10 +1,10 @@
 mod support;
 
 use ducky_app::{
-    Command, Focus, Loadable, MainView, Modal, Msg, Notice, NoticeLevel, QueryPane, SidebarAction,
-    SidebarItem, SidebarMsg,
+    Command, Focus, Loadable, Modal, Msg, Notice, NoticeLevel, PaneDirection, QueryPane,
+    SidebarMsg, TabsMsg,
 };
-use support::{send, workspace, workspace_mut, workspace_state};
+use support::{active_query, new_query, send, workspace, workspace_mut, workspace_state};
 
 #[test]
 fn quit_sets_should_quit() {
@@ -34,14 +34,11 @@ fn open_help_shows_help_modal() {
 }
 
 #[test]
-fn focus_cycles_through_editor_and_results_in_query_view() {
+fn focus_cycles_through_editor_and_results_in_query_tab() {
     let mut state = workspace_state();
-    support::select_sidebar_item(&mut state, |item| {
-        *item == SidebarItem::Action(SidebarAction::SqlCommand)
-    });
-    send(&mut state, Msg::Sidebar(SidebarMsg::Activate));
+    new_query(&mut state);
     let focus_and_pane =
-        |state: &ducky_app::AppState| (workspace(state).focus, workspace(state).query.pane);
+        |state: &ducky_app::AppState| (workspace(state).focus, active_query(state).pane);
     assert_eq!(focus_and_pane(&state), (Focus::Main, QueryPane::Editor));
     send(&mut state, Msg::ToggleFocus);
     assert_eq!(focus_and_pane(&state), (Focus::Main, QueryPane::Results));
@@ -52,12 +49,46 @@ fn focus_cycles_through_editor_and_results_in_query_view() {
 }
 
 #[test]
-fn focus_toggles_in_other_views() {
+fn focus_stays_on_sidebar_without_tabs() {
     let mut state = workspace_state();
-    assert_eq!(workspace(&state).view, MainView::Welcome);
+    assert!(workspace(&state).tabs.is_empty());
     send(&mut state, Msg::ToggleFocus);
+    assert_eq!(workspace(&state).focus, Focus::Sidebar);
+}
+
+#[test]
+fn focus_toggles_in_other_tabs() {
+    let mut state = workspace_state();
+    send(&mut state, Msg::Tabs(TabsMsg::OpenDump));
     assert_eq!(workspace(&state).focus, Focus::Main);
     send(&mut state, Msg::ToggleFocus);
+    assert_eq!(workspace(&state).focus, Focus::Sidebar);
+    send(&mut state, Msg::ToggleFocus);
+    assert_eq!(workspace(&state).focus, Focus::Main);
+}
+
+#[test]
+fn pane_directions_move_between_sidebar_editor_and_results() {
+    let mut state = workspace_state();
+    new_query(&mut state);
+    let focus_and_pane =
+        |state: &ducky_app::AppState| (workspace(state).focus, active_query(state).pane);
+    send(&mut state, Msg::FocusPane(PaneDirection::Down));
+    assert_eq!(focus_and_pane(&state), (Focus::Main, QueryPane::Results));
+    send(&mut state, Msg::FocusPane(PaneDirection::Left));
+    assert_eq!(focus_and_pane(&state), (Focus::Sidebar, QueryPane::Results));
+    send(&mut state, Msg::FocusPane(PaneDirection::Up));
+    assert_eq!(focus_and_pane(&state), (Focus::Sidebar, QueryPane::Results));
+    send(&mut state, Msg::FocusPane(PaneDirection::Right));
+    assert_eq!(focus_and_pane(&state), (Focus::Main, QueryPane::Results));
+    send(&mut state, Msg::FocusPane(PaneDirection::Up));
+    assert_eq!(focus_and_pane(&state), (Focus::Main, QueryPane::Editor));
+}
+
+#[test]
+fn pane_right_without_tabs_keeps_the_sidebar() {
+    let mut state = workspace_state();
+    send(&mut state, Msg::FocusPane(PaneDirection::Right));
     assert_eq!(workspace(&state).focus, Focus::Sidebar);
 }
 
@@ -107,5 +138,8 @@ fn workspace_messages_are_ignored_on_profiles_screen() {
     assert!(send(&mut state, Msg::RefreshCatalog).is_empty());
     assert!(send(&mut state, Msg::Reconnect).is_empty());
     assert!(send(&mut state, Msg::Sidebar(SidebarMsg::Activate)).is_empty());
+    assert!(send(&mut state, Msg::Tabs(TabsMsg::NewQuery)).is_empty());
+    assert!(send(&mut state, Msg::OpenPalette).is_empty());
+    assert!(state.modal.is_none());
     assert!(state.workspace().is_none());
 }

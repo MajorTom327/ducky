@@ -41,8 +41,8 @@ impl Runtime {
             Command::LoadDetails(relation) => {
                 database::spawn_load_details(&self.active, messages, relation)
             }
-            Command::RunScript { sql, mode } => {
-                database::spawn_run_script(&self.active, messages, sql, mode)
+            Command::RunScript { tab_id, sql, mode } => {
+                database::spawn_run_script(&self.active, messages, tab_id, sql, mode)
             }
             Command::CancelScript => database::spawn_cancel_script(&self.active, messages),
             Command::ListSqlFiles => files::spawn_list_sql_files(self.sql_store.clone(), messages),

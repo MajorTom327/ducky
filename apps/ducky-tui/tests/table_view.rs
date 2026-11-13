@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use ducky_app::{
-    Connection, Focus, GridCursor, Loadable, MainView, Msg, PAGE_SIZE, TableMsg, TableTab,
+    Connection, Focus, GridCursor, Loadable, Msg, RowDetail, Tab, TabContent, TableMsg, TableTab,
     TableView, Workspace,
 };
 use ducky_core::{
@@ -13,9 +13,15 @@ use ducky_core::{
 use ducky_tui::keys::table::handle;
 use ducky_tui::theme::palette;
 use ducky_tui::tui_state::TuiState;
-use ducky_tui::views::{ViewContext, table};
+use ducky_tui::views::{ViewContext, row_detail, table};
+use ducky_tui::widgets::grid::{GridOptions, GridViewport, render_grid};
 use ratatui::Terminal;
 use ratatui::backend::TestBackend;
+use ratatui::buffer::Buffer;
+use ratatui::layout::Rect;
+use ratatui::style::Color;
+
+const TAB_ID: u64 = 7;
 
 fn column(name: &str, data_type: &str, is_nullable: bool, is_primary_key: bool) -> Column {
     Column {
@@ -68,7 +74,7 @@ fn table_view(name: &str) -> TableView {
         request: PageRequest {
             relation,
             page_index: 0,
-            page_size: PAGE_SIZE,
+            page_size: 100,
             sort: None,
             filter: None,
         },
@@ -111,9 +117,12 @@ fn workspace(table_view: TableView) -> Workspace {
     );
     workspace.catalog = Loadable::Ready(catalog());
     workspace.schema_name = "public".to_owned();
-    workspace.view = MainView::Table;
     workspace.focus = Focus::Main;
-    workspace.table = Some(table_view);
+    workspace.tabs = vec![Tab {
+        id: TAB_ID,
+        content: TabContent::Table(table_view),
+    }];
+    workspace.active_tab_index = 0;
     workspace
 }
 
@@ -133,7 +142,10 @@ fn render_text(workspace: &Workspace) -> String {
     terminal
         .draw(|frame| table::render(frame, frame.area(), &context, &mut tui))
         .expect("draw");
-    let buffer = terminal.backend().buffer();
+    buffer_text(terminal.backend().buffer())
+}
+
+fn buffer_text(buffer: &Buffer) -> String {
     (0..buffer.area.height)
         .map(|y| {
             (0..buffer.area.width)
@@ -164,10 +176,174 @@ fn data_tab_shows_headers_first_row_page_and_sort() {
         "customer1@example.com",
         "NULL",
         "page 1",
-        "sort: name ↑",
-        "~250 rows",
+        "sort name ↑",
     ] {
         assert_contains(&text, expected);
+    }
+}
+
+#[test]
+fn block_titles_show_tabs_range_sort_filter_and_page() {
+    let mut view = table_view("customers");
+    view.request.sort = Some(Sort {
+        column: "email".to_owned(),
+        direction: SortDirection::Descending,
+    });
+    view.request.filter = Some("id > 0".to_owned());
+    let text = render_text(&workspace(view));
+    let lines: Vec<&str> = text.lines().collect();
+    let first_line = lines.first().copied().unwrap_or_default();
+    let last_line = lines.last().copied().unwrap_or_default();
+    assert_contains(first_line, " public.customers ");
+    assert_contains(first_line, " Data · Structure ");
+    assert!(
+        first_line.find("public.customers") < first_line.find("Data · Structure"),
+        "{first_line}"
+    );
+    assert_contains(last_line, " rows 1–1 · sort email ↓ · where id > 0 ");
+    assert_contains(last_line, " page 1 ");
+    assert!(
+        last_line.find("rows 1–1") < last_line.find("page 1"),
+        "{last_line}"
+    );
+}
+
+fn people_page(page_index: usize) -> TableView {
+    let mut view = table_view("customers");
+    view.request.page_index = page_index;
+    view.page = Loadable::Ready(Page {
+        result_set: ResultSet {
+            columns: vec!["id".to_owned(), "email".to_owned()],
+            rows: vec![
+                vec![Some("101".to_owned()), Some("a@example.com".to_owned())],
+                vec![Some("102".to_owned()), Some("b@example.com".to_owned())],
+            ],
+            is_truncated: false,
+        },
+        has_next_page: false,
+    });
+    view
+}
+
+#[test]
+fn page_two_gutter_starts_at_row_one_hundred_one() {
+    let text = render_text(&workspace(people_page(1)));
+    assert_contains(&text, "101  101  a@example.com");
+    assert_contains(&text, "102  102  b@example.com");
+    assert_contains(&text, "rows 101–102");
+    assert_contains(&text, "page 2");
+}
+
+fn render_small_grid(result_set: &ResultSet, cursor: GridCursor) -> Buffer {
+    let mut terminal = Terminal::new(TestBackend::new(40, 6)).expect("terminal");
+    let grid_palette = palette(Some(ProfileKind::Local));
+    terminal
+        .draw(|frame| {
+            let options = GridOptions {
+                cursor,
+                sort: None,
+                first_row_number: 1,
+                is_focused: true,
+            };
+            render_grid(
+                frame,
+                frame.area(),
+                result_set,
+                &mut GridViewport::default(),
+                options,
+                &grid_palette,
+            );
+        })
+        .expect("draw");
+    terminal.backend().buffer().clone()
+}
+
+fn numeric_result_set() -> ResultSet {
+    ResultSet {
+        columns: vec!["id".to_owned(), "name".to_owned()],
+        rows: vec![
+            vec![Some("1".to_owned()), Some("a".to_owned())],
+            vec![Some("10".to_owned()), None],
+        ],
+        is_truncated: false,
+    }
+}
+
+#[test]
+fn grid_has_header_rule_gutter_and_right_aligned_numbers() {
+    let buffer = render_small_grid(&numeric_result_set(), GridCursor::default());
+    let text = buffer_text(&buffer);
+    let lines: Vec<&str> = text.lines().collect();
+    assert!(lines[0].starts_with("#  id  name"), "{text}");
+    assert!(lines[1].starts_with("─  ──  ────"), "{text}");
+    assert!(lines[2].starts_with("1   1  a   "), "{text}");
+    assert!(lines[3].starts_with("2  10  NULL"), "{text}");
+}
+
+#[test]
+fn grid_cursor_row_is_dimmed_and_cursor_cell_selected() {
+    let cursor = GridCursor {
+        row_index: 1,
+        column_index: 1,
+    };
+    let buffer = render_small_grid(&numeric_result_set(), cursor);
+    assert_eq!(buffer[(3, 3)].bg, Color::DarkGray);
+    assert_eq!(buffer[(3, 3)].fg, Color::White);
+    assert_eq!(buffer[(7, 3)].bg, Color::Green);
+    assert_eq!(buffer[(3, 2)].bg, Color::Reset);
+}
+
+#[test]
+fn row_detail_fits_its_fields_and_aligns_names() {
+    let row_detail = RowDetail {
+        columns: vec![
+            "id".to_owned(),
+            "email".to_owned(),
+            "name".to_owned(),
+            "created_at".to_owned(),
+        ],
+        values: vec![
+            Some("7".to_owned()),
+            Some("x@y.z".to_owned()),
+            None,
+            Some("2024".to_owned()),
+        ],
+        selected_field_index: 1,
+    };
+    let workspace_palette = palette(Some(ProfileKind::Local));
+    let mut terminal = Terminal::new(TestBackend::new(100, 30)).expect("terminal");
+    let mut popup_area = Rect::default();
+    terminal
+        .draw(|frame| {
+            popup_area = row_detail::render(frame, frame.area(), &row_detail, &workspace_palette);
+        })
+        .expect("draw");
+    assert_eq!(popup_area.height, 6);
+    assert_eq!(popup_area.width, 70);
+    let text = buffer_text(terminal.backend().buffer());
+    let lines: Vec<&str> = text.lines().collect();
+    let name_width = "created_at".len();
+    let value_column = usize::from(popup_area.x) + 2 + name_width + 2;
+    for (field_offset, (name, value)) in [
+        ("id", "7"),
+        ("email", "x@y.z"),
+        ("name", "NULL"),
+        ("created_at", "2024"),
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let characters: Vec<char> = lines[usize::from(popup_area.y) + 1 + field_offset]
+            .chars()
+            .collect();
+        let value_text: String = characters[value_column..value_column + value.len()]
+            .iter()
+            .collect();
+        let name_text: String = characters[value_column - 2 - name.len()..value_column - 2]
+            .iter()
+            .collect();
+        assert_eq!(value_text, value);
+        assert_eq!(name_text, name);
     }
 }
 
@@ -195,8 +371,10 @@ fn structure_tab_shows_columns_indexes_and_foreign_keys() {
         "Columns",
         "NOT NULL",
         "PK",
+        "Indexes",
         "customers_email_key",
         "UNIQUE",
+        "Foreign keys",
         "FOREIGN KEY (owner_id) REFERENCES owners(id)",
     ] {
         assert_contains(&text, expected);
@@ -285,9 +463,16 @@ fn structure_keys_scroll_locally() {
     let key = |code| KeyEvent::new(code, KeyModifiers::NONE);
     assert!(handle(&workspace, &mut tui, key(KeyCode::Char('j'))).is_empty());
     assert!(handle(&workspace, &mut tui, key(KeyCode::Char('j'))).is_empty());
-    assert_eq!(tui.structure_scroll, 2);
+    assert!(handle(&workspace, &mut tui, key(KeyCode::Char('j'))).is_empty());
+    assert_eq!(tui.structure_scrolls.get(&TAB_ID), Some(&3));
+    assert!(handle(&workspace, &mut tui, key(KeyCode::Char('k'))).is_empty());
+    assert_eq!(tui.structure_scrolls.get(&TAB_ID), Some(&2));
     handle(&workspace, &mut tui, key(KeyCode::Char('g')));
-    assert_eq!(tui.structure_scroll, 0);
+    assert_eq!(tui.structure_scrolls.get(&TAB_ID), Some(&0));
+    assert_eq!(
+        handle(&workspace, &mut tui, key(KeyCode::Esc)),
+        vec![Msg::ToggleFocus]
+    );
     assert_eq!(
         handle(&workspace, &mut tui, key(KeyCode::Char('t'))),
         vec![Msg::Table(TableMsg::ToggleTab)]

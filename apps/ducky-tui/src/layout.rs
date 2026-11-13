@@ -9,6 +9,7 @@ pub struct FrameAreas {
     pub screen: Rect,
     pub header: Rect,
     pub sidebar: Rect,
+    pub tab_bar: Rect,
     pub main: Rect,
     pub status: Rect,
 }
@@ -20,21 +21,26 @@ impl FrameAreas {
             Constraint::Min(0),
             Constraint::Length(1),
         ]));
-        let [sidebar, main] = body.layout(&Layout::horizontal([
+        let [sidebar, main_column] = body.layout(&Layout::horizontal([
             Constraint::Length(SIDEBAR_WIDTH),
+            Constraint::Min(0),
+        ]));
+        let [tab_bar, main] = main_column.layout(&Layout::vertical([
+            Constraint::Length(1),
             Constraint::Min(0),
         ]));
         FrameAreas {
             screen,
             header,
             sidebar,
+            tab_bar,
             main,
             status,
         }
     }
 
     pub fn body(&self) -> Rect {
-        self.sidebar.union(self.main)
+        self.sidebar.union(self.tab_bar).union(self.main)
     }
 }
 

@@ -21,6 +21,9 @@ pub struct Sort {
     pub direction: SortDirection,
 }
 
+pub const DEFAULT_PAGE_SIZE: usize = 50;
+pub const MAX_PAGE_SIZE: usize = 5_000;
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PageRequest {
     pub relation: RelationRef,

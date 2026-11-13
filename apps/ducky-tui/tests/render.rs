@@ -14,7 +14,8 @@ use ducky_tui::keys::handle_key;
 use ducky_tui::theme::palette;
 use ducky_tui::tui_state::TuiState;
 use ducky_tui::views::draw;
-use ducky_tui::widgets::grid::{GridViewport, render_grid};
+use ducky_tui::views::sidebar::compact_count;
+use ducky_tui::widgets::grid::{GridOptions, GridViewport, render_grid};
 use ratatui::Terminal;
 use ratatui::backend::TestBackend;
 use ratatui::style::Color;
@@ -48,7 +49,7 @@ fn relation(name: &str, kind: RelationKind) -> Relation {
     Relation {
         name: name.to_owned(),
         kind,
-        estimated_row_count: Some(10),
+        estimated_row_count: Some(250),
         columns: vec![Column {
             name: "id".to_owned(),
             data_type: "integer".to_owned(),
@@ -172,38 +173,56 @@ fn profiles_screen_lists_every_label() {
 }
 
 #[test]
-fn sidebar_lists_actions_and_relations_of_the_selected_schema_only() {
+fn sidebar_lists_relations_of_the_selected_schema_with_their_meta() {
     let state = workspace_state(ProfileKind::Local, available_tools());
     let mut tui = TuiState::new(false);
-    let text = screen_text(&render(&state, &mut tui, WIDTH, HEIGHT));
-    for expected in [
-        "Schema: public",
+    let terminal = render(&state, &mut tui, WIDTH, HEIGHT);
+    let text = screen_text(&terminal);
+    assert!(text.contains(" public "));
+    let customers_row = (0..HEIGHT)
+        .map(|y| row_text(&terminal, y))
+        .find(|row| row.contains("customers"))
+        .expect("customers row");
+    let sidebar_part: String = customers_row.chars().take(32).collect();
+    assert!(sidebar_part.trim_end().ends_with("250 │"), "{sidebar_part}");
+    let view_row = (0..HEIGHT)
+        .map(|y| row_text(&terminal, y))
+        .find(|row| row.contains("order_totals"))
+        .expect("view row");
+    assert!(
+        view_row
+            .chars()
+            .take(32)
+            .collect::<String>()
+            .contains("view │")
+    );
+    for absent in [
+        "events",
         "SQL command",
-        "SQL files",
         "Dump database",
         "Restore dump",
         "Tables & views",
-        "customers",
-        "orders",
-        "order_totals",
     ] {
-        assert!(text.contains(expected), "missing {expected}");
+        assert!(!text.contains(absent), "unexpected {absent}");
     }
-    assert!(!text.contains("events"));
-    assert!(!text.contains("(unavailable)"));
 }
 
 #[test]
-fn missing_pg_dump_marks_the_dump_action_unavailable() {
-    let tools = PgTools {
-        pg_dump: ToolStatus::Missing("`pg_dump` was not found in PATH".to_owned()),
-        pg_restore: ToolStatus::Available(PathBuf::from("/usr/bin/pg_restore")),
-    };
-    let state = workspace_state(ProfileKind::Local, tools);
+fn empty_schema_shows_no_tables() {
+    let mut state = workspace_state(ProfileKind::Local, available_tools());
+    workspace_mut(&mut state).sidebar.filter = "zzz".to_owned();
     let mut tui = TuiState::new(false);
     let text = screen_text(&render(&state, &mut tui, WIDTH, HEIGHT));
-    assert!(text.contains("Dump database (unavailable)"));
-    assert!(!text.contains("Restore dump (unavailable)"));
+    assert!(text.contains("No tables"));
+    assert!(text.contains("/zzz"));
+}
+
+#[test]
+fn compact_counts_use_k_and_m_suffixes() {
+    assert_eq!(compact_count(250), "250");
+    assert_eq!(compact_count(1_234), "1.2k");
+    assert_eq!(compact_count(250_000), "250k");
+    assert_eq!(compact_count(3_400_000), "3.4M");
 }
 
 fn render_result_set(
@@ -219,10 +238,13 @@ fn render_result_set(
                 frame,
                 frame.area(),
                 result_set,
-                cursor,
                 viewport,
-                None,
-                true,
+                GridOptions {
+                    cursor,
+                    sort: None,
+                    first_row_number: 1,
+                    is_focused: true,
+                },
                 &grid_palette,
             )
         })
@@ -244,8 +266,8 @@ fn grid_renders_null_and_truncates_long_cells() {
         &mut GridViewport::default(),
     );
     assert!(text.contains("NULL"));
-    assert!(text.contains(&format!("{}…", "x".repeat(39))));
-    assert!(!text.contains(&"x".repeat(40)));
+    assert!(text.contains("x…"));
+    assert!(!text.contains(&"x".repeat(41)));
 }
 
 #[test]

@@ -4,17 +4,17 @@ use ratatui::layout::Rect;
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Clear, Paragraph};
 
+use crate::editor::panel::EditorPanel;
 use crate::theme::Palette;
-use crate::tui_state::TuiState;
 
 const MAX_VISIBLE_ITEMS: usize = 8;
 const LABEL_DETAIL_GAP: &str = "  ";
 
-pub fn render(frame: &mut Frame, editor_area: Rect, tui: &TuiState, palette: &Palette) {
-    let Some(popup) = &tui.editor.completion else {
+pub fn render(frame: &mut Frame, editor_area: Rect, editor: &EditorPanel, palette: &Palette) {
+    let Some(popup) = &editor.completion else {
         return;
     };
-    let Some(cursor_position) = tui.editor.state.cursor_screen_position() else {
+    let Some(cursor_position) = editor.state.cursor_screen_position() else {
         return;
     };
     let bounds = frame.area();

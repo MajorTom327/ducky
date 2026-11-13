@@ -4,8 +4,8 @@ use std::path::PathBuf;
 use std::time::Duration;
 
 use ducky_app::{
-    AppState, Command, Connection, Msg, ProfilesMsg, Screen, SidebarItem, SidebarMsg, Workspace,
-    update,
+    AppState, Command, Connection, Msg, ProfilesMsg, QueryView, Screen, SidebarItem, SidebarMsg,
+    TabContent, TabId, TableView, TabsMsg, Workspace, update,
 };
 use ducky_core::{
     Catalog, Column, FileEntry, Page, PgTools, Profile, ProfileKind, Relation, RelationKind,
@@ -149,11 +149,57 @@ pub fn select_sidebar_item(state: &mut AppState, predicate: impl Fn(&SidebarItem
 }
 
 pub fn activate_relation(state: &mut AppState, relation_name: &str) -> Vec<Command> {
-    select_sidebar_item(
-        state,
-        |item| matches!(item, SidebarItem::Relation { relation, .. } if relation.name == relation_name),
-    );
+    select_sidebar_item(state, |item| item.relation.name == relation_name);
     send(state, Msg::Sidebar(SidebarMsg::Activate))
+}
+
+pub fn active_tab_id(state: &AppState) -> TabId {
+    workspace(state).active_tab().expect("active tab").id
+}
+
+pub fn new_query(state: &mut AppState) -> TabId {
+    send(state, Msg::Tabs(TabsMsg::NewQuery));
+    active_tab_id(state)
+}
+
+pub fn query_tab(state: &AppState, tab_id: TabId) -> &QueryView {
+    let tab_index = workspace(state).tab_index(tab_id).expect("tab open");
+    match &workspace(state).tabs[tab_index].content {
+        TabContent::Query(query) => query,
+        other => panic!("expected a query tab, got {other:?}"),
+    }
+}
+
+pub fn query_tab_mut(state: &mut AppState, tab_id: TabId) -> &mut QueryView {
+    let tab_index = workspace(state).tab_index(tab_id).expect("tab open");
+    match &mut workspace_mut(state).tabs[tab_index].content {
+        TabContent::Query(query) => query,
+        other => panic!("expected a query tab, got {other:?}"),
+    }
+}
+
+pub fn active_query(state: &AppState) -> &QueryView {
+    query_tab(state, active_tab_id(state))
+}
+
+pub fn table_tab(state: &AppState, tab_id: TabId) -> &TableView {
+    let tab_index = workspace(state).tab_index(tab_id).expect("tab open");
+    match &workspace(state).tabs[tab_index].content {
+        TabContent::Table(table) => table,
+        other => panic!("expected a table tab, got {other:?}"),
+    }
+}
+
+pub fn table_tab_mut(state: &mut AppState, tab_id: TabId) -> &mut TableView {
+    let tab_index = workspace(state).tab_index(tab_id).expect("tab open");
+    match &mut workspace_mut(state).tabs[tab_index].content {
+        TabContent::Table(table) => table,
+        other => panic!("expected a table tab, got {other:?}"),
+    }
+}
+
+pub fn active_table(state: &AppState) -> &TableView {
+    table_tab(state, active_tab_id(state))
 }
 
 pub fn result_set(columns: &[&str], row_count: usize) -> ResultSet {

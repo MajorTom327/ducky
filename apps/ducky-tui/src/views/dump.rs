@@ -1,7 +1,7 @@
 use ducky_core::ToolStatus;
 use ratatui::Frame;
 use ratatui::layout::{Constraint, Layout, Rect};
-use ratatui::text::Line;
+use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Borders, Paragraph, Wrap};
 
 use crate::tui_state::TuiState;
@@ -33,22 +33,28 @@ pub fn render(frame: &mut Frame, area: Rect, context: &ViewContext, tui: &mut Tu
             workspace.session.database
         ),
     };
+    let fact = |label: &str, value: String| {
+        Line::from(vec![
+            Span::styled(format!("{label:<8}"), palette.muted()),
+            Span::raw(value),
+        ])
+    };
     let facts = vec![
-        Line::raw(format!("Tool: {}", tool_path.display())),
-        Line::raw(format!(
-            "Target: {}/{target_name}",
-            context.storage.dump_dir.display()
-        )),
-        Line::raw("Format: custom (pg_dump -Fc)"),
+        fact("Tool", tool_path.display().to_string()),
+        fact(
+            "Target",
+            format!("{}/{target_name}", context.storage.dump_dir.display()),
+        ),
+        fact("Format", "custom (pg_dump -Fc)".to_owned()),
     ];
     let [facts_area, _, state_area, log_area] = Layout::vertical([
-        Constraint::Length(3),
+        Constraint::Length(4),
         Constraint::Length(1),
         Constraint::Length(2),
         Constraint::Min(3),
     ])
     .areas(inner);
-    frame.render_widget(Paragraph::new(facts), facts_area);
+    frame.render_widget(Paragraph::new(facts).wrap(Wrap { trim: false }), facts_area);
     render_job_state(
         frame,
         state_area,

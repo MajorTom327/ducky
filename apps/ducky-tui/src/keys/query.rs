@@ -1,92 +1,114 @@
 use crossterm::event::{KeyCode, KeyEvent};
-use ducky_app::{GridMove, Msg, QueryMsg, Workspace};
+use ducky_app::{GridMove, Msg, QueryMsg, TabContent, TabId, Workspace};
 use edtui::EditorMode;
 
 use crate::editor::completion::{accept_completion, refresh_completion};
 use crate::editor::highlight::refresh_highlights;
-use crate::keys::{is_ctrl, is_plain_char};
+use crate::editor::panel::EditorPanel;
+use crate::keys::{focused_editor_tab, is_ctrl, is_plain_char};
 use crate::tui_state::TuiState;
 
 pub fn handle_editor(workspace: &Workspace, tui: &mut TuiState, key: KeyEvent) -> Vec<Msg> {
-    if key.code == KeyCode::F(5) || is_ctrl(key, 'e') {
-        return vec![Msg::Query(QueryMsg::Run {
-            sql: tui.editor.text(),
-        })];
-    }
-    if is_ctrl(key, 's') {
-        return vec![Msg::Query(QueryMsg::Save {
-            content: tui.editor.text(),
-        })];
-    }
-    if key.code == KeyCode::F(2) {
-        return vec![Msg::Query(QueryMsg::SaveAs {
-            content: tui.editor.text(),
-        })];
-    }
-    if is_ctrl(key, 't') {
-        return vec![Msg::Query(QueryMsg::ToggleTransactionMode)];
+    let Some(tab_id) = focused_editor_tab(workspace) else {
+        return Vec::new();
+    };
+    let editor = tui.editor(tab_id);
+    if let Some(messages) = script_messages(editor, key) {
+        return messages;
     }
     if is_ctrl(key, ' ') {
-        refresh_completion(&mut tui.editor, workspace, true);
+        refresh_completion(editor, workspace, true);
         return Vec::new();
     }
-    if tui.editor.completion.is_some() && handle_completion_key(tui, key) {
+    if editor.completion.is_some() && handle_completion_key(editor, key) {
         return Vec::new();
     }
-    if tui.editor.state.mode == EditorMode::Normal
+    if editor.state.mode == EditorMode::Normal
         && matches!(key.code, KeyCode::Tab | KeyCode::BackTab)
     {
         return vec![Msg::ToggleFocus];
     }
-    let text_before = tui.editor.text();
-    tui.editor
-        .event_handler
-        .on_key_event(key, &mut tui.editor.state);
-    let has_text_changed = tui.editor.text() != text_before;
-    refresh_highlights(&mut tui.editor);
-    match has_text_changed && tui.editor.is_insert_mode() {
-        true => refresh_completion(&mut tui.editor, workspace, false),
-        false => tui.editor.completion = None,
+    let text_before = editor.text();
+    editor.event_handler.on_key_event(key, &mut editor.state);
+    let has_text_changed = editor.text() != text_before;
+    refresh_highlights(editor);
+    match has_text_changed && editor.is_insert_mode() {
+        true => refresh_completion(editor, workspace, false),
+        false => editor.completion = None,
     }
     Vec::new()
 }
 
-pub fn handle_paste(_workspace: &Workspace, tui: &mut TuiState, pasted_text: String) -> Vec<Msg> {
-    tui.editor
+pub fn handle_paste(workspace: &Workspace, tui: &mut TuiState, pasted_text: String) -> Vec<Msg> {
+    let Some(tab_id) = focused_editor_tab(workspace) else {
+        return Vec::new();
+    };
+    let editor = tui.editor(tab_id);
+    editor
         .event_handler
-        .on_paste_event(pasted_text, &mut tui.editor.state);
-    tui.editor.completion = None;
-    refresh_highlights(&mut tui.editor);
+        .on_paste_event(pasted_text, &mut editor.state);
+    editor.completion = None;
+    refresh_highlights(editor);
     Vec::new()
 }
 
-pub fn handle_results(_workspace: &Workspace, _tui: &mut TuiState, key: KeyEvent) -> Vec<Msg> {
+pub fn handle_results(workspace: &Workspace, tui: &mut TuiState, key: KeyEvent) -> Vec<Msg> {
+    let Some(tab_id) = active_query_tab(workspace) else {
+        return Vec::new();
+    };
+    if let Some(messages) = script_messages(tui.editor(tab_id), key) {
+        return messages;
+    }
     if let Some(grid_move) = grid_move(key) {
         return vec![Msg::Query(QueryMsg::Move(grid_move))];
     }
     let query_msg = match key.code {
         KeyCode::Esc => return vec![Msg::ToggleFocus],
         KeyCode::Enter => QueryMsg::OpenRowDetail,
-        _ if is_plain_char(key, '[') => QueryMsg::PreviousResult,
-        _ if is_plain_char(key, ']') => QueryMsg::NextResult,
+        _ if is_plain_char(key, 'p') => QueryMsg::PreviousResult,
+        _ if is_plain_char(key, 'n') => QueryMsg::NextResult,
         _ if is_plain_char(key, 'y') => QueryMsg::CopyCell,
         _ => return Vec::new(),
     };
     vec![Msg::Query(query_msg)]
 }
 
-fn handle_completion_key(tui: &mut TuiState, key: KeyEvent) -> bool {
-    let Some(popup) = tui.editor.completion.as_mut() else {
+fn active_query_tab(workspace: &Workspace) -> Option<TabId> {
+    let tab = workspace.active_tab()?;
+    match tab.content {
+        TabContent::Query(_) => Some(tab.id),
+        _ => None,
+    }
+}
+
+fn script_messages(editor: &EditorPanel, key: KeyEvent) -> Option<Vec<Msg>> {
+    let query_msg = match key.code {
+        KeyCode::F(5) => QueryMsg::Run { sql: editor.text() },
+        KeyCode::F(2) => QueryMsg::SaveAs {
+            content: editor.text(),
+        },
+        _ if is_ctrl(key, 'e') => QueryMsg::Run { sql: editor.text() },
+        _ if is_ctrl(key, 's') => QueryMsg::Save {
+            content: editor.text(),
+        },
+        _ if is_ctrl(key, 't') => QueryMsg::ToggleTransactionMode,
+        _ => return None,
+    };
+    Some(vec![Msg::Query(query_msg)])
+}
+
+fn handle_completion_key(editor: &mut EditorPanel, key: KeyEvent) -> bool {
+    let Some(popup) = editor.completion.as_mut() else {
         return false;
     };
     match key.code {
         KeyCode::Tab => {
-            accept_completion(&mut tui.editor);
-            refresh_highlights(&mut tui.editor);
+            accept_completion(editor);
+            refresh_highlights(editor);
         }
         KeyCode::Down => popup.select_next(),
         KeyCode::Up => popup.select_previous(),
-        KeyCode::Esc => tui.editor.completion = None,
+        KeyCode::Esc => editor.completion = None,
         _ if is_ctrl(key, 'n') => popup.select_next(),
         _ if is_ctrl(key, 'p') => popup.select_previous(),
         _ => return false,

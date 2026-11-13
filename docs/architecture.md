@@ -37,11 +37,23 @@ sequenceDiagram
     TUI->>User: draw(AppState)
 ```
 
-Responses carry their request (`PageLoaded { request }`, `DetailsLoaded { relation }`, `FilePreviewLoaded { name }`); `update` drops responses that no longer match the visible state.
+Responses carry their request (`PageLoaded { request }`, `DetailsLoaded { relation }`, `FilePreviewLoaded { name }`, `ScriptFinished { tab_id, report }`); `update` drops responses that no longer match the state.
+
+## Tabs and focus
+
+`Workspace` holds `tabs: Vec<Tab>` and `active_tab_index`. A `Tab` has a `TabId` and a `TabContent`: `Table(TableView)` (one per relation, reused when reopened), `Query(QueryView)` (numbered `Query N` unless named after a file), or the singletons `Files`, `Dump`, `Restore`. Per-tab state (page, cursor, document, run state) lives in the tab; `TabsMsg` opens, switches and closes tabs. The sidebar lists only the relations of `schema_name`.
+
+`Msg::OpenPalette` opens `Modal::Palette(CommandPalette)`; `Workspace::palette_items(query)` lists `PaletteItem`s whose `PaletteAction` switches to a tab, runs an action (new query, SQL files, dump, restore, schema, refresh, reconnect, disconnect, help) or opens a relation of any schema. `Msg::FocusPane(PaneDirection)` moves focus between sidebar, main pane, editor and results.
+
+Only one script runs at a time: `running_script_tab_id` records the query tab that issued `Command::RunScript { tab_id, .. }`; `Run` from any tab is refused while it is set, and `ScriptFinished { tab_id, .. }` clears it and stores the report in that tab (if still open).
+
+Table pages use `AppState::page_size` (set with `AppState::with_page_size` from the config's `page_size`, default `DEFAULT_PAGE_SIZE`).
+
+In `apps/ducky-tui`, `TuiState` keeps view-only state per tab in maps keyed by `TabId`: `editors` (one edtui `EditorPanel` per query tab), `table_viewports`, `results_viewports`, `structure_scrolls`.
 
 ## Adding a view
 
-1. Add state to `ducky-app/src/state`, a `MainView` variant, a `Msg` family and its `update/` module; add `Command`s if IO is needed, with tests in `crates/ducky-app/tests`.
+1. Add state to `ducky-app/src/state`, a `TabContent` variant (and a `PaletteAction` to open it), a `Msg` family and its `update/` module; add `Command`s if IO is needed, with tests in `crates/ducky-app/tests`.
 2. Handle new commands in `ducky-runtime`, answering with `Msg`.
 3. In `apps/ducky-tui`: `views/<name>.rs` (`render(frame, area, &ViewContext, &mut TuiState)`), `keys/<name>.rs`, dispatch in `views/mod.rs` and `keys/mod.rs`, rows in `keys/help.rs` and `docs/keybindings.md`.
 
@@ -58,7 +70,7 @@ Each session opens two connections with `tokio-postgres` (simple-query protocol,
 
 Scripts are split into statements by `ducky-sql::split_statements` and executed one by one, keeping at most 10 000 rows per result.
 
-- `Transaction` (default, `tx ON`): `BEGIN`, statements, `COMMIT`; the first failure stops and issues `ROLLBACK`.
-- `AutoCommit` (`tx OFF`, toggled with `Ctrl+t`): statements are sent as-is and stop at the first failure; earlier statements stay committed.
+- `Transaction` (default, ` one transaction `): `BEGIN`, statements, `COMMIT`; the first failure stops and issues `ROLLBACK`.
+- `AutoCommit` (` autocommit `, toggled with `Ctrl+t`): statements are sent as-is and stop at the first failure; earlier statements stay committed.
 
 After a script that affected rows, the catalog is reloaded. Table data is read-only; writes go through the editor.

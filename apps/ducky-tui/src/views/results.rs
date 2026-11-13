@@ -1,4 +1,4 @@
-use ducky_app::{Focus, NoticeLevel, QueryPane, QueryView, RunState};
+use ducky_app::{Focus, NoticeLevel, QueryPane, QueryView, RunState, TabId};
 use ducky_core::{ScriptFailure, ScriptReport, StatementOutcome, StatementResult, TransactionMode};
 use ratatui::Frame;
 use ratatui::layout::{Constraint, Layout, Rect};
@@ -8,20 +8,30 @@ use ratatui::widgets::{Block, Paragraph, Wrap};
 use crate::theme::Palette;
 use crate::tui_state::TuiState;
 use crate::views::ViewContext;
-use crate::widgets::grid::render_grid;
+use crate::views::editor::transaction_label;
+use crate::widgets::grid::{GridOptions, render_grid};
 use crate::widgets::loading::{LoadSlot, render_loading, render_message};
 
 const SQL_PREVIEW_CHARS: usize = 24;
-const STATEMENT_SEPARATOR: &str = "  ";
+const STATEMENT_SEPARATOR: &str = " ";
 
 pub fn render(frame: &mut Frame, area: Rect, context: &ViewContext, tui: &mut TuiState) {
-    let workspace = context.workspace;
+    let Some((tab_id, query)) = context.active_query() else {
+        return;
+    };
     let palette = context.palette;
-    let query = &workspace.query;
-    let is_focused = workspace.focus == Focus::Main && query.pane == QueryPane::Results;
-    let block = Block::bordered()
+    let is_focused = context.workspace.focus == Focus::Main && query.pane == QueryPane::Results;
+    let mut block = Block::bordered()
         .title(Span::styled(" Results ", palette.title()))
         .border_style(palette.border(is_focused));
+    if let RunState::Finished(report) = &query.run {
+        let summary = format!(
+            " {} ms · {} ",
+            report.elapsed.as_millis(),
+            transaction_label(report.mode)
+        );
+        block = block.title_bottom(Line::styled(summary, palette.muted()));
+    }
     let inner_area = block.inner(area);
     frame.render_widget(block, area);
     match &query.run {
@@ -40,20 +50,37 @@ pub fn render(frame: &mut Frame, area: Rect, context: &ViewContext, tui: &mut Tu
             palette,
         ),
         RunState::Finished(report) => {
-            render_report(frame, inner_area, query, report, is_focused, tui, palette)
+            let report_view = ReportView {
+                tab_id,
+                query,
+                report,
+                is_focused,
+            };
+            render_report(frame, inner_area, &report_view, tui, palette)
         }
     }
+}
+
+struct ReportView<'a> {
+    tab_id: TabId,
+    query: &'a QueryView,
+    report: &'a ScriptReport,
+    is_focused: bool,
 }
 
 fn render_report(
     frame: &mut Frame,
     area: Rect,
-    query: &QueryView,
-    report: &ScriptReport,
-    is_focused: bool,
+    report_view: &ReportView,
     tui: &mut TuiState,
     palette: &Palette,
 ) {
+    let ReportView {
+        tab_id,
+        query,
+        report,
+        is_focused,
+    } = *report_view;
     let failure_lines = report
         .failure
         .as_ref()
@@ -62,29 +89,19 @@ fn render_report(
     let failure_height = u16::try_from(failure_lines.len())
         .unwrap_or(u16::MAX)
         .min(area.height / 2);
-    let [statements_area, summary_area, failure_area, body_area] =
-        area.layout(&Layout::vertical([
-            Constraint::Length(1),
-            Constraint::Length(1),
-            Constraint::Length(failure_height),
-            Constraint::Min(0),
-        ]));
+    let [statements_area, failure_area, body_area] = area.layout(&Layout::vertical([
+        Constraint::Length(1),
+        Constraint::Length(failure_height),
+        Constraint::Min(0),
+    ]));
     let statements_line = statements_line(
         &report.results,
         query.selected_result_index,
         usize::from(statements_area.width),
+        is_focused,
         palette,
     );
     frame.render_widget(Paragraph::new(statements_line), statements_area);
-    let mode_label = match report.mode {
-        TransactionMode::Transaction => "transaction",
-        TransactionMode::AutoCommit => "autocommit",
-    };
-    let summary = format!("{} ms · {mode_label}", report.elapsed.as_millis());
-    frame.render_widget(
-        Paragraph::new(Line::styled(summary, palette.muted())),
-        summary_area,
-    );
     frame.render_widget(
         Paragraph::new(failure_lines).wrap(Wrap { trim: false }),
         failure_area,
@@ -94,17 +111,21 @@ fn render_report(
             frame,
             body_area,
             result_set,
-            query.cursor,
-            &mut tui.results_viewport,
-            None,
-            is_focused,
+            tui.results_viewports.entry(tab_id).or_default(),
+            GridOptions {
+                cursor: query.cursor,
+                sort: None,
+                first_row_number: 1,
+                is_focused,
+            },
             palette,
         ),
-        Some(StatementOutcome::Affected(affected_count)) => render_message(
-            frame,
+        Some(StatementOutcome::Affected(affected_count)) => frame.render_widget(
+            Paragraph::new(Line::styled(
+                format!(" {} affected ", row_count_label(*affected_count)),
+                palette.title(),
+            )),
             body_area,
-            &format!("{affected_count} rows affected"),
-            palette,
         ),
         None => {}
     }
@@ -138,6 +159,7 @@ fn statements_line(
     results: &[StatementResult],
     selected_result_index: usize,
     available_width: usize,
+    is_focused: bool,
     palette: &Palette,
 ) -> Line<'static> {
     let labels: Vec<String> = results
@@ -152,7 +174,7 @@ fn statements_line(
             spans.push(Span::raw(STATEMENT_SEPARATOR));
         }
         match result_index == selected_result_index {
-            true => spans.push(Span::styled(label, palette.title())),
+            true => spans.push(Span::styled(label, palette.selected(is_focused))),
             false => spans.push(Span::styled(label, palette.muted())),
         }
     }
@@ -177,17 +199,23 @@ fn first_shown_index(
 }
 
 fn statement_label(result_index: usize, result: &StatementResult) -> String {
-    let sql_preview: String = result
-        .sql
-        .split_whitespace()
-        .collect::<Vec<_>>()
-        .join(" ")
-        .chars()
-        .take(SQL_PREVIEW_CHARS)
-        .collect();
+    let collapsed_sql = result.sql.split_whitespace().collect::<Vec<_>>().join(" ");
+    let mut sql_preview: String = collapsed_sql.chars().take(SQL_PREVIEW_CHARS).collect();
+    if collapsed_sql.chars().count() > SQL_PREVIEW_CHARS {
+        sql_preview.push('…');
+    }
     let outcome = match &result.outcome {
-        StatementOutcome::Rows(result_set) => format!("{} rows", result_set.rows.len()),
-        StatementOutcome::Affected(affected_count) => format!("{affected_count} affected"),
+        StatementOutcome::Rows(result_set) => row_count_label(result_set.rows.len() as u64),
+        StatementOutcome::Affected(affected_count) => {
+            format!("{} affected", row_count_label(*affected_count))
+        }
     };
-    format!("{}: {sql_preview} ({outcome})", result_index + 1)
+    format!(" {} {sql_preview} {outcome} ", result_index + 1)
+}
+
+fn row_count_label(row_count: u64) -> String {
+    match row_count {
+        1 => "1 row".to_owned(),
+        _ => format!("{row_count} rows"),
+    }
 }

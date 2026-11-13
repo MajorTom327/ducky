@@ -6,19 +6,9 @@ pub struct Sidebar {
     pub filter: String,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum SidebarAction {
-    SqlCommand,
-    SqlFiles,
-    Dump,
-    Restore,
-}
-
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum SidebarItem {
-    Action(SidebarAction),
-    Relation {
-        relation: RelationRef,
-        kind: RelationKind,
-    },
+pub struct SidebarItem {
+    pub relation: RelationRef,
+    pub kind: RelationKind,
+    pub estimated_row_count: Option<i64>,
 }

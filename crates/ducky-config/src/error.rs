@@ -21,6 +21,8 @@ pub enum ConfigError {
     InvalidUrl { label: String, reason: String },
     #[error("environment variable `{variable}` is not set")]
     MissingEnvVar { variable: String },
+    #[error("page_size must be between 1 and {max}, got {page_size}", max = ducky_core::MAX_PAGE_SIZE)]
+    InvalidPageSize { page_size: usize },
 }
 
 fn display_paths(paths: &[PathBuf]) -> String {

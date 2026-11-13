@@ -1,18 +1,18 @@
 mod support;
 
 use ducky_app::{
-    AppState, Command, ConfirmKind, FilesMsg, Focus, Loadable, MainView, Modal, ModalMsg, Msg,
-    NoticeLevel, QueryPane, SidebarAction, SidebarItem, SidebarMsg,
+    AppState, Command, ConfirmKind, FilesMsg, Focus, Loadable, Modal, ModalMsg, Msg, NoticeLevel,
+    QueryPane, TabContent, TabsMsg,
 };
 use ducky_core::TransactionMode;
-use support::{file_entry, select_sidebar_item, send, workspace, workspace_state};
+use support::{
+    active_query, active_tab_id, file_entry, new_query, query_tab, query_tab_mut, send, workspace,
+    workspace_state,
+};
 
 fn files_state() -> AppState {
     let mut state = workspace_state();
-    select_sidebar_item(&mut state, |item| {
-        *item == SidebarItem::Action(SidebarAction::SqlFiles)
-    });
-    send(&mut state, Msg::Sidebar(SidebarMsg::Activate));
+    send(&mut state, Msg::Tabs(TabsMsg::OpenFiles));
     send(
         &mut state,
         Msg::SqlFilesListed(Ok(vec![file_entry("a.sql"), file_entry("b.sql")])),
@@ -164,18 +164,18 @@ fn execute_confirm_open_then_run() {
     assert_eq!(
         commands,
         vec![Command::RunScript {
+            tab_id: 2,
             sql: "select 1".to_owned(),
             mode: TransactionMode::Transaction,
         }]
     );
-    let workspace = workspace(&state);
-    assert_eq!(workspace.query.document.name.as_deref(), Some("a.sql"));
-    assert_eq!(workspace.query.document.text, "select 1");
-    assert_eq!(workspace.query.document.revision, 1);
-    assert_eq!(
-        (workspace.view, workspace.focus, workspace.query.pane),
-        (MainView::Query, Focus::Main, QueryPane::Editor)
-    );
+    let query = active_query(&state);
+    assert_eq!(query.document.name.as_deref(), Some("a.sql"));
+    assert_eq!(query.document.text, "select 1");
+    assert_eq!(query.document.revision, 1);
+    assert_eq!(query.pane, QueryPane::Editor);
+    assert_eq!(active_tab_id(&state), 2);
+    assert_eq!(workspace(&state).focus, Focus::Main);
 }
 
 #[test]
@@ -190,7 +190,8 @@ fn file_opened_without_run_only_loads_document() {
         },
     );
     assert!(commands.is_empty());
-    assert_eq!(workspace(&state).view, MainView::Query);
+    assert_eq!(workspace(&state).tabs.len(), 2);
+    assert_eq!(active_query(&state).document.text, "select 1");
 }
 
 #[test]
@@ -209,5 +210,41 @@ fn file_opened_error_sets_notice() {
         (notice.level, notice.text.as_str()),
         (NoticeLevel::Error, "missing")
     );
-    assert_eq!(workspace(&state).view, MainView::Files);
+    assert_eq!(workspace(&state).tabs.len(), 1);
+    assert!(matches!(
+        workspace(&state).active_tab().map(|tab| &tab.content),
+        Some(TabContent::Files)
+    ));
+}
+
+#[test]
+fn file_opened_reuses_the_tab_with_the_same_name() {
+    let mut state = files_state();
+    let query_tab_id = new_query(&mut state);
+    query_tab_mut(&mut state, query_tab_id).document.name = Some("a.sql".to_owned());
+    query_tab_mut(&mut state, query_tab_id).document.revision = 3;
+    send(&mut state, Msg::Tabs(TabsMsg::Select(0)));
+    send(
+        &mut state,
+        Msg::FileOpened {
+            name: "a.sql".to_owned(),
+            run_after_open: false,
+            result: Ok("select 2".to_owned()),
+        },
+    );
+    assert_eq!(workspace(&state).tabs.len(), 2);
+    assert_eq!(active_tab_id(&state), query_tab_id);
+    let document = &query_tab(&state, query_tab_id).document;
+    assert_eq!(document.text, "select 2");
+    assert_eq!(document.revision, 4);
+}
+
+#[test]
+fn open_files_tab_is_a_singleton_and_lists_once_ready() {
+    let mut state = files_state();
+    new_query(&mut state);
+    assert!(send(&mut state, Msg::Tabs(TabsMsg::OpenFiles)).is_empty());
+    let workspace = workspace(&state);
+    assert_eq!(workspace.tabs.len(), 2);
+    assert_eq!(workspace.active_tab_index, 0);
 }

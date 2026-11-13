@@ -4,8 +4,8 @@ use crate::command::Command;
 use crate::loadable::Loadable;
 use crate::msg::{DumpMsg, RestoreMsg};
 use crate::state::{
-    AppState, Confirm, ConfirmKind, JobKind, JobState, MAX_JOB_LOG_LINES, MainView, Modal,
-    NoticeLevel, Prompt, PromptKind,
+    AppState, Confirm, ConfirmKind, JobKind, JobState, MAX_JOB_LOG_LINES, Modal, NoticeLevel,
+    Prompt, PromptKind, TabContent,
 };
 use crate::update::{clamp_index, notice, step_index, workspace_mut};
 
@@ -13,7 +13,7 @@ pub(crate) fn update_dump(state: &mut AppState, msg: DumpMsg) -> Vec<Command> {
     let Some(workspace) = workspace_mut(&mut state.screen) else {
         return Vec::new();
     };
-    if workspace.view != MainView::Dump {
+    if !workspace.is_active_content(|content| matches!(content, TabContent::Dump)) {
         return Vec::new();
     }
     let dump = &mut workspace.dump;
@@ -47,7 +47,7 @@ pub(crate) fn update_restore(state: &mut AppState, msg: RestoreMsg) -> Vec<Comma
     let Some(workspace) = workspace_mut(&mut state.screen) else {
         return Vec::new();
     };
-    if workspace.view != MainView::Restore {
+    if !workspace.is_active_content(|content| matches!(content, TabContent::Restore)) {
         return Vec::new();
     }
     let restore = &mut workspace.restore;

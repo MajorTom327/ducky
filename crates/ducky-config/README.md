@@ -13,6 +13,7 @@ Loads ducky's TOML configuration: connection profiles and storage directories.
 ```toml
 sql_dir = "sql"      # optional, relative to the config file
 dump_dir = "dumps"   # optional, relative to the config file
+page_size = 50       # optional, rows per table page, 1–5000
 
 [[profiles]]
 label = "Prod"
@@ -24,8 +25,8 @@ type = "prod"        # local | staging | prod
 
 ## Public API
 
-- `Config { source, profiles, storage }`
-- `ConfigError`
+- `Config { source, profiles, storage, page_size }`
+- `ConfigError` (including `InvalidPageSize { page_size }`)
 - `SearchContext { explicit_path, working_dir, xdg_config_home, home_dir }`, `SearchContext::from_process`
 - `resolve_config_path(&SearchContext)`
 - `load(&Path)`

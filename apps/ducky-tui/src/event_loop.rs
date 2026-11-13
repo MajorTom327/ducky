@@ -1,13 +1,16 @@
+use std::io::stdout;
 use std::time::Duration;
 
+use crossterm::cursor::SetCursorStyle;
 use crossterm::event::{Event, EventStream, KeyEventKind};
+use crossterm::execute;
 use ducky_app::{AppState, Msg, update};
 use ducky_runtime::Runtime;
 use futures::StreamExt;
 use ratatui::DefaultTerminal;
 use tokio::sync::mpsc::UnboundedReceiver;
 
-use crate::tui_state::TuiState;
+use crate::tui_state::{CursorShape, TuiState};
 use crate::{keys, views};
 
 const ANIMATION_FRAME_PERIOD: Duration = Duration::from_millis(16);
@@ -22,11 +25,16 @@ pub async fn run(
 ) -> anyhow::Result<()> {
     apply_messages(&mut state, &mut runtime, startup_messages);
     let mut terminal_events = EventStream::new();
+    let mut applied_cursor_shape = None;
     while !state.should_quit {
         if let Some(workspace) = state.workspace() {
-            tui.editor.sync_document(&workspace.query.document);
+            tui.sync_workspace(workspace);
         }
         terminal.draw(|frame| views::draw(frame, &state, &mut tui))?;
+        if applied_cursor_shape != Some(tui.cursor_shape) {
+            execute!(stdout(), cursor_style(tui.cursor_shape))?;
+            applied_cursor_shape = Some(tui.cursor_shape);
+        }
         let incoming_messages = tokio::select! {
             terminal_event = terminal_events.next() => match terminal_event {
                 Some(Ok(Event::Key(key))) if key.kind == KeyEventKind::Press => {
@@ -45,6 +53,12 @@ pub async fn run(
     Ok(())
 }
 
+fn cursor_style(shape: CursorShape) -> SetCursorStyle {
+    match shape {
+        CursorShape::Block => SetCursorStyle::SteadyBlock,
+        CursorShape::Bar => SetCursorStyle::SteadyBar,
+    }
+}
 fn apply_messages(state: &mut AppState, runtime: &mut Runtime, messages: Vec<Msg>) {
     for message in messages {
         for command in update(state, message) {

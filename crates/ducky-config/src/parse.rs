@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 
-use ducky_core::{Profile, ProfileKind, StoragePaths};
+use ducky_core::{DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE, Profile, ProfileKind, StoragePaths};
 use serde::Deserialize;
 
 use crate::ConfigError;
@@ -12,6 +12,7 @@ pub struct Config {
     pub source: PathBuf,
     pub profiles: Vec<Profile>,
     pub storage: StoragePaths,
+    pub page_size: usize,
 }
 
 #[derive(Deserialize)]
@@ -19,6 +20,7 @@ pub struct Config {
 struct RawConfig {
     sql_dir: Option<PathBuf>,
     dump_dir: Option<PathBuf>,
+    page_size: Option<usize>,
     #[serde(default)]
     profiles: Vec<RawProfile>,
 }
@@ -83,6 +85,10 @@ pub fn load(config_path: &Path) -> Result<Config, ConfigError> {
             kind: raw_profile.kind.into(),
         });
     }
+    let page_size = raw_config.page_size.unwrap_or(DEFAULT_PAGE_SIZE);
+    if !(1..=MAX_PAGE_SIZE).contains(&page_size) {
+        return Err(ConfigError::InvalidPageSize { page_size });
+    }
     let base_dir = config_path.parent().unwrap_or(Path::new(""));
     let storage = StoragePaths {
         sql_dir: base_dir.join(raw_config.sql_dir.unwrap_or_else(|| PathBuf::from("sql"))),
@@ -96,6 +102,7 @@ pub fn load(config_path: &Path) -> Result<Config, ConfigError> {
         source: config_path.to_path_buf(),
         profiles,
         storage,
+        page_size,
     })
 }
 

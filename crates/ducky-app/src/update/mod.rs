@@ -1,18 +1,19 @@
 mod connection;
 mod files;
+mod focus;
 mod grid;
 mod jobs;
 mod modal;
+mod palette;
 mod profiles;
 mod query;
 mod sidebar;
 mod table;
+mod tabs;
 
 use crate::command::Command;
 use crate::msg::Msg;
-use crate::state::{
-    AppState, Focus, MainView, Modal, Notice, NoticeLevel, QueryPane, Screen, Workspace,
-};
+use crate::state::{AppState, Modal, Notice, NoticeLevel, Screen, Workspace};
 
 pub fn update(state: &mut AppState, msg: Msg) -> Vec<Command> {
     match msg {
@@ -32,8 +33,11 @@ pub fn update(state: &mut AppState, msg: Msg) -> Vec<Command> {
             state.notice = Some(notice);
             Vec::new()
         }
-        Msg::ToggleFocus => toggle_focus(state),
+        Msg::ToggleFocus => focus::toggle(state),
+        Msg::FocusPane(direction) => focus::move_towards(state, direction),
         Msg::OpenSchemaPicker => open_schema_picker(state),
+        Msg::OpenPalette => palette::open(state),
+        Msg::Tabs(tabs_msg) => tabs::update(state, tabs_msg),
         Msg::RefreshCatalog => refresh_catalog(state),
         Msg::Reconnect => connection::reconnect(state),
         Msg::Disconnect => connection::disconnect(state),
@@ -48,7 +52,7 @@ pub fn update(state: &mut AppState, msg: Msg) -> Vec<Command> {
         Msg::PageLoaded { request, result } => table::page_loaded(state, request, result),
         Msg::DetailsLoaded { relation, result } => table::details_loaded(state, relation, result),
         Msg::Query(query_msg) => query::update(state, query_msg),
-        Msg::ScriptFinished(report) => query::script_finished(state, report),
+        Msg::ScriptFinished { tab_id, report } => query::script_finished(state, tab_id, report),
         Msg::FileSaved { name, result } => query::file_saved(state, name, result),
         Msg::Files(files_msg) => files::update(state, files_msg),
         Msg::SqlFilesListed(result) => files::listed(state, result),
@@ -88,24 +92,6 @@ pub(crate) fn step_index(index: usize, length: usize, is_forward: bool) -> usize
     } else {
         index.saturating_sub(1)
     }
-}
-
-fn toggle_focus(state: &mut AppState) -> Vec<Command> {
-    let Some(workspace) = workspace_mut(&mut state.screen) else {
-        return Vec::new();
-    };
-    match (workspace.view, workspace.focus, workspace.query.pane) {
-        (MainView::Query, Focus::Sidebar, _) => {
-            workspace.focus = Focus::Main;
-            workspace.query.pane = QueryPane::Editor;
-        }
-        (MainView::Query, Focus::Main, QueryPane::Editor) => {
-            workspace.query.pane = QueryPane::Results;
-        }
-        (_, Focus::Main, _) => workspace.focus = Focus::Sidebar,
-        (_, Focus::Sidebar, _) => workspace.focus = Focus::Main,
-    }
-    Vec::new()
 }
 
 fn open_schema_picker(state: &mut AppState) -> Vec<Command> {

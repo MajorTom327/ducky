@@ -2,18 +2,33 @@ mod support;
 
 use ducky_app::{
     AppState, Command, ConfirmKind, GridCursor, GridMove, Modal, ModalMsg, Msg, NoticeLevel,
-    PromptKind, QueryMsg, RunState, SaveFailure,
+    PendingSave, PromptKind, QueryMsg, RunState, SaveFailure, TabId, TabsMsg,
 };
-use ducky_core::{ScriptFailure, TransactionMode};
+use ducky_core::{ScriptFailure, ScriptReport, TransactionMode};
 use support::{
-    affected_result, file_entry, report, rows_result, send, workspace, workspace_mut,
-    workspace_state,
+    active_query, active_tab_id, affected_result, file_entry, new_query, query_tab, query_tab_mut,
+    report, rows_result, send, workspace, workspace_mut, workspace_state,
 };
 use tui_input::InputRequest;
 
 fn notice_text(state: &AppState) -> (NoticeLevel, String) {
     let notice = state.notice.clone().expect("notice");
     (notice.level, notice.text)
+}
+
+fn query_state() -> AppState {
+    let mut state = workspace_state();
+    new_query(&mut state);
+    state
+}
+
+fn finish(state: &mut AppState, report: ScriptReport) -> Vec<Command> {
+    let tab_id = active_tab_id(state);
+    finish_tab(state, tab_id, report)
+}
+
+fn finish_tab(state: &mut AppState, tab_id: TabId, report: ScriptReport) -> Vec<Command> {
+    send(state, Msg::ScriptFinished { tab_id, report })
 }
 
 fn run(state: &mut AppState, sql: &str) -> Vec<Command> {
@@ -27,22 +42,24 @@ fn run(state: &mut AppState, sql: &str) -> Vec<Command> {
 
 #[test]
 fn run_emits_script_with_mode() {
-    let mut state = workspace_state();
+    let mut state = query_state();
     send(&mut state, Msg::Query(QueryMsg::ToggleTransactionMode));
     let commands = run(&mut state, "select 1");
     assert_eq!(
         commands,
         vec![Command::RunScript {
+            tab_id: 1,
             sql: "select 1".to_owned(),
             mode: TransactionMode::AutoCommit,
         }]
     );
-    assert_eq!(workspace(&state).query.run, RunState::Running);
+    assert_eq!(active_query(&state).run, RunState::Running);
+    assert_eq!(workspace(&state).running_script_tab_id, Some(1));
 }
 
 #[test]
 fn run_is_refused_while_running() {
-    let mut state = workspace_state();
+    let mut state = query_state();
     run(&mut state, "select 1");
     assert!(run(&mut state, "select 2").is_empty());
     assert_eq!(
@@ -53,18 +70,18 @@ fn run_is_refused_while_running() {
 
 #[test]
 fn blank_run_is_refused() {
-    let mut state = workspace_state();
+    let mut state = query_state();
     assert!(run(&mut state, "  \n ").is_empty());
     assert_eq!(
         notice_text(&state),
         (NoticeLevel::Error, "Nothing to run".to_owned())
     );
-    assert_eq!(workspace(&state).query.run, RunState::Idle);
+    assert_eq!(active_query(&state).run, RunState::Idle);
 }
 
 #[test]
 fn cancel_only_while_running() {
-    let mut state = workspace_state();
+    let mut state = query_state();
     assert!(send(&mut state, Msg::Query(QueryMsg::Cancel)).is_empty());
     run(&mut state, "select pg_sleep(1)");
     assert_eq!(
@@ -75,21 +92,21 @@ fn cancel_only_while_running() {
 
 #[test]
 fn success_notice_selects_last_result() {
-    let mut state = workspace_state();
+    let mut state = query_state();
     run(&mut state, "select 1; select 2");
-    let commands = send(
+    let commands = finish(
         &mut state,
-        Msg::ScriptFinished(report(
+        report(
             TransactionMode::Transaction,
             vec![rows_result("select 1", 1), rows_result("select 2", 2)],
-        )),
+        ),
     );
     assert!(commands.is_empty());
     assert_eq!(
         notice_text(&state),
         (NoticeLevel::Success, "2 statement(s) in 42 ms".to_owned())
     );
-    assert_eq!(workspace(&state).query.selected_result_index, 1);
+    assert_eq!(active_query(&state).selected_result_index, 1);
 }
 
 #[test]
@@ -110,10 +127,10 @@ fn failure_notices_depend_on_mode() {
         ),
     ];
     for (mode, expected_text) in expectations {
-        let mut state = workspace_state();
+        let mut state = query_state();
         let mut failed_report = report(mode, vec![rows_result("select 1", 1)]);
         failed_report.failure = Some(failure.clone());
-        send(&mut state, Msg::ScriptFinished(failed_report));
+        finish(&mut state, failed_report);
         assert_eq!(
             notice_text(&state),
             (NoticeLevel::Error, expected_text.to_owned())
@@ -123,48 +140,45 @@ fn failure_notices_depend_on_mode() {
 
 #[test]
 fn affected_result_reloads_catalog() {
-    let mut state = workspace_state();
-    let commands = send(
+    let mut state = query_state();
+    let commands = finish(
         &mut state,
-        Msg::ScriptFinished(report(
+        report(
             TransactionMode::Transaction,
             vec![affected_result("create table t()", 0)],
-        )),
+        ),
     );
     assert_eq!(commands, vec![Command::LoadCatalog]);
 }
 
 #[test]
 fn results_navigation_clamps_and_resets_cursor() {
-    let mut state = workspace_state();
-    send(
+    let mut state = query_state();
+    finish(
         &mut state,
-        Msg::ScriptFinished(report(
+        report(
             TransactionMode::Transaction,
             vec![rows_result("select 1", 3), affected_result("delete", 2)],
-        )),
+        ),
     );
     send(&mut state, Msg::Query(QueryMsg::PreviousResult));
     send(&mut state, Msg::Query(QueryMsg::Move(GridMove::Down)));
-    assert_eq!(workspace(&state).query.cursor.row_index, 1);
+    assert_eq!(active_query(&state).cursor.row_index, 1);
     send(&mut state, Msg::Query(QueryMsg::NextResult));
     send(&mut state, Msg::Query(QueryMsg::NextResult));
-    assert_eq!(workspace(&state).query.selected_result_index, 1);
-    assert_eq!(workspace(&state).query.cursor, GridCursor::default());
+    assert_eq!(active_query(&state).selected_result_index, 1);
+    assert_eq!(active_query(&state).cursor, GridCursor::default());
     send(&mut state, Msg::Query(QueryMsg::Move(GridMove::Down)));
-    assert_eq!(workspace(&state).query.cursor, GridCursor::default());
+    assert_eq!(active_query(&state).cursor, GridCursor::default());
     assert!(send(&mut state, Msg::Query(QueryMsg::CopyCell)).is_empty());
 }
 
 #[test]
 fn copy_and_row_detail_use_selected_rows() {
-    let mut state = workspace_state();
-    send(
+    let mut state = query_state();
+    finish(
         &mut state,
-        Msg::ScriptFinished(report(
-            TransactionMode::Transaction,
-            vec![rows_result("s", 2)],
-        )),
+        report(TransactionMode::Transaction, vec![rows_result("s", 2)]),
     );
     send(&mut state, Msg::Query(QueryMsg::Move(GridMove::Down)));
     assert_eq!(
@@ -179,7 +193,7 @@ fn copy_and_row_detail_use_selected_rows() {
 
 #[test]
 fn save_unnamed_prompts_then_confirms_overwrite() {
-    let mut state = workspace_state();
+    let mut state = query_state();
     let content = "select 1".to_owned();
     assert!(
         send(
@@ -243,9 +257,11 @@ fn save_unnamed_prompts_then_confirms_overwrite() {
             result: Ok(file_entry("report.sql")),
         },
     );
-    let query = &workspace(&state).query;
+    let query = active_query(&state);
     assert_eq!(query.document.name.as_deref(), Some("report.sql"));
-    assert_eq!(query.pending_save, None);
+    assert_eq!(query.document.text, "select 1");
+    assert_eq!(query.document.revision, 0);
+    assert_eq!(workspace(&state).pending_save, None);
     assert_eq!(
         notice_text(&state),
         (NoticeLevel::Success, "Saved report.sql".to_owned())
@@ -254,8 +270,9 @@ fn save_unnamed_prompts_then_confirms_overwrite() {
 
 #[test]
 fn save_named_overwrites_directly() {
-    let mut state = workspace_state();
-    workspace_mut(&mut state).query.document.name = Some("a.sql".to_owned());
+    let mut state = query_state();
+    let tab_id = active_tab_id(&state);
+    query_tab_mut(&mut state, tab_id).document.name = Some("a.sql".to_owned());
     let commands = send(
         &mut state,
         Msg::Query(QueryMsg::Save {
@@ -270,11 +287,19 @@ fn save_named_overwrites_directly() {
             overwrite: true,
         }]
     );
+    assert_eq!(
+        workspace(&state).pending_save,
+        Some(PendingSave {
+            tab_id,
+            name: "a.sql".to_owned(),
+            content: "x".to_owned(),
+        })
+    );
 }
 
 #[test]
 fn file_saved_refreshes_ready_file_list() {
-    let mut state = workspace_state();
+    let mut state = query_state();
     workspace_mut(&mut state).files.entries = ducky_app::Loadable::Ready(Vec::new());
     let commands = send(
         &mut state,
@@ -288,7 +313,7 @@ fn file_saved_refreshes_ready_file_list() {
 
 #[test]
 fn save_failure_clears_pending_save() {
-    let mut state = workspace_state();
+    let mut state = query_state();
     send(
         &mut state,
         Msg::Query(QueryMsg::SaveAs {
@@ -307,9 +332,137 @@ fn save_failure_clears_pending_save() {
             result: Err(SaveFailure::Other("disk full".to_owned())),
         },
     );
-    assert_eq!(workspace(&state).query.pending_save, None);
+    assert_eq!(workspace(&state).pending_save, None);
     assert_eq!(
         notice_text(&state),
         (NoticeLevel::Error, "disk full".to_owned())
     );
+}
+
+#[test]
+fn cancel_works_from_another_tab() {
+    let mut state = query_state();
+    run(&mut state, "select pg_sleep(1)");
+    send(&mut state, Msg::Tabs(TabsMsg::OpenDump));
+    assert_eq!(
+        send(&mut state, Msg::Query(QueryMsg::Cancel)),
+        vec![Command::CancelScript]
+    );
+}
+
+#[test]
+fn query_messages_are_ignored_without_query_tab() {
+    let mut state = workspace_state();
+    assert!(run(&mut state, "select 1").is_empty());
+    assert!(
+        send(
+            &mut state,
+            Msg::Query(QueryMsg::SaveAs {
+                content: "x".to_owned()
+            })
+        )
+        .is_empty()
+    );
+    assert!(state.modal.is_none());
+}
+
+#[test]
+fn script_is_routed_to_the_tab_that_ran_it() {
+    let mut state = query_state();
+    let first_tab_id = active_tab_id(&state);
+    run(&mut state, "select 1");
+    let second_tab_id = new_query(&mut state);
+    finish_tab(
+        &mut state,
+        first_tab_id,
+        report(
+            TransactionMode::Transaction,
+            vec![rows_result("select 1", 1)],
+        ),
+    );
+    assert!(matches!(
+        query_tab(&state, first_tab_id).run,
+        RunState::Finished(_)
+    ));
+    assert_eq!(query_tab(&state, second_tab_id).run, RunState::Idle);
+    assert_eq!(workspace(&state).running_script_tab_id, None);
+    assert_eq!(active_tab_id(&state), second_tab_id);
+}
+
+#[test]
+fn run_is_refused_while_another_tab_runs() {
+    let mut state = query_state();
+    run(&mut state, "select 1");
+    let second_tab_id = new_query(&mut state);
+    assert!(run(&mut state, "select 2").is_empty());
+    assert_eq!(
+        notice_text(&state),
+        (NoticeLevel::Error, "A script is already running".to_owned())
+    );
+    assert_eq!(query_tab(&state, second_tab_id).run, RunState::Idle);
+}
+
+#[test]
+fn script_finished_for_a_closed_tab_still_notifies_and_reloads_catalog() {
+    let mut state = query_state();
+    let commands = finish_tab(
+        &mut state,
+        99,
+        report(
+            TransactionMode::AutoCommit,
+            vec![affected_result("delete", 1)],
+        ),
+    );
+    assert_eq!(commands, vec![Command::LoadCatalog]);
+    assert_eq!(
+        notice_text(&state),
+        (NoticeLevel::Success, "1 statement(s) in 42 ms".to_owned())
+    );
+    assert_eq!(active_query(&state).run, RunState::Idle);
+}
+
+#[test]
+fn save_from_one_tab_names_that_tab_after_switching() {
+    let mut state = query_state();
+    let first_tab_id = active_tab_id(&state);
+    send(
+        &mut state,
+        Msg::Query(QueryMsg::SaveAs {
+            content: "select 1".to_owned(),
+        }),
+    );
+    send(
+        &mut state,
+        Msg::Modal(ModalMsg::Input(InputRequest::InsertChar('a'))),
+    );
+    send(&mut state, Msg::Modal(ModalMsg::Submit));
+    let second_tab_id = new_query(&mut state);
+    send(
+        &mut state,
+        Msg::FileSaved {
+            name: "a".to_owned(),
+            result: Ok(file_entry("a.sql")),
+        },
+    );
+    let first_document = &query_tab(&state, first_tab_id).document;
+    assert_eq!(first_document.name.as_deref(), Some("a.sql"));
+    assert_eq!(first_document.text, "select 1");
+    assert_eq!(query_tab(&state, second_tab_id).document.name, None);
+}
+
+#[test]
+fn save_as_prompt_is_prefilled_with_document_name() {
+    let mut state = query_state();
+    let tab_id = active_tab_id(&state);
+    query_tab_mut(&mut state, tab_id).document.name = Some("a.sql".to_owned());
+    send(
+        &mut state,
+        Msg::Query(QueryMsg::SaveAs {
+            content: "x".to_owned(),
+        }),
+    );
+    let Some(Modal::Prompt(prompt)) = &state.modal else {
+        panic!("expected prompt");
+    };
+    assert_eq!(prompt.input.value(), "a.sql");
 }

@@ -134,11 +134,13 @@ async fn database_commands_without_connection_answer_not_connected() {
     );
 
     runtime.dispatch(Command::RunScript {
+        tab_id: 3,
         sql: "select 1".to_owned(),
         mode: ducky_core::TransactionMode::Transaction,
     });
     match next_message(&mut receiver).await {
-        Msg::ScriptFinished(report) => {
+        Msg::ScriptFinished { tab_id, report } => {
+            assert_eq!(tab_id, 3);
             let failure = report.failure.expect("a failure");
             assert_eq!(failure.statement_index, 0);
             assert_eq!(failure.message, "Not connected");

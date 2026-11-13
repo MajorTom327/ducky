@@ -2,9 +2,9 @@ mod support;
 
 use ducky_app::{
     Command, DumpMsg, Modal, ModalMsg, Msg, NoticeLevel, PromptKind, QueryMsg, RowDetail,
-    SidebarAction, SidebarItem, SidebarMsg,
+    SidebarMsg, TabsMsg,
 };
-use support::{select_sidebar_item, send, workspace, workspace_mut, workspace_state};
+use support::{new_query, send, workspace, workspace_mut, workspace_state};
 use tui_input::InputRequest;
 
 fn type_text(state: &mut ducky_app::AppState, text: &str) {
@@ -19,7 +19,7 @@ fn type_text(state: &mut ducky_app::AppState, text: &str) {
 #[test]
 fn sidebar_filter_input_updates_filter_live() {
     let mut state = workspace_state();
-    workspace_mut(&mut state).sidebar.selected_item_index = 5;
+    workspace_mut(&mut state).sidebar.selected_item_index = 2;
     send(&mut state, Msg::Sidebar(SidebarMsg::StartFilter));
     type_text(&mut state, "cus");
     assert_eq!(workspace(&state).sidebar.filter, "cus");
@@ -77,6 +77,7 @@ fn schema_picker_next_clamps() {
 #[test]
 fn save_as_requires_a_name() {
     let mut state = workspace_state();
+    new_query(&mut state);
     send(
         &mut state,
         Msg::Query(QueryMsg::SaveAs {
@@ -99,12 +100,13 @@ fn save_as_requires_a_name() {
             content: "x".to_owned()
         }
     );
-    assert_eq!(workspace(&state).query.pending_save, None);
+    assert_eq!(workspace(&state).pending_save, None);
 }
 
 #[test]
 fn cancel_overwrite_clears_pending_save() {
     let mut state = workspace_state();
+    new_query(&mut state);
     send(
         &mut state,
         Msg::Query(QueryMsg::SaveAs {
@@ -113,7 +115,7 @@ fn cancel_overwrite_clears_pending_save() {
     );
     type_text(&mut state, "a");
     send(&mut state, Msg::Modal(ModalMsg::Submit));
-    assert!(workspace(&state).query.pending_save.is_some());
+    assert!(workspace(&state).pending_save.is_some());
     send(
         &mut state,
         Msg::FileSaved {
@@ -123,16 +125,13 @@ fn cancel_overwrite_clears_pending_save() {
     );
     send(&mut state, Msg::Modal(ModalMsg::Cancel));
     assert!(state.modal.is_none());
-    assert_eq!(workspace(&state).query.pending_save, None);
+    assert_eq!(workspace(&state).pending_save, None);
 }
 
 #[test]
 fn dump_file_name_submit_sets_custom_name() {
     let mut state = workspace_state();
-    select_sidebar_item(&mut state, |item| {
-        *item == SidebarItem::Action(SidebarAction::Dump)
-    });
-    send(&mut state, Msg::Sidebar(SidebarMsg::Activate));
+    send(&mut state, Msg::Tabs(TabsMsg::OpenDump));
     send(&mut state, Msg::Dump(DumpMsg::EditFileName));
     type_text(&mut state, " nightly ");
     send(&mut state, Msg::Modal(ModalMsg::Submit));

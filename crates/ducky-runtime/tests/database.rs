@@ -79,11 +79,13 @@ async fn run_script_returns_one_result_per_statement() {
     ));
 
     runtime.dispatch(Command::RunScript {
+        tab_id: 7,
         sql: "select 1; select 2".to_owned(),
         mode: TransactionMode::Transaction,
     });
     match next_message(&mut receiver).await {
-        Msg::ScriptFinished(report) => {
+        Msg::ScriptFinished { tab_id, report } => {
+            assert_eq!(tab_id, 7);
             assert_eq!(report.failure, None);
             assert_eq!(report.results.len(), 2);
             assert!(

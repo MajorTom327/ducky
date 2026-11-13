@@ -3,11 +3,18 @@ mod support;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use crossterm::event::KeyCode;
-use ducky_app::{RunState, SidebarItem};
+use ducky_app::{QueryView, RunState, TabContent};
 use ducky_core::{Profile, ProfileKind, TransactionMode};
 use ducky_postgres::PgSession;
 
 use support::Harness;
+
+fn active_query(harness: &Harness) -> &QueryView {
+    match harness.workspace().active_tab().map(|tab| &tab.content) {
+        Some(TabContent::Query(query)) => query,
+        other => panic!("a query tab is not active: {other:?}"),
+    }
+}
 
 const PROFILE_LABEL: &str = "E2E local";
 
@@ -53,39 +60,15 @@ async fn explore_query_and_save() {
     harness.settle().await;
     let screen = harness.screen();
     assert!(screen.contains(PROFILE_LABEL), "{screen}");
-    assert!(screen.contains("SQL command"), "{screen}");
+    assert!(screen.contains("Ctrl+p"), "{screen}");
 
-    let schema_names = harness.workspace().schema_names();
-    let schema_position = schema_names
-        .iter()
-        .position(|name| name == &schema_name)
-        .expect("the test schema is in the catalog");
-    harness.press_char('s');
-    for _ in 0..schema_names.len() {
-        harness.press_char('k');
-    }
-    for _ in 0..schema_position {
-        harness.press_char('j');
-    }
+    harness.press_ctrl('p');
+    harness.type_text(&format!("{schema_name}.people"));
     harness.press_code(KeyCode::Enter);
+    harness.settle().await;
     assert_eq!(harness.workspace().schema_name, schema_name);
     let screen = harness.screen();
     assert!(screen.contains("people"), "{screen}");
-
-    let people_position = harness
-        .workspace()
-        .sidebar_items()
-        .iter()
-        .position(|item| {
-            matches!(item, SidebarItem::Relation { relation, .. } if relation.name == "people")
-        })
-        .expect("people is listed in the sidebar");
-    for _ in 0..people_position {
-        harness.press_char('j');
-    }
-    harness.press_code(KeyCode::Enter);
-    harness.settle().await;
-    let screen = harness.screen();
     assert!(screen.contains("name"), "{screen}");
     assert!(screen.contains("page 1"), "{screen}");
 
@@ -100,9 +83,7 @@ async fn explore_query_and_save() {
     assert!(screen.contains("Columns"), "{screen}");
     assert!(screen.contains("NOT NULL"), "{screen}");
 
-    harness.press_code(KeyCode::Tab);
-    harness.press_char('g');
-    harness.press_code(KeyCode::Enter);
+    harness.press_ctrl('n');
     harness.screen();
     harness.press_char('i');
     harness.type_text(&format!(
@@ -110,7 +91,7 @@ async fn explore_query_and_save() {
     ));
     harness.press_code(KeyCode::F(5));
     harness.settle().await;
-    match &harness.workspace().query.run {
+    match &active_query(&harness).run {
         RunState::Finished(report) => {
             assert_eq!(report.failure, None);
             assert_eq!(report.results.len(), 2);
@@ -119,10 +100,18 @@ async fn explore_query_and_save() {
     }
     let screen = harness.screen();
     assert!(screen.contains("151"), "{screen}");
+    assert!(screen.contains("Query 1"), "{screen}");
+
+    harness.press_code(KeyCode::Esc);
+    harness.press_code(KeyCode::Tab);
+    harness.press_char('1');
+    assert_eq!(harness.workspace().active_tab_index, 0);
+    harness.press_char('L');
+    assert_eq!(harness.workspace().active_tab_index, 1);
 
     harness.press_ctrl('t');
     assert_eq!(
-        harness.workspace().query.transaction_mode,
+        active_query(&harness).transaction_mode,
         TransactionMode::AutoCommit
     );
     harness.set_editor_text("select 1; select nope;");
@@ -141,6 +130,11 @@ async fn explore_query_and_save() {
         saved_content.contains("select 1; select nope;"),
         "{saved_content}"
     );
+    let screen = harness.screen();
+    assert!(screen.contains("e2e.sql"), "{screen}");
+
+    harness.press_ctrl('w');
+    assert_eq!(harness.workspace().tabs.len(), 1);
 
     run_setup(
         &setup_session,

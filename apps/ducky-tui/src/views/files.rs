@@ -37,7 +37,7 @@ pub fn render(frame: &mut Frame, area: Rect, context: &ViewContext, tui: &mut Tu
     ) {
         match entries.is_empty() {
             true => frame.render_widget(
-                Paragraph::new("No .sql files yet. Save a query with Ctrl+s in SQL command.")
+                Paragraph::new("No .sql files yet. Save a query tab with Ctrl+s.")
                     .style(palette.muted())
                     .wrap(Wrap { trim: true }),
                 list_inner,

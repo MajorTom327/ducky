@@ -1,4 +1,4 @@
-use ducky_app::{AppState, Confirm, Modal, Prompt, RowDetail};
+use ducky_app::{AppState, Confirm, Modal, Prompt};
 use ratatui::Frame;
 use ratatui::layout::{Constraint, Layout, Rect};
 use ratatui::style::{Modifier, Style};
@@ -8,9 +8,9 @@ use ratatui::widgets::{Block, Clear, Paragraph, Wrap};
 use crate::keys::help::HELP_ROWS;
 use crate::theme::Palette;
 use crate::tui_state::TuiState;
+use crate::views::{palette as palette_view, row_detail};
 
-const HELP_KEY_WIDTH: usize = 16;
-const HELP_COLUMN_WIDTH: u16 = 48;
+const TWO_COLUMN_MIN_WIDTH: u16 = 110;
 
 pub fn render(
     frame: &mut Frame,
@@ -21,23 +21,25 @@ pub fn render(
     palette: &Palette,
 ) {
     let area = match modal {
-        Modal::Prompt(_) => popup_area(screen, 60, Constraint::Length(3)),
-        Modal::Confirm(_) => popup_area(screen, 60, Constraint::Length(6)),
-        Modal::RowDetail(_) => popup_area(screen, 60, Constraint::Percentage(70)),
-        Modal::SchemaPicker { .. } => {
-            let schema_count = state
-                .workspace()
-                .map_or(0, |workspace| workspace.schema_names().len());
-            let height = u16::try_from(schema_count + 2).unwrap_or(u16::MAX);
-            popup_area(screen, 60, Constraint::Length(height.min(screen.height)))
+        Modal::RowDetail(detail) => row_detail::render(frame, screen, detail, palette),
+        Modal::Palette(command_palette) => match state.workspace() {
+            Some(workspace) => {
+                palette_view::render(frame, screen, workspace, command_palette, palette)
+            }
+            None => return,
+        },
+        Modal::Prompt(prompt) => {
+            let area = popup_area(screen, 60, Constraint::Length(3));
+            frame.render_widget(Clear, area);
+            render_prompt(frame, area, prompt, palette);
+            area
         }
-        Modal::Help => popup_area(screen, 90, Constraint::Percentage(90)),
-    };
-    frame.render_widget(Clear, area);
-    match modal {
-        Modal::Prompt(prompt) => render_prompt(frame, area, prompt, palette),
-        Modal::Confirm(confirm) => render_confirm(frame, area, confirm, palette),
-        Modal::RowDetail(row_detail) => render_row_detail(frame, area, row_detail, palette),
+        Modal::Confirm(confirm) => {
+            let area = popup_area(screen, 60, Constraint::Length(6));
+            frame.render_widget(Clear, area);
+            render_confirm(frame, area, confirm, palette);
+            area
+        }
         Modal::SchemaPicker {
             selected_schema_index,
         } => {
@@ -45,10 +47,19 @@ pub fn render(
                 .workspace()
                 .map(|workspace| workspace.schema_names())
                 .unwrap_or_default();
+            let height = u16::try_from(schema_names.len() + 2).unwrap_or(u16::MAX);
+            let area = popup_area(screen, 60, Constraint::Length(height.min(screen.height)));
+            frame.render_widget(Clear, area);
             render_schema_picker(frame, area, &schema_names, *selected_schema_index, palette);
+            area
         }
-        Modal::Help => render_help(frame, area, palette),
-    }
+        Modal::Help => {
+            let area = popup_area(screen, 80, Constraint::Percentage(80));
+            frame.render_widget(Clear, area);
+            render_help(frame, area, tui, palette);
+            area
+        }
+    };
     tui.effects.mark_modal(area);
 }
 
@@ -93,50 +104,6 @@ fn render_confirm(frame: &mut Frame, area: Rect, confirm: &Confirm, palette: &Pa
     );
 }
 
-fn render_row_detail(frame: &mut Frame, area: Rect, row_detail: &RowDetail, palette: &Palette) {
-    let block = popup_block("Row detail", palette);
-    let inner_area = block.inner(area);
-    let name_style = Style::new().add_modifier(Modifier::BOLD);
-    let mut lines = Vec::new();
-    let mut selected_line_index = 0;
-    for (field_index, column) in row_detail.columns.iter().enumerate() {
-        let is_selected = field_index == row_detail.selected_field_index;
-        if is_selected {
-            selected_line_index = lines.len();
-        }
-        let value = row_detail.values.get(field_index).cloned().flatten();
-        let mut field_lines = match value {
-            Some(text) => {
-                let mut value_lines = text.split('\n').map(str::to_owned);
-                let first_line = value_lines.next().unwrap_or_default();
-                let mut field_lines = vec![Line::from(vec![
-                    Span::styled(format!("{column}: "), name_style),
-                    Span::raw(first_line),
-                ])];
-                field_lines.extend(value_lines.map(Line::raw));
-                field_lines
-            }
-            None => vec![Line::from(vec![
-                Span::styled(format!("{column}: "), name_style),
-                Span::styled("NULL", palette.null_cell()),
-            ])],
-        };
-        if is_selected {
-            field_lines = field_lines
-                .into_iter()
-                .map(|line| line.style(palette.selected(true)))
-                .collect();
-        }
-        lines.extend(field_lines);
-    }
-    let scroll = selected_line_index.saturating_sub(usize::from(inner_area.height) / 2);
-    let paragraph = Paragraph::new(lines)
-        .wrap(Wrap { trim: false })
-        .scroll((u16::try_from(scroll).unwrap_or(0), 0))
-        .block(block);
-    frame.render_widget(paragraph, area);
-}
-
 fn render_schema_picker(
     frame: &mut Frame,
     area: Rect,
@@ -166,25 +133,98 @@ fn render_schema_picker(
     );
 }
 
-fn render_help(frame: &mut Frame, area: Rect, palette: &Palette) {
-    let block = popup_block("Help · Esc closes", palette);
+fn render_help(frame: &mut Frame, area: Rect, tui: &mut TuiState, palette: &Palette) {
+    let block = popup_block("Help · j/k scroll · Esc close", palette);
     let inner_area = block.inner(area);
     frame.render_widget(block, area);
-    let rows_per_column = usize::from(inner_area.height.max(1));
-    let column_count = HELP_ROWS.len().div_ceil(rows_per_column).max(1);
-    let constraints = vec![Constraint::Length(HELP_COLUMN_WIDTH); column_count];
-    let column_areas = Layout::horizontal(constraints).split(inner_area);
-    for (column_rows, column_area) in HELP_ROWS.chunks(rows_per_column).zip(column_areas.iter()) {
-        let lines: Vec<Line> = column_rows
-            .iter()
-            .map(|(keys, description)| match keys.is_empty() {
-                true => Line::styled(*description, palette.title()),
-                false => Line::from(vec![
-                    Span::styled(format!("{keys:<HELP_KEY_WIDTH$}"), palette.muted()),
-                    Span::raw(*description),
-                ]),
-            })
-            .collect();
-        frame.render_widget(Paragraph::new(lines), *column_area);
+    let help_groups = help_groups();
+    let key_width = HELP_ROWS
+        .iter()
+        .map(|(keys, _)| keys.chars().count())
+        .max()
+        .unwrap_or(0);
+    let column_count = match area.width >= TWO_COLUMN_MIN_WIDTH {
+        true => 2,
+        false => 1,
+    };
+    let columns = split_groups(&help_groups, column_count);
+    let column_areas = Layout::horizontal(vec![Constraint::Fill(1); columns.len()])
+        .spacing(2)
+        .split(inner_area);
+    let column_lines: Vec<Vec<Line>> = columns
+        .iter()
+        .map(|column_groups| help_lines(column_groups, key_width, palette))
+        .collect();
+    let tallest_column = column_lines.iter().map(Vec::len).max().unwrap_or(0);
+    let max_scroll = tallest_column.saturating_sub(usize::from(inner_area.height));
+    tui.help_scroll = tui
+        .help_scroll
+        .min(u16::try_from(max_scroll).unwrap_or(u16::MAX));
+    for (lines, column_area) in column_lines.into_iter().zip(column_areas.iter()) {
+        frame.render_widget(
+            Paragraph::new(lines).scroll((tui.help_scroll, 0)),
+            *column_area,
+        );
     }
+}
+
+type HelpGroup<'a> = (&'a str, &'a [(&'a str, &'a str)]);
+
+fn help_groups() -> Vec<HelpGroup<'static>> {
+    let mut groups = Vec::new();
+    let mut remaining_rows = HELP_ROWS;
+    while let Some(((_, title), rest)) = remaining_rows.split_first() {
+        let binding_count = rest
+            .iter()
+            .position(|(keys, _)| keys.is_empty())
+            .unwrap_or(rest.len());
+        let (bindings, next_rows) = rest.split_at(binding_count);
+        groups.push((*title, bindings));
+        remaining_rows = next_rows;
+    }
+    groups
+}
+
+fn split_groups<'a>(groups: &[HelpGroup<'a>], column_count: usize) -> Vec<Vec<HelpGroup<'a>>> {
+    let total_height: usize = groups.iter().map(group_height).sum();
+    let column_target = total_height.div_ceil(column_count.max(1));
+    let mut columns: Vec<Vec<HelpGroup<'a>>> = vec![Vec::new()];
+    let mut current_height = 0;
+    for group in groups {
+        let is_column_full = current_height >= column_target && columns.len() < column_count;
+        if is_column_full {
+            columns.push(Vec::new());
+            current_height = 0;
+        }
+        current_height += group_height(group);
+        if let Some(column) = columns.last_mut() {
+            column.push(*group);
+        }
+    }
+    columns
+}
+
+fn group_height(group: &HelpGroup) -> usize {
+    group.1.len() + 2
+}
+
+fn help_lines<'a>(groups: &[HelpGroup<'a>], key_width: usize, palette: &Palette) -> Vec<Line<'a>> {
+    let mut lines = Vec::new();
+    for (group_index, (title, bindings)) in groups.iter().enumerate() {
+        if group_index > 0 {
+            lines.push(Line::default());
+        }
+        lines.push(Line::styled(*title, palette.title()));
+        lines.extend(bindings.iter().map(|(keys, description)| {
+            Line::from(vec![
+                Span::styled(
+                    format!("{keys:<key_width$}"),
+                    Style::new().add_modifier(Modifier::BOLD),
+                ),
+                Span::raw("  "),
+                Span::raw(*description),
+            ])
+        }));
+    }
+    lines
 }

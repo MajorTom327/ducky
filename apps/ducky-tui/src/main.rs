@@ -2,6 +2,7 @@ use std::io::stdout;
 use std::process::ExitCode;
 
 use clap::Parser;
+use crossterm::cursor::SetCursorStyle;
 use crossterm::event::{DisableBracketedPaste, EnableBracketedPaste};
 use crossterm::execute;
 use ducky_app::{AppState, Msg, ProfilesMsg};
@@ -42,7 +43,7 @@ async fn main() -> anyhow::Result<ExitCode> {
     };
     let (sender, receiver) = tokio::sync::mpsc::unbounded_channel();
     let runtime = Runtime::new(config.storage.clone(), sender);
-    let state = AppState::new(config.profiles, config.storage);
+    let state = AppState::new(config.profiles, config.storage).with_page_size(config.page_size);
     let tui = TuiState::new(!args.no_effects);
     let mut terminal = ratatui::init();
     let outcome = match execute!(stdout(), EnableBracketedPaste) {
@@ -56,8 +57,12 @@ async fn main() -> anyhow::Result<ExitCode> {
                 startup_messages,
             )
             .await;
-            let paste_reset = execute!(stdout(), DisableBracketedPaste);
-            outcome.and(paste_reset.map_err(anyhow::Error::from))
+            let terminal_reset = execute!(
+                stdout(),
+                DisableBracketedPaste,
+                SetCursorStyle::DefaultUserShape
+            );
+            outcome.and(terminal_reset.map_err(anyhow::Error::from))
         }
         Err(error) => Err(error.into()),
     };

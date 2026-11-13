@@ -2,6 +2,8 @@
 sql_dir = "sql"
 # Directory for pg_dump archives, relative to this file.
 dump_dir = "dumps"
+# Rows per page when browsing a table (1 to 5000, default 50).
+page_size = 50
 
 # type: local (green), staging (orange) or prod (red).
 [[profiles]]

@@ -1,21 +1,43 @@
-use ducky_app::{AppState, Focus, MainView, Modal, QueryPane, Screen, TableTab};
+use ducky_app::{AppState, Focus, Modal, QueryPane, Screen, TabContent, TableTab};
 
-pub const HELP_ROWS: &[(&str, &str)] = &[
+pub type KeyHint = (&'static str, &'static str);
+
+pub const HELP_ROWS: &[KeyHint] = &[
     ("", "Global"),
-    ("Ctrl+q", "quit"),
-    ("q", "quit (outside the editor)"),
-    ("F1 / ?", "help"),
-    ("Tab / Shift+Tab", "switch focus"),
+    ("Ctrl+p", "go to anything"),
+    ("Ctrl+n", "new SQL query tab"),
+    ("Ctrl+w", "close the active tab"),
+    ("Ctrl+o", "open the SQL files tab"),
+    ("Ctrl+h / Ctrl+l", "focus the sidebar / the main pane"),
+    ("Ctrl+k / Ctrl+j", "focus the editor / the results"),
+    ("Ctrl+PgDn", "next tab"),
+    ("Ctrl+PgUp", "previous tab"),
+    ("F1", "help"),
     ("Ctrl+c", "cancel the running script"),
+    ("Ctrl+q", "quit"),
+    ("", "Outside insert mode"),
+    ("[b / ]b", "previous / next tab"),
+    ("Space b d", "close the active tab"),
+    ("", "Outside the editor"),
+    ("1 … 9", "jump to tab N"),
+    ("H / L", "previous / next tab"),
+    ("Tab / Shift+Tab", "cycle the focus"),
+    ("?", "help"),
+    ("q", "quit"),
+    ("", "Go to anything"),
+    ("type", "filter tabs, actions, tables"),
+    ("↓ / Ctrl+n / Tab", "next item"),
+    ("↑ / Ctrl+p", "previous item"),
+    ("Enter", "open the item"),
+    ("Ctrl+w / Ctrl+u", "delete a word / the query"),
+    ("Esc", "close"),
     ("", "Profiles"),
-    ("j / ↓", "next profile"),
-    ("k / ↑", "previous profile"),
+    ("j / k", "next / previous profile"),
     ("Enter", "connect"),
     ("", "Sidebar"),
-    ("j / ↓", "next item"),
-    ("k / ↑", "previous item"),
-    ("g / G", "first / last item"),
-    ("Enter / l / →", "open the item"),
+    ("j / k", "next / previous table"),
+    ("g / G", "first / last table"),
+    ("Enter / l / →", "open the table in a tab"),
     ("/", "filter tables"),
     ("Esc", "clear the filter"),
     ("s", "choose the schema"),
@@ -26,9 +48,9 @@ pub const HELP_ROWS: &[(&str, &str)] = &[
     ("h j k l / arrows", "move the cursor"),
     ("g / G", "first / last row"),
     ("0 / $", "first / last column"),
-    ("n / ]", "next page"),
-    ("p / [", "previous page"),
-    ("o", "cycle the sort"),
+    ("n", "next page"),
+    ("p", "previous page"),
+    ("o", "cycle the sort of the column"),
     ("/", "edit the WHERE filter"),
     ("Esc", "clear the filter, then sidebar"),
     ("Enter", "row detail"),
@@ -37,7 +59,7 @@ pub const HELP_ROWS: &[(&str, &str)] = &[
     ("t", "structure tab"),
     ("", "Table structure"),
     ("j / k", "scroll"),
-    ("g", "back to top"),
+    ("g", "back to the top"),
     ("t", "data tab"),
     ("r", "reload"),
     ("Esc", "sidebar"),
@@ -45,23 +67,26 @@ pub const HELP_ROWS: &[(&str, &str)] = &[
     ("F5 / Ctrl+e", "run the script"),
     ("Ctrl+s", "save"),
     ("F2", "save as"),
-    ("Ctrl+t", "toggle the transaction"),
-    ("Ctrl+Space", "open completion"),
+    ("Ctrl+t", "one transaction / autocommit"),
+    ("Ctrl+Space", "open the completion"),
     ("Tab", "accept the completion"),
-    ("↓ ↑ / Ctrl+n Ctrl+p", "move in the completion"),
+    ("↓ ↑ / Ctrl+n p", "move in the completion"),
     ("Esc", "close completion / normal mode"),
     ("i / a / o", "insert mode (vim)"),
     ("", "Results"),
     ("h j k l / arrows", "move the cursor"),
-    ("g G 0 $", "first / last row / column"),
-    ("[ / ]", "previous / next result"),
+    ("g G 0 $", "first / last row or column"),
+    ("p / n", "previous / next statement"),
     ("Enter", "row detail"),
     ("y", "copy the cell"),
+    ("F5 / Ctrl+e", "run the editor content"),
+    ("Ctrl+s / F2", "save / save as"),
+    ("Ctrl+t", "one transaction / autocommit"),
     ("Esc", "sidebar"),
     ("", "SQL files"),
     ("j / k", "select a file"),
-    ("Enter", "open in the editor"),
-    ("x", "execute"),
+    ("Enter", "open in a query tab"),
+    ("x", "execute the file"),
     ("r", "reload"),
     ("Ctrl+d / Ctrl+u", "scroll the preview"),
     ("Esc", "sidebar"),
@@ -95,44 +120,126 @@ pub const HELP_ROWS: &[(&str, &str)] = &[
     ("Enter", "choose"),
     ("Esc", "cancel"),
     ("", "Help"),
+    ("j / k", "scroll"),
+    ("g", "back to the top"),
+    ("Ctrl+d / Ctrl+u", "half a page down / up"),
     ("Esc / q / ?", "close"),
 ];
 
-pub fn hints(state: &AppState) -> &'static str {
+const PROFILES_HINTS: &[KeyHint] = &[("j/k", "select"), ("Enter", "connect"), ("q", "quit")];
+const SIDEBAR_HINTS: &[KeyHint] = &[
+    ("Ctrl+p", "go to"),
+    ("Enter", "open"),
+    ("/", "filter"),
+    ("s", "schema"),
+    ("?", "help"),
+];
+const NO_TAB_HINTS: &[KeyHint] = &[
+    ("Ctrl+p", "go to"),
+    ("Ctrl+n", "new query"),
+    ("Ctrl+o", "SQL files"),
+    ("Tab", "sidebar"),
+    ("?", "help"),
+];
+const TABLE_DATA_HINTS: &[KeyHint] = &[
+    ("hjkl", "move"),
+    ("n/p", "page"),
+    ("o", "sort"),
+    ("/", "where"),
+    ("Enter", "row"),
+    ("y", "copy"),
+    ("t", "structure"),
+    ("?", "help"),
+];
+const TABLE_STRUCTURE_HINTS: &[KeyHint] = &[
+    ("j/k", "scroll"),
+    ("t", "data"),
+    ("r", "reload"),
+    ("Esc", "sidebar"),
+];
+const EDITOR_HINTS: &[KeyHint] = &[
+    ("F5", "run"),
+    ("Ctrl+s", "save"),
+    ("F2", "save as"),
+    ("Ctrl+t", "tx / autocommit"),
+    ("Ctrl+Space", "complete"),
+    ("Ctrl+p", "go to"),
+];
+const RESULTS_HINTS: &[KeyHint] = &[
+    ("hjkl", "move"),
+    ("p/n", "statement"),
+    ("Enter", "row"),
+    ("y", "copy"),
+    ("F5", "run"),
+    ("Ctrl+s", "save"),
+    ("Esc", "sidebar"),
+];
+const FILES_HINTS: &[KeyHint] = &[
+    ("j/k", "select"),
+    ("Enter", "open"),
+    ("x", "execute"),
+    ("r", "reload"),
+    ("Esc", "sidebar"),
+];
+const DUMP_HINTS: &[KeyHint] = &[
+    ("Enter", "start"),
+    ("e", "rename"),
+    ("Ctrl+u/d", "log"),
+    ("Esc", "sidebar"),
+];
+const RESTORE_HINTS: &[KeyHint] = &[
+    ("j/k", "select"),
+    ("c", "clean"),
+    ("o", "owner"),
+    ("Enter", "start"),
+    ("r", "reload"),
+    ("Esc", "sidebar"),
+];
+
+pub fn hints(state: &AppState) -> &'static [KeyHint] {
     if let Some(modal) = &state.modal {
-        return match modal {
-            Modal::Prompt(_) => "Enter submit · Esc cancel · Ctrl+w delete word · Ctrl+u clear",
-            Modal::Confirm(_) => "y / Enter confirm · n / Esc cancel",
-            Modal::RowDetail(_) => "j/k move · y copy value · Esc close",
-            Modal::SchemaPicker { .. } => "j/k move · Enter choose · Esc cancel",
-            Modal::Help => "Esc / q / ? close",
-        };
+        return modal_hints(modal);
     }
     let workspace = match &state.screen {
-        Screen::Profiles(_) => return "j/k select · Enter connect · q quit",
+        Screen::Profiles(_) => return PROFILES_HINTS,
         Screen::Workspace(workspace) => workspace,
     };
     if workspace.focus == Focus::Sidebar {
-        return "j/k move · Enter open · / filter · s schema · r refresh · Tab focus · ? help";
+        return SIDEBAR_HINTS;
     }
-    match workspace.view {
-        MainView::Welcome => "Tab sidebar · ? help · q quit",
-        MainView::Table => match workspace.table.as_ref().map(|table| table.tab) {
-            Some(TableTab::Structure) => "j/k scroll · t data · r reload · Esc sidebar",
-            Some(TableTab::Data) | None => {
-                "hjkl move · n/p page · o sort · / where · Enter row · y copy · t structure"
-            }
+    match workspace.active_tab().map(|tab| &tab.content) {
+        None => NO_TAB_HINTS,
+        Some(TabContent::Table(table)) => match table.tab {
+            TableTab::Data => TABLE_DATA_HINTS,
+            TableTab::Structure => TABLE_STRUCTURE_HINTS,
         },
-        MainView::Query => match workspace.query.pane {
-            QueryPane::Editor => {
-                "F5 run · Ctrl+s save · F2 save as · Ctrl+t transaction · Ctrl+Space complete"
-            }
-            QueryPane::Results => "hjkl move · [ ] result · Enter row · y copy · Esc sidebar",
+        Some(TabContent::Query(query)) => match query.pane {
+            QueryPane::Editor => EDITOR_HINTS,
+            QueryPane::Results => RESULTS_HINTS,
         },
-        MainView::Files => "j/k select · Enter open · x execute · r reload · Esc sidebar",
-        MainView::Dump => "Enter start · e rename · Ctrl+u/Ctrl+d log · Esc sidebar",
-        MainView::Restore => {
-            "j/k select · c clean · o owner · Enter start · r reload · Esc sidebar"
-        }
+        Some(TabContent::Files) => FILES_HINTS,
+        Some(TabContent::Dump) => DUMP_HINTS,
+        Some(TabContent::Restore) => RESTORE_HINTS,
+    }
+}
+
+fn modal_hints(modal: &Modal) -> &'static [KeyHint] {
+    match modal {
+        Modal::Prompt(_) => &[
+            ("Enter", "submit"),
+            ("Esc", "cancel"),
+            ("Ctrl+w", "delete word"),
+            ("Ctrl+u", "clear"),
+        ],
+        Modal::Confirm(_) => &[("y/Enter", "confirm"), ("n/Esc", "cancel")],
+        Modal::RowDetail(_) => &[("j/k", "move"), ("y", "copy value"), ("Esc", "close")],
+        Modal::SchemaPicker { .. } => &[("j/k", "move"), ("Enter", "choose"), ("Esc", "cancel")],
+        Modal::Help => &[
+            ("j/k", "scroll"),
+            ("g", "top"),
+            ("Ctrl+d/u", "half page"),
+            ("Esc", "close"),
+        ],
+        Modal::Palette(_) => &[("Enter", "open"), ("↑↓", "move"), ("Esc", "close")],
     }
 }

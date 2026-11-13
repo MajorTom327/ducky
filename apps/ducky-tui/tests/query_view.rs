@@ -3,8 +3,8 @@ use std::time::Duration;
 
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use ducky_app::{
-    AppState, Connection, Document, Focus, GridMove, Loadable, MainView, Msg, QueryMsg, QueryPane,
-    RunState, Screen, Workspace,
+    AppState, Connection, Document, Focus, GridMove, Loadable, Msg, PaneDirection, QueryMsg,
+    QueryPane, QueryView, RunState, Screen, Tab, TabContent, TabId, Workspace,
 };
 use ducky_core::{
     Catalog, Column, PgTools, Profile, ProfileKind, Relation, RelationKind, ResultSet, Schema,
@@ -14,7 +14,7 @@ use ducky_core::{
 use ducky_sql::TokenKind;
 use ducky_tui::keys::query::{handle_editor, handle_results};
 use ducky_tui::theme::token_style;
-use ducky_tui::tui_state::TuiState;
+use ducky_tui::tui_state::{CursorShape, TuiState};
 use ducky_tui::views::draw;
 use edtui::{Highlight, Index2};
 use ratatui::Terminal;
@@ -74,6 +74,9 @@ fn catalog() -> Catalog {
     }
 }
 
+const FIRST_TAB_ID: TabId = 1;
+const SECOND_TAB_ID: TabId = 2;
+
 fn query_state() -> AppState {
     let profile = Profile {
         label: "Dev local".to_owned(),
@@ -102,9 +105,20 @@ fn query_state() -> AppState {
     );
     workspace.catalog = Loadable::Ready(catalog());
     workspace.schema_name = "public".to_owned();
-    workspace.view = MainView::Query;
+    workspace.tabs = vec![
+        Tab {
+            id: FIRST_TAB_ID,
+            content: TabContent::Query(QueryView::new(1)),
+        },
+        Tab {
+            id: SECOND_TAB_ID,
+            content: TabContent::Query(QueryView::new(2)),
+        },
+    ];
+    workspace.active_tab_index = 0;
+    workspace.next_tab_id = 3;
+    workspace.next_query_number = 3;
     workspace.focus = Focus::Main;
-    workspace.query.pane = QueryPane::Editor;
     state.screen = Screen::Workspace(Box::new(workspace));
     state
 }
@@ -120,8 +134,26 @@ fn workspace_mut(state: &mut AppState) -> &mut Workspace {
     }
 }
 
+fn active_query_mut(state: &mut AppState) -> &mut QueryView {
+    let workspace = workspace_mut(state);
+    let active_tab_index = workspace.active_tab_index;
+    match &mut workspace.tabs[active_tab_index].content {
+        TabContent::Query(query) => query,
+        _ => panic!("expected a query tab"),
+    }
+}
+
 fn press(state: &AppState, tui: &mut TuiState, code: KeyCode, modifiers: KeyModifiers) -> Vec<Msg> {
     handle_editor(workspace(state), tui, KeyEvent::new(code, modifiers))
+}
+
+fn press_in_results(
+    state: &AppState,
+    tui: &mut TuiState,
+    code: KeyCode,
+    modifiers: KeyModifiers,
+) -> Vec<Msg> {
+    handle_results(workspace(state), tui, KeyEvent::new(code, modifiers))
 }
 
 fn type_in_insert_mode(state: &AppState, tui: &mut TuiState, text: &str) {
@@ -164,13 +196,25 @@ fn typing_in_insert_mode_updates_text_and_highlights() {
     let state = query_state();
     let mut tui = TuiState::new(false);
     type_in_insert_mode(&state, &mut tui, "select 1");
-    assert_eq!(tui.editor.text(), "select 1");
+    let editor = tui.editor(FIRST_TAB_ID);
+    assert_eq!(editor.text(), "select 1");
     let keyword_highlight = Highlight::new(
         Index2::new(0, 0),
         Index2::new(0, 5),
         token_style(TokenKind::Keyword),
     );
-    assert!(tui.editor.state.highlights.contains(&keyword_highlight));
+    assert!(editor.state.highlights.contains(&keyword_highlight));
+}
+
+#[test]
+fn each_query_tab_keeps_its_own_buffer() {
+    let mut state = query_state();
+    let mut tui = TuiState::new(false);
+    type_in_insert_mode(&state, &mut tui, "select 1");
+    workspace_mut(&mut state).active_tab_index = 1;
+    type_in_insert_mode(&state, &mut tui, "select 2");
+    assert_eq!(tui.editor(FIRST_TAB_ID).text(), "select 1");
+    assert_eq!(tui.editor(SECOND_TAB_ID).text(), "select 2");
 }
 
 #[test]
@@ -178,12 +222,16 @@ fn completion_popup_opens_and_tab_accepts() {
     let state = query_state();
     let mut tui = TuiState::new(false);
     type_in_insert_mode(&state, &mut tui, "select * from cu");
-    let popup = tui.editor.completion.as_ref().expect("completion popup");
+    let popup = tui
+        .editor(FIRST_TAB_ID)
+        .completion
+        .as_ref()
+        .expect("completion popup");
     assert_eq!(popup.completion.items[0].label, "customers");
     let messages = press(&state, &mut tui, KeyCode::Tab, KeyModifiers::NONE);
     assert!(messages.is_empty());
-    assert_eq!(tui.editor.text(), "select * from customers");
-    assert!(tui.editor.completion.is_none());
+    assert_eq!(tui.editor(FIRST_TAB_ID).text(), "select * from customers");
+    assert!(tui.editor(FIRST_TAB_ID).completion.is_none());
 }
 
 #[test]
@@ -192,8 +240,8 @@ fn escape_closes_the_popup_and_stays_in_insert_mode() {
     let mut tui = TuiState::new(false);
     type_in_insert_mode(&state, &mut tui, "select * from cu");
     press(&state, &mut tui, KeyCode::Esc, KeyModifiers::NONE);
-    assert!(tui.editor.completion.is_none());
-    assert!(tui.editor.is_insert_mode());
+    assert!(tui.editor(FIRST_TAB_ID).completion.is_none());
+    assert!(tui.editor(FIRST_TAB_ID).is_insert_mode());
 }
 
 #[test]
@@ -211,6 +259,43 @@ fn f5_runs_the_buffer_text() {
 }
 
 #[test]
+fn results_pane_runs_and_saves_the_tab_text() {
+    let mut state = query_state();
+    let mut tui = TuiState::new(false);
+    workspace_mut(&mut state).active_tab_index = 1;
+    type_in_insert_mode(&state, &mut tui, "select 7");
+    active_query_mut(&mut state).pane = QueryPane::Results;
+    assert_eq!(
+        press_in_results(&state, &mut tui, KeyCode::F(5), KeyModifiers::NONE),
+        vec![Msg::Query(QueryMsg::Run {
+            sql: "select 7".to_owned()
+        })]
+    );
+    assert_eq!(
+        press_in_results(&state, &mut tui, KeyCode::Char('e'), KeyModifiers::CONTROL),
+        vec![Msg::Query(QueryMsg::Run {
+            sql: "select 7".to_owned()
+        })]
+    );
+    assert_eq!(
+        press_in_results(&state, &mut tui, KeyCode::Char('s'), KeyModifiers::CONTROL),
+        vec![Msg::Query(QueryMsg::Save {
+            content: "select 7".to_owned()
+        })]
+    );
+    assert_eq!(
+        press_in_results(&state, &mut tui, KeyCode::F(2), KeyModifiers::NONE),
+        vec![Msg::Query(QueryMsg::SaveAs {
+            content: "select 7".to_owned()
+        })]
+    );
+    assert_eq!(
+        press_in_results(&state, &mut tui, KeyCode::Char('t'), KeyModifiers::CONTROL),
+        vec![Msg::Query(QueryMsg::ToggleTransactionMode)]
+    );
+}
+
+#[test]
 fn tab_in_normal_mode_toggles_focus() {
     let state = query_state();
     let mut tui = TuiState::new(false);
@@ -221,41 +306,88 @@ fn tab_in_normal_mode_toggles_focus() {
 #[test]
 fn sync_document_replaces_the_buffer_on_a_new_revision() {
     let mut tui = TuiState::new(false);
-    tui.editor.sync_document(&Document {
+    let editor = tui.editor(FIRST_TAB_ID);
+    editor.sync_document(&Document {
         name: None,
         text: "select 1".to_owned(),
         revision: 1,
     });
-    assert_eq!(tui.editor.text(), "select 1");
-    tui.editor.sync_document(&Document {
+    assert_eq!(editor.text(), "select 1");
+    editor.sync_document(&Document {
         name: Some("report".to_owned()),
         text: "select 2".to_owned(),
         revision: 1,
     });
-    assert_eq!(tui.editor.text(), "select 1");
-    tui.editor.sync_document(&Document {
+    assert_eq!(editor.text(), "select 1");
+    editor.sync_document(&Document {
         name: Some("report".to_owned()),
         text: "select 3".to_owned(),
         revision: 2,
     });
-    assert_eq!(tui.editor.text(), "select 3");
+    assert_eq!(editor.text(), "select 3");
+}
+
+#[test]
+fn a_freshly_loaded_document_is_not_modified() {
+    let mut tui = TuiState::new(false);
+    let document = Document {
+        name: Some("report.sql".to_owned()),
+        text: "select 1;\r\nselect 2;\n".to_owned(),
+        revision: 1,
+    };
+    let editor = tui.editor(FIRST_TAB_ID);
+    editor.sync_document(&document);
+    assert!(!editor.is_modified(&document));
+}
+
+#[test]
+fn editor_title_shows_name_marker_mode_and_transaction() {
+    let state = query_state();
+    let mut tui = TuiState::new(false);
+    let untouched = screen_text(&state, &mut tui);
+    assert!(untouched.contains(" Query 1 "));
+    assert!(!untouched.contains("Query 1 •"));
+    let bottom_border = untouched
+        .lines()
+        .find(|line| line.contains(" NORMAL "))
+        .expect("the mode badge is on the bottom border");
+    let mode_position = bottom_border.find(" NORMAL ").unwrap_or(usize::MAX);
+    let transaction_position = bottom_border
+        .find(" one transaction · Ctrl+t ")
+        .expect("the transaction mode is on the bottom border");
+    assert!(mode_position < transaction_position);
+    type_in_insert_mode(&state, &mut tui, "select 1");
+    let modified = screen_text(&state, &mut tui);
+    assert!(modified.contains("Query 1 •"));
+    assert!(modified.contains(" INSERT "));
+}
+
+#[test]
+fn the_terminal_cursor_is_a_bar_in_insert_mode_and_a_block_otherwise() {
+    let state = query_state();
+    let mut tui = TuiState::new(false);
+    screen_text(&state, &mut tui);
+    assert_eq!(tui.cursor_shape, CursorShape::Block);
+    type_in_insert_mode(&state, &mut tui, "select 1");
+    screen_text(&state, &mut tui);
+    assert_eq!(tui.cursor_shape, CursorShape::Bar);
 }
 
 #[test]
 fn results_keys_map_to_query_messages() {
-    let state = query_state();
+    let mut state = query_state();
+    active_query_mut(&mut state).pane = QueryPane::Results;
     let mut tui = TuiState::new(false);
-    let key = |code| KeyEvent::new(code, KeyModifiers::NONE);
     assert_eq!(
-        handle_results(workspace(&state), &mut tui, key(KeyCode::Char('j'))),
+        press_in_results(&state, &mut tui, KeyCode::Char('j'), KeyModifiers::NONE),
         vec![Msg::Query(QueryMsg::Move(GridMove::Down))]
     );
     assert_eq!(
-        handle_results(workspace(&state), &mut tui, key(KeyCode::Char(']'))),
+        press_in_results(&state, &mut tui, KeyCode::Char('n'), KeyModifiers::NONE),
         vec![Msg::Query(QueryMsg::NextResult)]
     );
     assert_eq!(
-        handle_results(workspace(&state), &mut tui, key(KeyCode::Esc)),
+        press_in_results(&state, &mut tui, KeyCode::Esc, KeyModifiers::NONE),
         vec![Msg::ToggleFocus]
     );
 }
@@ -263,7 +395,7 @@ fn results_keys_map_to_query_messages() {
 #[test]
 fn results_view_renders_a_failure_report() {
     let mut state = query_state();
-    workspace_mut(&mut state).query.run = RunState::Finished(ScriptReport {
+    active_query_mut(&mut state).run = RunState::Finished(ScriptReport {
         mode: TransactionMode::Transaction,
         results: vec![rows_result("select 1", "1")],
         failure: Some(ScriptFailure {
@@ -281,9 +413,9 @@ fn results_view_renders_a_failure_report() {
 }
 
 #[test]
-fn results_view_lists_every_statement() {
+fn results_view_renders_statement_tabs_and_timing() {
     let mut state = query_state();
-    let query = &mut workspace_mut(&mut state).query;
+    let query = active_query_mut(&mut state);
     query.run = RunState::Finished(ScriptReport {
         mode: TransactionMode::AutoCommit,
         results: vec![
@@ -296,8 +428,47 @@ fn results_view_lists_every_statement() {
     query.selected_result_index = 1;
     let mut tui = TuiState::new(false);
     let text = screen_text(&state, &mut tui);
-    assert!(text.contains("1: select 'first' (1 rows)"));
-    assert!(text.contains("2: select 'second' (1 rows)"));
-    assert!(text.contains("7 ms · autocommit"));
+    assert!(text.contains(" 1 select 'first' 1 row "));
+    assert!(text.contains(" 2 select 'second' 1 row "));
+    assert!(text.contains(" 7 ms · autocommit "));
     assert!(text.contains("second"));
+}
+
+#[test]
+fn results_view_shows_the_affected_count() {
+    let mut state = query_state();
+    active_query_mut(&mut state).run = RunState::Finished(ScriptReport {
+        mode: TransactionMode::Transaction,
+        results: vec![StatementResult {
+            sql: "delete from orders".to_owned(),
+            outcome: StatementOutcome::Affected(2),
+            elapsed: Duration::from_millis(3),
+        }],
+        failure: None,
+        elapsed: Duration::from_millis(3),
+    });
+    let mut tui = TuiState::new(false);
+    let text = screen_text(&state, &mut tui);
+    assert!(text.contains(" 1 delete from orders 2 rows affected "));
+    assert_eq!(text.matches(" 2 rows affected ").count(), 2);
+}
+
+#[test]
+fn ctrl_hjkl_move_the_focus_even_while_typing_in_the_editor() {
+    let state = query_state();
+    let mut tui = TuiState::new(false);
+    type_in_insert_mode(&state, &mut tui, "select");
+    for (character, direction) in [
+        ('h', PaneDirection::Left),
+        ('j', PaneDirection::Down),
+        ('k', PaneDirection::Up),
+        ('l', PaneDirection::Right),
+    ] {
+        let key = KeyEvent::new(KeyCode::Char(character), KeyModifiers::CONTROL);
+        assert_eq!(
+            ducky_tui::keys::handle_key(&state, &mut tui, key),
+            vec![Msg::FocusPane(direction)]
+        );
+    }
+    assert_eq!(tui.editor(FIRST_TAB_ID).text(), "select");
 }

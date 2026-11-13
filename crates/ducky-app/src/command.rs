@@ -1,5 +1,7 @@
 use ducky_core::{PageRequest, Profile, RelationRef, RestoreOptions, TransactionMode};
 
+use crate::state::TabId;
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Command {
     Connect {
@@ -11,6 +13,7 @@ pub enum Command {
     LoadPage(PageRequest),
     LoadDetails(RelationRef),
     RunScript {
+        tab_id: TabId,
         sql: String,
         mode: TransactionMode,
     },

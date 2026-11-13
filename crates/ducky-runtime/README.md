@@ -14,7 +14,7 @@ Executes the `ducky_app::Command`s produced by `ducky_app::update` on tokio and 
 | `Connect` | expands `${VAR}` in the profile URL, opens a `PgSession`, reads its info, detects `pg_dump` / `pg_restore` in `PATH`, replaces the active connection; `Connected` |
 | `Disconnect` | drops the active connection; no answer |
 | `LoadCatalog`, `LoadPage`, `LoadDetails` | `CatalogLoaded`, `PageLoaded`, `DetailsLoaded` |
-| `RunScript` | splits with `ducky_sql::split_statements`; `ScriptFinished` |
+| `RunScript` | splits with `ducky_sql::split_statements`; `ScriptFinished` carrying the command's `tab_id` |
 | `CancelScript` | `Notified(Error)` only when cancelling fails |
 | `ListSqlFiles`, `LoadFilePreview`, `OpenFile` | `SqlFilesListed`, `FilePreviewLoaded`, `FileOpened` |
 | `SaveFile` | `FileSaved` with the normalized name; an existing file without overwrite is `SaveFailure::AlreadyExists` |
@@ -23,7 +23,7 @@ Executes the `ducky_app::Command`s produced by `ducky_app::update` on tokio and 
 | `StartRestore` | `JobLogged` per `pg_restore` stderr line, then `JobFinished` |
 | `CopyToClipboard` | `Notified(Error "Clipboard unavailable: …")` on failure |
 
-Database commands without an active connection answer with `Err("Not connected")` (`RunScript`: a report failing at statement 0). The clipboard is created on first use and kept alive for the process, because X11 loses the selection when it drops.
+Database commands without an active connection answer with `Err("Not connected")` (`RunScript`: a `ScriptFinished` for the same `tab_id` with a report failing at statement 0). The clipboard is created on first use and kept alive for the process, because X11 loses the selection when it drops.
 
 ## Tests
 

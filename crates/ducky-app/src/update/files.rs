@@ -3,18 +3,16 @@ use ducky_core::FileEntry;
 use crate::command::Command;
 use crate::loadable::Loadable;
 use crate::msg::FilesMsg;
-use crate::state::{
-    AppState, Confirm, ConfirmKind, Document, FilesView, Focus, MainView, Modal, NoticeLevel,
-    QueryPane,
-};
+use crate::state::{AppState, Confirm, ConfirmKind, FilesView, Modal, NoticeLevel, TabContent};
 use crate::update::query::run;
+use crate::update::tabs::open_document;
 use crate::update::{clamp_index, notice, step_index, workspace_mut};
 
 pub(crate) fn update(state: &mut AppState, msg: FilesMsg) -> Vec<Command> {
     let Some(workspace) = workspace_mut(&mut state.screen) else {
         return Vec::new();
     };
-    if workspace.view != MainView::Files {
+    if !workspace.is_active_content(|content| matches!(content, TabContent::Files)) {
         return Vec::new();
     }
     let files = &mut workspace.files;
@@ -118,17 +116,9 @@ pub(crate) fn opened(
             return Vec::new();
         }
     };
-    let query = &mut workspace.query;
-    query.document = Document {
-        name: Some(name),
-        text: text.clone(),
-        revision: query.document.revision + 1,
-    };
-    query.pane = QueryPane::Editor;
-    workspace.view = MainView::Query;
-    workspace.focus = Focus::Main;
+    let tab_id = open_document(workspace, name, text.clone());
     if run_after_open {
-        run(state, text)
+        run(state, tab_id, text)
     } else {
         Vec::new()
     }

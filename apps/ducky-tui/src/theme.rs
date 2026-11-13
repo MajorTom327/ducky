@@ -48,6 +48,14 @@ impl Palette {
         Style::new().fg(Color::DarkGray)
     }
 
+    pub fn warning(&self) -> Style {
+        Style::new().fg(Color::Yellow)
+    }
+
+    pub fn cursor_row(&self) -> Style {
+        Style::new().fg(Color::White).bg(Color::DarkGray)
+    }
+
     pub fn null_cell(&self) -> Style {
         Style::new()
             .fg(Color::DarkGray)

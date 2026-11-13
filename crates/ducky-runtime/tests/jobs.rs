@@ -41,11 +41,12 @@ impl Harness {
 
     async fn run_script(&mut self, sql: &str, mode: TransactionMode) -> ScriptReport {
         self.runtime.dispatch(Command::RunScript {
+            tab_id: 1,
             sql: sql.to_owned(),
             mode,
         });
         match self.next_message().await {
-            Msg::ScriptFinished(report) => report,
+            Msg::ScriptFinished { report, .. } => report,
             other => panic!("unexpected message {other:?}"),
         }
     }

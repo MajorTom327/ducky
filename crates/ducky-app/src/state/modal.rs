@@ -1,6 +1,8 @@
 use ducky_core::Cell;
 use tui_input::Input;
 
+use crate::state::palette::CommandPalette;
+
 #[derive(Debug, Clone)]
 pub enum Modal {
     Prompt(Prompt),
@@ -8,6 +10,7 @@ pub enum Modal {
     RowDetail(RowDetail),
     SchemaPicker { selected_schema_index: usize },
     Help,
+    Palette(CommandPalette),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

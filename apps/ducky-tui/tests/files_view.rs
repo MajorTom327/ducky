@@ -2,8 +2,8 @@ use std::path::PathBuf;
 
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use ducky_app::{
-    AppState, Connection, DumpMsg, FilesMsg, Focus, JobState, Loadable, MainView, Msg, RestoreMsg,
-    Screen, Workspace,
+    AppState, Connection, DumpMsg, FilesMsg, Focus, JobState, Loadable, Msg, RestoreMsg, Screen,
+    Tab, TabContent, Workspace,
 };
 use ducky_core::{
     FileEntry, PgTools, Profile, ProfileKind, RestoreOptions, SessionInfo, StoragePaths, ToolStatus,
@@ -22,7 +22,7 @@ fn available_tools() -> PgTools {
     }
 }
 
-fn workspace_state(view: MainView, tools: PgTools) -> AppState {
+fn workspace_state(content: TabContent, tools: PgTools) -> AppState {
     let profile = Profile {
         label: "Dev local".to_owned(),
         url: "postgres://ducky@localhost/ducky".to_owned(),
@@ -45,7 +45,8 @@ fn workspace_state(view: MainView, tools: PgTools) -> AppState {
             tools,
         },
     );
-    workspace.view = view;
+    workspace.tabs = vec![Tab { id: 1, content }];
+    workspace.next_tab_id = 2;
     workspace.focus = Focus::Main;
     state.screen = Screen::Workspace(Box::new(workspace));
     state
@@ -97,7 +98,7 @@ fn press(state: &AppState, code: KeyCode) -> Vec<Msg> {
 
 #[test]
 fn files_view_lists_entries_and_shows_the_preview() {
-    let mut state = workspace_state(MainView::Files, available_tools());
+    let mut state = workspace_state(TabContent::Files, available_tools());
     let workspace = workspace_mut(&mut state);
     workspace.files.entries = Loadable::Ready(vec![entry("first.sql"), entry("second.sql")]);
     workspace.files.preview = Loadable::Ready("select 42 from customers".to_owned());
@@ -110,7 +111,7 @@ fn files_view_lists_entries_and_shows_the_preview() {
 
 #[test]
 fn files_view_explains_the_empty_state() {
-    let mut state = workspace_state(MainView::Files, available_tools());
+    let mut state = workspace_state(TabContent::Files, available_tools());
     workspace_mut(&mut state).files.entries = Loadable::Ready(Vec::new());
     let text = flattened(&screen(&state));
     assert!(text.contains("No .sql files yet."));
@@ -123,7 +124,7 @@ fn dump_view_explains_a_missing_tool() {
         pg_dump: ToolStatus::Missing("`pg_dump` was not found in PATH".to_owned()),
         pg_restore: ToolStatus::Available(PathBuf::from("/usr/bin/pg_restore")),
     };
-    let state = workspace_state(MainView::Dump, tools);
+    let state = workspace_state(TabContent::Dump, tools);
     let text = screen(&state);
     assert!(text.contains("Dump is disabled: `pg_dump` was not found in PATH."));
     let joined = flattened(&text);
@@ -133,7 +134,7 @@ fn dump_view_explains_a_missing_tool() {
 
 #[test]
 fn restore_view_reflects_the_options() {
-    let mut state = workspace_state(MainView::Restore, available_tools());
+    let mut state = workspace_state(TabContent::Restore, available_tools());
     let workspace = workspace_mut(&mut state);
     workspace.restore.entries = Loadable::Ready(vec![entry("ducky.dump")]);
     workspace.restore.options = RestoreOptions {
@@ -148,7 +149,7 @@ fn restore_view_reflects_the_options() {
 
 #[test]
 fn running_job_shows_its_last_log_line() {
-    let mut state = workspace_state(MainView::Dump, available_tools());
+    let mut state = workspace_state(TabContent::Dump, available_tools());
     let workspace = workspace_mut(&mut state);
     workspace.dump.job = JobState::Running;
     workspace.dump.log_lines = (1..=50).map(|index| format!("log line {index}")).collect();
@@ -158,12 +159,12 @@ fn running_job_shows_its_last_log_line() {
 
 #[test]
 fn keys_map_to_files_and_job_messages() {
-    let files_state = workspace_state(MainView::Files, available_tools());
+    let files_state = workspace_state(TabContent::Files, available_tools());
     assert_eq!(
         press(&files_state, KeyCode::Char('x')),
         vec![Msg::Files(FilesMsg::Execute)]
     );
-    let restore_state = workspace_state(MainView::Restore, available_tools());
+    let restore_state = workspace_state(TabContent::Restore, available_tools());
     assert_eq!(
         press(&restore_state, KeyCode::Char('c')),
         vec![Msg::Restore(RestoreMsg::ToggleClean)]
@@ -176,7 +177,7 @@ fn keys_map_to_files_and_job_messages() {
         press(&restore_state, KeyCode::Enter),
         vec![Msg::Restore(RestoreMsg::Start)]
     );
-    let dump_state = workspace_state(MainView::Dump, available_tools());
+    let dump_state = workspace_state(TabContent::Dump, available_tools());
     assert_eq!(
         press(&dump_state, KeyCode::Enter),
         vec![Msg::Dump(DumpMsg::Start)]

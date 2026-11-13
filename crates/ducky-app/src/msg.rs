@@ -4,7 +4,7 @@ use ducky_core::{
 };
 use tui_input::InputRequest;
 
-use crate::state::{JobKind, Notice};
+use crate::state::{JobKind, Notice, TabId};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Msg {
@@ -12,10 +12,13 @@ pub enum Msg {
     DismissNotice,
     OpenHelp,
     ToggleFocus,
+    FocusPane(PaneDirection),
     Reconnect,
     Disconnect,
     RefreshCatalog,
     OpenSchemaPicker,
+    OpenPalette,
+    Tabs(TabsMsg),
     Profiles(ProfilesMsg),
     Sidebar(SidebarMsg),
     Table(TableMsg),
@@ -37,7 +40,10 @@ pub enum Msg {
         relation: RelationRef,
         result: Result<RelationDetails, String>,
     },
-    ScriptFinished(ScriptReport),
+    ScriptFinished {
+        tab_id: TabId,
+        report: ScriptReport,
+    },
     SqlFilesListed(Result<Vec<FileEntry>, String>),
     FilePreviewLoaded {
         name: String,
@@ -85,6 +91,18 @@ pub enum ProfilesMsg {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TabsMsg {
+    Next,
+    Previous,
+    Select(usize),
+    Close,
+    NewQuery,
+    OpenFiles,
+    OpenDump,
+    OpenRestore,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SidebarMsg {
     Next,
     Previous,
@@ -93,6 +111,14 @@ pub enum SidebarMsg {
     Activate,
     StartFilter,
     ClearFilter,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PaneDirection {
+    Left,
+    Right,
+    Up,
+    Down,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
