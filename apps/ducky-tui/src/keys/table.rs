@@ -1,5 +1,5 @@
 use crossterm::event::{KeyCode, KeyEvent};
-use ducky_app::{GridMove, Msg, TabContent, TableMsg, TableTab, Workspace};
+use ducky_app::{GridMove, Msg, TabContent, TableMsg, TableTab, TableView, Workspace};
 
 use crate::keys::is_plain_char;
 use crate::tui_state::TuiState;
@@ -12,7 +12,7 @@ pub fn handle(workspace: &Workspace, tui: &mut TuiState, key: KeyEvent) -> Vec<M
         return Vec::new();
     };
     let message = match table.tab {
-        TableTab::Data => data_message(table.request.filter.is_some(), key),
+        TableTab::Data => data_message(table, key),
         TableTab::Structure => {
             structure_message(tui.structure_scrolls.entry(tab.id).or_default(), key)
         }
@@ -20,14 +20,15 @@ pub fn handle(workspace: &Workspace, tui: &mut TuiState, key: KeyEvent) -> Vec<M
     message.into_iter().collect()
 }
 
-fn data_message(has_filter: bool, key: KeyEvent) -> Option<Msg> {
+fn data_message(table: &TableView, key: KeyEvent) -> Option<Msg> {
     let table_message = match key.code {
         KeyCode::Left => TableMsg::Move(GridMove::Left),
         KeyCode::Right => TableMsg::Move(GridMove::Right),
         KeyCode::Down => TableMsg::Move(GridMove::Down),
         KeyCode::Up => TableMsg::Move(GridMove::Up),
         KeyCode::Enter => TableMsg::OpenRowDetail,
-        KeyCode::Esc if has_filter => TableMsg::ClearFilter,
+        KeyCode::Esc if table.has_selection() => TableMsg::ClearSelection,
+        KeyCode::Esc if table.request.filter.is_some() => TableMsg::ClearFilter,
         KeyCode::Esc => return Some(Msg::ToggleFocus),
         _ => data_char_message(key)?,
     };
@@ -50,6 +51,9 @@ fn data_char_message(key: KeyEvent) -> Option<TableMsg> {
         ('y', TableMsg::CopyCell),
         ('r', TableMsg::Reload),
         ('t', TableMsg::ToggleTab),
+        ('v', TableMsg::ToggleRowMark),
+        ('V', TableMsg::ToggleVisualSelection),
+        ('e', TableMsg::EditSelectedRows),
     ];
     bindings
         .into_iter()

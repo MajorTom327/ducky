@@ -8,7 +8,7 @@ use crate::state::{
     Workspace,
 };
 use crate::update::grid::{cell_text, clamp_cursor, move_cursor};
-use crate::update::{notice, references, workspace_mut};
+use crate::update::{notice, references, selection, workspace_mut};
 
 pub(crate) fn update(state: &mut AppState, msg: TableMsg) -> Vec<Command> {
     let Some(workspace) = workspace_mut(&mut state.screen) else {
@@ -20,6 +20,13 @@ pub(crate) fn update(state: &mut AppState, msg: TableMsg) -> Vec<Command> {
     match msg {
         TableMsg::GoToReferenced => references::go_to_referenced(state),
         TableMsg::FindReferencing => references::find_referencing(state),
+        TableMsg::ToggleRowMark => selection::toggle_row_mark(table),
+        TableMsg::ToggleVisualSelection => selection::toggle_visual_selection(table),
+        TableMsg::ClearSelection => {
+            table.clear_selection();
+            Vec::new()
+        }
+        TableMsg::EditSelectedRows => selection::edit_selected_rows(state),
         TableMsg::ToggleTab => toggle_tab(table),
         TableMsg::Move(grid_move) => {
             if let Some(page) = table.page.ready() {
@@ -89,6 +96,7 @@ pub(crate) fn update(state: &mut AppState, msg: TableMsg) -> Vec<Command> {
 
 pub(crate) fn reload_page(table: &mut TableView) -> Command {
     table.page = Loadable::Loading;
+    table.clear_selection();
     Command::LoadPage(table.request.clone())
 }
 
@@ -171,6 +179,7 @@ pub(crate) fn page_loaded(
     };
     for table in table_views_mut(workspace).filter(|table| table.request == request) {
         table.page = Loadable::from_result(result.clone());
+        table.clear_selection();
         if let Some(page) = table.page.ready() {
             clamp_cursor(&mut table.cursor, &page.result_set);
         }

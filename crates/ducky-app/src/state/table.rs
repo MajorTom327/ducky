@@ -1,3 +1,5 @@
+use std::collections::BTreeSet;
+
 use ducky_core::{Page, PageRequest, RelationDetails, RelationRef};
 
 use crate::loadable::Loadable;
@@ -22,6 +24,8 @@ pub struct TableView {
     pub page: Loadable<Page>,
     pub cursor: GridCursor,
     pub details: Loadable<RelationDetails>,
+    pub marked_row_indexes: BTreeSet<usize>,
+    pub visual_anchor_row_index: Option<usize>,
 }
 
 impl TableView {
@@ -39,6 +43,27 @@ impl TableView {
             page: Loadable::Loading,
             cursor: GridCursor::default(),
             details: Loadable::Idle,
+            marked_row_indexes: BTreeSet::new(),
+            visual_anchor_row_index: None,
         }
+    }
+
+    pub fn selected_row_indexes(&self) -> Vec<usize> {
+        let mut selected_row_indexes = self.marked_row_indexes.clone();
+        if let Some(anchor_row_index) = self.visual_anchor_row_index {
+            let first_row_index = anchor_row_index.min(self.cursor.row_index);
+            let last_row_index = anchor_row_index.max(self.cursor.row_index);
+            selected_row_indexes.extend(first_row_index..=last_row_index);
+        }
+        selected_row_indexes.into_iter().collect()
+    }
+
+    pub fn has_selection(&self) -> bool {
+        !self.marked_row_indexes.is_empty() || self.visual_anchor_row_index.is_some()
+    }
+
+    pub(crate) fn clear_selection(&mut self) {
+        self.marked_row_indexes.clear();
+        self.visual_anchor_row_index = None;
     }
 }

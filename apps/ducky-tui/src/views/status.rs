@@ -5,7 +5,7 @@ use ratatui::text::{Line, Span};
 use ratatui::widgets::Paragraph;
 
 use crate::keys::help::KeyHint;
-use crate::keys::hints::hints;
+use crate::keys::hints::{hints, mode_label};
 use crate::keys::sequence::{KeyPrefix, pending_hints};
 use crate::theme::Palette;
 
@@ -28,7 +28,14 @@ pub fn render(
             format!(" {}", notice.text.lines().next().unwrap_or_default()),
             palette.notice(notice.level),
         ),
-        (None, None) => hint_line(hints(state), palette),
+        (None, None) => {
+            let mut line = hint_line(hints(state), palette);
+            if let Some(label) = mode_label(state) {
+                line.spans.insert(1, Span::raw("  "));
+                line.spans.insert(1, Span::styled(label, palette.title()));
+            }
+            line
+        }
     };
     frame.render_widget(Paragraph::new(message), message_area);
     frame.render_widget(

@@ -56,6 +56,16 @@ To run the same query on another database, pick `Switch to <profile>` in go to a
 
 Foreign keys are navigable from table data (foreign-key columns end with ` →` in the header). On a foreign-key cell, `gd` (go to referenced row) opens the referenced table in a new tab filtered on that key (`where "id" = '42'`). `gr` (find referencing rows) opens, in a new tab, the rows of another table whose foreign key points at the current row; when several foreign keys reference the table, a picker lists them (`orders.customer_id → customers.id`). A tab with the same table and filter is reused, and the sidebar follows the schema of the opened table.
 
+Rows of the current table page can be selected for an edit: `v` marks or unmarks the cursor row and moves down, `V` starts a visual range (a second `V` keeps it), `Esc` clears the selection. Selected rows show `▌` in the gutter and the bottom border counts them. `e` opens a new query tab with an `UPDATE` preset for the selected rows (the cursor row when none is selected), targeting them by primary key (or an `id` column) and setting the cursor column to a `:<column>` parameter; `F5` asks for its value through the query parameters form:
+
+```sql
+UPDATE "public"."orders"
+SET
+  "status" = :status
+WHERE "id" IN ('17', '21', '25')
+;
+```
+
 When browsing a table, PostGIS `geometry` and `geography` columns are shown as GeoJSON (`{"type":"Point","coordinates":[2.35,48.85]}`) in the grid, the row detail and copied values. Query tabs show exactly what your SQL returns; use `ST_AsGeoJSON` or `ST_AsText` there. Long values use the free width of the grid before being cut with `…`.
 
 ## Query parameters

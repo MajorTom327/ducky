@@ -246,6 +246,7 @@ fn render_result_set(
                     first_row_number: 1,
                     is_focused: true,
                     linked_columns: &[],
+                    selected_row_indexes: &[],
                 },
                 &grid_palette,
             )

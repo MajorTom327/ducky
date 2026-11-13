@@ -10,7 +10,7 @@ use ducky_core::{
     RelationKind, RelationRef, ResultSet, Schema, SessionInfo, StoragePaths, ToolStatus,
 };
 use ducky_tui::keys::handle_key;
-use ducky_tui::keys::sequence::KeyPrefix;
+use ducky_tui::keys::sequence::{GridPane, KeyPrefix};
 use ducky_tui::tui_state::TuiState;
 use ducky_tui::views::draw;
 use ratatui::Terminal;
@@ -84,6 +84,8 @@ fn orders_view() -> TableView {
             column_index: 1,
         },
         details: Loadable::Idle,
+        marked_row_indexes: Default::default(),
+        visual_anchor_row_index: None,
     }
 }
 
@@ -200,7 +202,7 @@ fn g_prefix_is_cancelled_by_any_other_key() {
     let state = state_with(TabContent::Table(orders_view()));
     let mut tui = TuiState::new(false);
     assert!(press_all(&state, &mut tui, "g").is_empty());
-    assert_eq!(tui.pending_prefix, Some(KeyPrefix::Go));
+    assert_eq!(tui.pending_prefix, Some(KeyPrefix::Go(GridPane::TableData)));
     assert!(press_all(&state, &mut tui, "x").is_empty());
     assert_eq!(tui.pending_prefix, None);
     assert!(press_all(&state, &mut tui, "g").is_empty());
@@ -231,6 +233,31 @@ fn g_prefix_in_results_only_goes_to_the_first_row() {
     assert!(press_all(&state, &mut tui, "gd").is_empty());
     assert!(press_all(&state, &mut tui, "gr").is_empty());
     assert_eq!(tui.pending_prefix, None);
+}
+
+#[test]
+fn pending_g_prefix_in_results_only_hints_the_first_row() {
+    let state = results_state();
+    let mut tui = TuiState::new(false);
+    press_all(&state, &mut tui, "g");
+    assert_eq!(tui.pending_prefix, Some(KeyPrefix::Go(GridPane::Results)));
+    let status_row = screen_rows(&state, &mut tui).pop().unwrap_or_default();
+    assert!(status_row.contains("g first row"), "{status_row}");
+    assert!(!status_row.contains("referenced"), "{status_row}");
+    assert!(!status_row.contains("referencing"), "{status_row}");
+}
+
+#[test]
+fn visual_anchor_switches_the_status_hints() {
+    let mut view = orders_view();
+    view.visual_anchor_row_index = Some(0);
+    let state = state_with(TabContent::Table(view));
+    let mut tui = TuiState::new(false);
+    let status_row = screen_rows(&state, &mut tui).pop().unwrap_or_default();
+    assert!(
+        status_row.contains("VISUAL  j/k extend · V keep · e edit · Esc clear"),
+        "{status_row}"
+    );
 }
 
 #[test]

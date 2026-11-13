@@ -12,7 +12,7 @@ pub enum KeyPrefix {
     Leader,
     LeaderBuffer,
     LeaderQuit,
-    Go,
+    Go(GridPane),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -37,7 +37,7 @@ pub fn handle(tui: &mut TuiState, key: KeyEvent, grid_pane: Option<GridPane>) ->
             '[' => Some(KeyPrefix::Previous),
             ']' => Some(KeyPrefix::Next),
             ' ' => Some(KeyPrefix::Leader),
-            'g' if grid_pane.is_some() => Some(KeyPrefix::Go),
+            'g' => Some(KeyPrefix::Go(grid_pane?)),
             ':' => {
                 return Some(vec![
                     Msg::OpenPalette,
@@ -61,17 +61,14 @@ pub fn handle(tui: &mut TuiState, key: KeyEvent, grid_pane: Option<GridPane>) ->
         }
         (KeyPrefix::LeaderBuffer, Some('d')) => Msg::Tabs(TabsMsg::Close),
         (KeyPrefix::LeaderQuit, Some('q')) => Msg::Quit,
-        (KeyPrefix::Go, Some('g')) => match grid_pane {
-            Some(GridPane::TableData) => Msg::Table(TableMsg::Move(GridMove::FirstRow)),
-            Some(GridPane::Results) => Msg::Query(QueryMsg::Move(GridMove::FirstRow)),
-            None => return Some(Vec::new()),
-        },
-        (KeyPrefix::Go, Some('d')) if grid_pane == Some(GridPane::TableData) => {
-            Msg::Table(TableMsg::GoToReferenced)
+        (KeyPrefix::Go(GridPane::TableData), Some('g')) => {
+            Msg::Table(TableMsg::Move(GridMove::FirstRow))
         }
-        (KeyPrefix::Go, Some('r')) if grid_pane == Some(GridPane::TableData) => {
-            Msg::Table(TableMsg::FindReferencing)
+        (KeyPrefix::Go(GridPane::Results), Some('g')) => {
+            Msg::Query(QueryMsg::Move(GridMove::FirstRow))
         }
+        (KeyPrefix::Go(GridPane::TableData), Some('d')) => Msg::Table(TableMsg::GoToReferenced),
+        (KeyPrefix::Go(GridPane::TableData), Some('r')) => Msg::Table(TableMsg::FindReferencing),
         _ => return Some(Vec::new()),
     };
     Some(vec![message])
@@ -89,11 +86,12 @@ pub fn pending_hints(prefix: KeyPrefix) -> &'static [KeyHint] {
         ],
         KeyPrefix::LeaderBuffer => &[("Space b", "…"), ("d", "close tab"), ("Esc", "cancel")],
         KeyPrefix::LeaderQuit => &[("Space q", "…"), ("q", "quit"), ("Esc", "cancel")],
-        KeyPrefix::Go => &[
+        KeyPrefix::Go(GridPane::TableData) => &[
             ("g", "…"),
             ("g", "first row"),
             ("d", "referenced row"),
             ("r", "referencing rows"),
         ],
+        KeyPrefix::Go(GridPane::Results) => &[("g", "…"), ("g", "first row")],
     }
 }

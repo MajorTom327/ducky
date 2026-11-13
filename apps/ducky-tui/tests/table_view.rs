@@ -94,6 +94,8 @@ fn table_view(name: &str) -> TableView {
         }),
         cursor: GridCursor::default(),
         details: Loadable::Idle,
+        marked_row_indexes: Default::default(),
+        visual_anchor_row_index: None,
     }
 }
 
@@ -236,7 +238,11 @@ fn page_two_gutter_starts_at_row_one_hundred_one() {
     assert_contains(&text, "page 2");
 }
 
-fn render_small_grid(result_set: &ResultSet, cursor: GridCursor) -> Buffer {
+fn render_small_grid(
+    result_set: &ResultSet,
+    cursor: GridCursor,
+    selected_row_indexes: &[usize],
+) -> Buffer {
     let mut terminal = Terminal::new(TestBackend::new(40, 6)).expect("terminal");
     let grid_palette = palette(Some(ProfileKind::Local));
     terminal
@@ -247,6 +253,7 @@ fn render_small_grid(result_set: &ResultSet, cursor: GridCursor) -> Buffer {
                 first_row_number: 1,
                 is_focused: true,
                 linked_columns: &[],
+                selected_row_indexes,
             };
             render_grid(
                 frame,
@@ -274,7 +281,7 @@ fn numeric_result_set() -> ResultSet {
 
 #[test]
 fn grid_has_header_rule_gutter_and_right_aligned_numbers() {
-    let buffer = render_small_grid(&numeric_result_set(), GridCursor::default());
+    let buffer = render_small_grid(&numeric_result_set(), GridCursor::default(), &[]);
     let text = buffer_text(&buffer);
     let lines: Vec<&str> = text.lines().collect();
     assert!(lines[0].starts_with("#  id  name"), "{text}");
@@ -289,7 +296,7 @@ fn grid_cursor_row_is_dimmed_and_cursor_cell_selected() {
         row_index: 1,
         column_index: 1,
     };
-    let buffer = render_small_grid(&numeric_result_set(), cursor);
+    let buffer = render_small_grid(&numeric_result_set(), cursor, &[]);
     assert_eq!(buffer[(3, 3)].bg, Color::DarkGray);
     assert_eq!(buffer[(3, 3)].fg, Color::White);
     assert_eq!(buffer[(7, 3)].bg, Color::Green);
@@ -455,6 +462,76 @@ fn escape_clears_a_filter_or_toggles_focus() {
         press(&workspace(view), KeyCode::Esc),
         vec![Msg::Table(TableMsg::ClearFilter)]
     );
+}
+
+#[test]
+fn selection_keys_map_to_table_messages() {
+    let view = table_view("customers");
+    assert_eq!(
+        press(&workspace(view.clone()), KeyCode::Char('v')),
+        vec![Msg::Table(TableMsg::ToggleRowMark)]
+    );
+    assert_eq!(
+        press(&workspace(view.clone()), KeyCode::Char('V')),
+        vec![Msg::Table(TableMsg::ToggleVisualSelection)]
+    );
+    assert_eq!(
+        press(&workspace(view), KeyCode::Char('e')),
+        vec![Msg::Table(TableMsg::EditSelectedRows)]
+    );
+}
+
+#[test]
+fn escape_clears_the_selection_before_the_filter() {
+    let mut view = table_view("customers");
+    view.request.filter = Some("id > 1".to_owned());
+    view.marked_row_indexes.insert(0);
+    assert_eq!(
+        press(&workspace(view.clone()), KeyCode::Esc),
+        vec![Msg::Table(TableMsg::ClearSelection)]
+    );
+    view.marked_row_indexes.clear();
+    view.visual_anchor_row_index = Some(0);
+    assert_eq!(
+        press(&workspace(view), KeyCode::Esc),
+        vec![Msg::Table(TableMsg::ClearSelection)]
+    );
+}
+
+#[test]
+fn selected_rows_get_a_marker_and_the_border_counts_them() {
+    let mut view = people_page(0);
+    view.marked_row_indexes.insert(1);
+    let text = render_text(&workspace(view));
+    let lines: Vec<&str> = text.lines().collect();
+    let first_row = lines
+        .iter()
+        .find(|line| line.contains("a@example.com"))
+        .copied()
+        .unwrap_or_default();
+    let second_row = lines
+        .iter()
+        .find(|line| line.contains("b@example.com"))
+        .copied()
+        .unwrap_or_default();
+    assert!(!first_row.contains('▌'), "{first_row}");
+    assert!(
+        second_row.contains("▌2  102  b@example.com"),
+        "{second_row}"
+    );
+    let last_line = lines.last().copied().unwrap_or_default();
+    assert_contains(last_line, "rows 1–2 · 1 selected");
+}
+
+#[test]
+fn grid_marker_uses_the_title_style_on_selected_rows_only() {
+    let buffer = render_small_grid(&numeric_result_set(), GridCursor::default(), &[1]);
+    let text = buffer_text(&buffer);
+    let lines: Vec<&str> = text.lines().collect();
+    assert!(lines[0].starts_with(" #  id  name"), "{text}");
+    assert!(lines[2].starts_with(" 1   1  a   "), "{text}");
+    assert!(lines[3].starts_with("▌2  10  NULL"), "{text}");
+    assert_eq!(buffer[(0, 3)].fg, Color::Green);
 }
 
 #[test]

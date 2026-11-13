@@ -301,3 +301,75 @@ async fn follow_foreign_keys_between_tabs() {
     )
     .await;
 }
+
+#[tokio::test(flavor = "multi_thread")]
+#[ignore = "needs DUCKY_TEST_DATABASE_URL"]
+async fn edit_selected_rows_opens_an_update_preset() {
+    let database_url =
+        std::env::var("DUCKY_TEST_DATABASE_URL").expect("DUCKY_TEST_DATABASE_URL is set");
+    let nanos = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .expect("clock after epoch")
+        .as_nanos();
+    let schema_name = format!("ducky_edit_{nanos}");
+    let setup_session = PgSession::connect(&database_url)
+        .await
+        .expect("connects to the test database");
+    run_setup(
+        &setup_session,
+        vec![
+            format!("CREATE SCHEMA {schema_name}"),
+            format!("CREATE TABLE {schema_name}.orders (id serial PRIMARY KEY, customer_id integer, status text)"),
+            format!(
+                "INSERT INTO {schema_name}.orders (customer_id, status) VALUES (1, 'paid'), (2, 'pending'), (3, 'paid')"
+            ),
+        ],
+    )
+    .await;
+
+    let mut harness = Harness::new(vec![Profile {
+        label: PROFILE_LABEL.to_owned(),
+        url: database_url.clone(),
+        kind: ProfileKind::Local,
+    }]);
+    harness.press_code(KeyCode::Enter);
+    harness.settle().await;
+
+    harness.press_ctrl('p');
+    harness.type_text(&format!("{schema_name}.orders"));
+    harness.press_code(KeyCode::Enter);
+    harness.settle().await;
+    assert_eq!(active_table(&harness).relation.name, "orders");
+    harness.type_text("ll");
+    let rows = active_rows(&harness);
+    let first_id = rows[0][0].clone().expect("id is set");
+    let second_id = rows[1][0].clone().expect("id is set");
+    harness.type_text("vv");
+    assert_eq!(active_table(&harness).selected_row_indexes(), vec![0, 1]);
+    let screen = harness.screen();
+    assert!(screen.contains("2 selected"), "{screen}");
+
+    harness.press_char('e');
+    let tab_title = harness
+        .workspace()
+        .active_tab()
+        .expect("a tab is active")
+        .title();
+    assert!(tab_title.starts_with("Query "), "{tab_title}");
+    let text = active_query(&harness).document.text.clone();
+    let relation_line = format!("UPDATE \"{schema_name}\".\"orders\"");
+    assert!(text.starts_with(&relation_line), "{text}");
+    assert!(text.contains("\"status\" = :status"), "{text}");
+    assert!(
+        text.contains(&format!("WHERE \"id\" IN ('{first_id}', '{second_id}')")),
+        "{text}"
+    );
+    let screen = harness.screen();
+    assert!(screen.contains(&relation_line), "{screen}");
+
+    run_setup(
+        &setup_session,
+        vec![format!("DROP SCHEMA {schema_name} CASCADE")],
+    )
+    .await;
+}

@@ -84,6 +84,10 @@ fn summary_text(table: &TableView) -> Option<String> {
     if let Some(filter) = &table.request.filter {
         parts.push(format!("where {filter}"));
     }
+    let selected_row_count = table.selected_row_indexes().len();
+    if selected_row_count > 0 {
+        parts.push(format!("{selected_row_count} selected"));
+    }
     match parts.is_empty() {
         true => None,
         false => Some(format!(" {} ", parts.join(" · "))),
@@ -136,12 +140,14 @@ fn render_data(
                 .collect()
         })
         .unwrap_or_default();
+    let selected_row_indexes = table.selected_row_indexes();
     let options = GridOptions {
         cursor: table.cursor,
         sort: table.request.sort.as_ref(),
         first_row_number: first_row_number(table),
         is_focused: context.workspace.focus == Focus::Main,
         linked_columns: &linked_columns,
+        selected_row_indexes: &selected_row_indexes,
     };
     render_grid(
         frame,

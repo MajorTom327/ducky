@@ -21,6 +21,7 @@ const HEADER_ROW_COUNT: usize = 2;
 const GUTTER_HEADER: &str = "#";
 const NULL_CELL: Cell = None;
 const LINK_SUFFIX: &str = " →";
+const SELECTION_MARKER: &str = "▌";
 
 #[derive(Debug, Clone, Copy)]
 pub struct GridOptions<'a> {
@@ -29,6 +30,7 @@ pub struct GridOptions<'a> {
     pub first_row_number: usize,
     pub is_focused: bool,
     pub linked_columns: &'a [String],
+    pub selected_row_indexes: &'a [usize],
 }
 
 pub fn render_grid(
@@ -66,8 +68,10 @@ pub fn render_grid(
     let last_row_number =
         options.first_row_number + viewport.first_row_index + visible_rows.len().saturating_sub(1);
     let gutter_width = last_row_number.to_string().len().max(GUTTER_HEADER.len());
+    let marker_width = usize::from(!options.selected_row_indexes.is_empty());
+    let full_gutter_width = gutter_width + marker_width;
     let column_widths: Vec<usize> = columns.iter().map(|column| column.width).collect();
-    let grid_width = usize::from(area.width).saturating_sub(gutter_width);
+    let grid_width = usize::from(area.width).saturating_sub(full_gutter_width);
     scroll_columns(
         viewport,
         cursor.column_index,
@@ -80,8 +84,8 @@ pub fn render_grid(
     let shown_columns = shown_columns.as_slice();
 
     let mut lines = vec![
-        header_line(shown_columns, gutter_width, palette),
-        rule_line(shown_columns, gutter_width, palette),
+        header_line(shown_columns, full_gutter_width, palette),
+        rule_line(shown_columns, full_gutter_width, palette),
     ];
     if result_set.rows.is_empty() {
         lines.push(Line::styled("No rows", palette.muted()));
@@ -90,13 +94,24 @@ pub fn render_grid(
         let row_index = viewport.first_row_index + offset;
         let row_number = options.first_row_number + row_index;
         let cursor_column_index = (row_index == cursor.row_index).then_some(cursor.column_index);
-        let mut spans = vec![Span::styled(
+        let is_selected = options
+            .selected_row_indexes
+            .binary_search(&row_index)
+            .is_ok();
+        let mut spans = Vec::with_capacity(2 * shown_columns.len() + 2);
+        if marker_width > 0 {
+            spans.push(match is_selected {
+                true => Span::styled(SELECTION_MARKER, palette.title()),
+                false => Span::raw(" "),
+            });
+        }
+        spans.push(Span::styled(
             format!("{row_number:>gutter_width$}"),
             match cursor_column_index {
                 Some(_) => palette.cursor_row(),
                 None => palette.muted(),
             },
-        )];
+        ));
         for (shown_offset, column) in shown_columns.iter().enumerate() {
             let column_index = viewport.first_column_index + shown_offset;
             let cell = row.get(column_index).unwrap_or(&NULL_CELL);
@@ -104,6 +119,7 @@ pub fn render_grid(
                 cell,
                 cursor_column_index,
                 column_index,
+                is_selected,
                 options.is_focused,
                 palette,
             );
@@ -169,13 +185,18 @@ fn cell_style(
     cell: &Cell,
     cursor_column_index: Option<usize>,
     column_index: usize,
+    is_selected: bool,
     is_focused: bool,
     palette: &Palette,
 ) -> Style {
     let Some(cursor_column_index) = cursor_column_index else {
-        return match cell {
+        let style = match cell {
             Some(_) => Style::new(),
             None => palette.null_cell(),
+        };
+        return match is_selected {
+            true => style.patch(palette.muted()).add_modifier(Modifier::BOLD),
+            false => style,
         };
     };
     let mut style = palette.cursor_row();

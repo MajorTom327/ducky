@@ -147,6 +147,10 @@ pub enum TableMsg {
     CopyCell,
     GoToReferenced,
     FindReferencing,
+    ToggleRowMark,
+    ToggleVisualSelection,
+    ClearSelection,
+    EditSelectedRows,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

@@ -22,12 +22,18 @@ const TABLE_DATA_HINTS: &[KeyHint] = &[
     ("n/p", "page"),
     ("o", "sort"),
     ("/", "where"),
-    ("gd", "referenced"),
-    ("gr", "referencing"),
-    ("Enter", "row"),
-    ("y", "copy"),
+    ("v", "mark"),
+    ("V", "visual"),
+    ("e", "edit"),
+    ("gd/gr", "references"),
     ("t", "structure"),
     ("?", "help"),
+];
+const TABLE_VISUAL_HINTS: &[KeyHint] = &[
+    ("j/k", "extend"),
+    ("V", "keep"),
+    ("e", "edit"),
+    ("Esc", "clear"),
 ];
 const TABLE_STRUCTURE_HINTS: &[KeyHint] = &[
     ("j/k", "scroll"),
@@ -88,6 +94,7 @@ pub fn hints(state: &AppState) -> &'static [KeyHint] {
     match workspace.active_tab().map(|tab| &tab.content) {
         None => NO_TAB_HINTS,
         Some(TabContent::Table(table)) => match table.tab {
+            TableTab::Data if table.visual_anchor_row_index.is_some() => TABLE_VISUAL_HINTS,
             TableTab::Data => TABLE_DATA_HINTS,
             TableTab::Structure => TABLE_STRUCTURE_HINTS,
         },
@@ -126,5 +133,20 @@ fn modal_hints(modal: &Modal) -> &'static [KeyHint] {
             ("Enter", "run"),
             ("Esc", "cancel"),
         ],
+    }
+}
+
+pub fn mode_label(state: &AppState) -> Option<&'static str> {
+    let workspace = state.workspace()?;
+    if state.modal.is_some() || workspace.focus != Focus::Main {
+        return None;
+    }
+    match &workspace.active_tab()?.content {
+        TabContent::Table(table)
+            if table.tab == TableTab::Data && table.visual_anchor_row_index.is_some() =>
+        {
+            Some("VISUAL")
+        }
+        _ => None,
     }
 }

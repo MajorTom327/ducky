@@ -123,6 +123,7 @@ fn render_report(
                 first_row_number: 1,
                 is_focused,
                 linked_columns: &[],
+                selected_row_indexes: &[],
             },
             palette,
         ),

@@ -9,6 +9,7 @@ mod parameters;
 mod profiles;
 mod query;
 mod references;
+mod selection;
 mod sidebar;
 mod switch;
 mod table;
