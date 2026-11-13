@@ -1,0 +1,20 @@
+[package]
+name = "ducky-postgres"
+edition.workspace = true
+version.workspace = true
+publish.workspace = true
+
+[dependencies]
+ducky-core.workspace = true
+ducky-sql.workspace = true
+tokio.workspace = true
+tokio-postgres.workspace = true
+tokio-postgres-rustls.workspace = true
+rustls.workspace = true
+rustls-native-certs.workspace = true
+futures.workspace = true
+url.workspace = true
+thiserror.workspace = true
+
+[lints]
+workspace = true

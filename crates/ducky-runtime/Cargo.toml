@@ -1,0 +1,23 @@
+[package]
+name = "ducky-runtime"
+edition.workspace = true
+version.workspace = true
+publish.workspace = true
+
+[dependencies]
+ducky-core.workspace = true
+ducky-app.workspace = true
+ducky-config.workspace = true
+ducky-sql.workspace = true
+ducky-postgres.workspace = true
+ducky-files.workspace = true
+tokio.workspace = true
+arboard.workspace = true
+chrono.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
+url.workspace = true
+
+[lints]
+workspace = true

@@ -1,0 +1,17 @@
+sql_dir = "../sql"
+dump_dir = "../dumps"
+
+[[profiles]]
+label = "Dev local"
+url = "postgres://ducky:ducky@localhost:5440/ducky"
+type = "local"
+
+[[profiles]]
+label = "Dev as staging"
+url = "postgres://ducky:ducky@localhost:5440/ducky"
+type = "staging"
+
+[[profiles]]
+label = "Dev as prod"
+url = "postgres://ducky:ducky@localhost:5440/ducky"
+type = "prod"

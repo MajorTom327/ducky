@@ -1,0 +1,15 @@
+services:
+  postgres:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_USER: ducky
+      POSTGRES_PASSWORD: ducky
+      POSTGRES_DB: ducky
+    ports:
+      - "5440:5432"
+    volumes:
+      - ./dev/seed.sql:/docker-entrypoint-initdb.d/seed.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ducky -d ducky"]
+      interval: 2s
+      retries: 30

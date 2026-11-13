@@ -1,0 +1,16 @@
+# Directory for saved SQL files, relative to this file.
+sql_dir = "sql"
+# Directory for pg_dump archives, relative to this file.
+dump_dir = "dumps"
+
+# type: local (green), staging (orange) or prod (red).
+[[profiles]]
+label = "Local"
+url = "postgres://postgres:postgres@localhost:5432/postgres"
+type = "local"
+
+# ${VAR} is expanded from the environment at connect time.
+[[profiles]]
+label = "Production"
+url = "postgres://app:${PROD_DB_PASSWORD}@db.example.com:5432/app?sslmode=require"
+type = "prod"

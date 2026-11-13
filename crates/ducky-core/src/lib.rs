@@ -1,0 +1,16 @@
+mod catalog;
+mod data;
+mod files;
+mod profile;
+mod script;
+mod session;
+
+pub use catalog::{
+    Catalog, Column, ForeignKey, Index, Relation, RelationDetails, RelationKind, RelationRef,
+    Schema,
+};
+pub use data::{Cell, Page, PageRequest, ResultSet, Sort, SortDirection};
+pub use files::{FileEntry, PgTools, RestoreOptions, StoragePaths, ToolStatus};
+pub use profile::{Profile, ProfileKind};
+pub use script::{ScriptFailure, ScriptReport, StatementOutcome, StatementResult, TransactionMode};
+pub use session::SessionInfo;

@@ -1,0 +1,33 @@
+name: CI
+on:
+  push:
+    branches: [main]
+  pull_request:
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_USER: ducky
+          POSTGRES_PASSWORD: ducky
+          POSTGRES_DB: ducky
+        options: >-
+          --health-cmd "pg_isready -U ducky -d ducky"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DUCKY_TEST_DATABASE_URL: postgres://ducky:ducky@postgres:5432/ducky
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.99.1
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo fmt --all --check
+      - run: cargo clippy --workspace --all-targets -- -D warnings
+      - run: cargo test --workspace
+      - run: cargo test --workspace -- --ignored --skip dump_then_restore
+      - run: cargo build --workspace --release
