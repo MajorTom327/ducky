@@ -1,10 +1,15 @@
 use ducky_app::Document;
 use edtui::{EditorEventHandler, EditorMode, EditorState, Lines};
 
+use crate::editor::completion::CompletionPopup;
+use crate::editor::highlight::refresh_highlights;
+
 pub struct EditorPanel {
     pub state: EditorState,
     pub event_handler: EditorEventHandler,
     pub loaded_revision: Option<u64>,
+    pub highlighted_text: String,
+    pub completion: Option<CompletionPopup>,
 }
 
 impl Default for EditorPanel {
@@ -19,6 +24,8 @@ impl EditorPanel {
             state: EditorState::default(),
             event_handler: EditorEventHandler::default(),
             loaded_revision: None,
+            highlighted_text: String::new(),
+            completion: None,
         }
     }
 
@@ -32,6 +39,9 @@ impl EditorPanel {
         }
         self.state = EditorState::new(Lines::from(document.text.as_str()));
         self.loaded_revision = Some(document.revision);
+        self.highlighted_text.clear();
+        self.completion = None;
+        refresh_highlights(self);
     }
 
     pub fn is_insert_mode(&self) -> bool {

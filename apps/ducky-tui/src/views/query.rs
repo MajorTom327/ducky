@@ -1,10 +1,14 @@
 use ratatui::Frame;
-use ratatui::layout::Rect;
+use ratatui::layout::{Constraint, Layout, Rect};
 
 use crate::tui_state::TuiState;
-use crate::views::ViewContext;
-use crate::widgets::loading::render_message;
+use crate::views::{ViewContext, editor, results};
 
-pub fn render(frame: &mut Frame, area: Rect, context: &ViewContext, _tui: &mut TuiState) {
-    render_message(frame, area, "SQL command", context.palette);
+pub fn render(frame: &mut Frame, area: Rect, context: &ViewContext, tui: &mut TuiState) {
+    let [editor_area, results_area] = area.layout(&Layout::vertical([
+        Constraint::Percentage(40),
+        Constraint::Percentage(60),
+    ]));
+    editor::render(frame, editor_area, context, tui);
+    results::render(frame, results_area, context, tui);
 }
