@@ -9,6 +9,7 @@ mod parameters;
 mod profiles;
 mod query;
 mod references;
+mod run_confirmation;
 mod selection;
 mod sidebar;
 mod switch;

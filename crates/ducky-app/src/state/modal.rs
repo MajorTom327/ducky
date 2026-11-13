@@ -4,6 +4,7 @@ use tui_input::Input;
 use crate::state::palette::CommandPalette;
 use crate::state::parameters::ParameterForm;
 use crate::state::profiles::ProfilePicker;
+use crate::state::tabs::TabId;
 
 #[derive(Debug, Clone)]
 pub enum Modal {
@@ -51,7 +52,7 @@ impl Prompt {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ConfirmKind {
     OverwriteFile,
-    ExecuteFile { name: String },
+    RunScript { tab_id: TabId, sql: String },
     Restore { file_name: String },
 }
 

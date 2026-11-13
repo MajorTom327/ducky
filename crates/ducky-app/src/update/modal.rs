@@ -4,7 +4,9 @@ use crate::state::{
     AppState, Confirm, ConfirmKind, JobState, Modal, NoticeLevel, PendingSave, Prompt, PromptKind,
 };
 use crate::update::table::apply_filter;
-use crate::update::{notice, palette, parameters, profiles, references, step_index, workspace_mut};
+use crate::update::{
+    notice, palette, parameters, profiles, references, run_confirmation, step_index, workspace_mut,
+};
 
 pub(crate) fn update(state: &mut AppState, msg: ModalMsg) -> Vec<Command> {
     match msg {
@@ -77,6 +79,10 @@ pub(crate) fn update(state: &mut AppState, msg: ModalMsg) -> Vec<Command> {
                         workspace.pending_save = None;
                     }
                 }
+                Some(Modal::Confirm(Confirm {
+                    kind: ConfirmKind::RunScript { .. },
+                    ..
+                })) => run_confirmation::cancelled(state),
                 _ => {}
             }
             Vec::new()
@@ -201,10 +207,7 @@ fn submit_confirm(state: &mut AppState, confirm: Confirm) -> Vec<Command> {
             }],
             None => Vec::new(),
         },
-        ConfirmKind::ExecuteFile { name } => vec![Command::OpenFile {
-            name,
-            run_after_open: true,
-        }],
+        ConfirmKind::RunScript { tab_id, sql } => run_confirmation::confirmed(state, tab_id, sql),
         ConfirmKind::Restore { file_name } => {
             let restore = &mut workspace.restore;
             restore.job = JobState::Running;

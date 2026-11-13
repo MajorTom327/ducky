@@ -1,4 +1,5 @@
 pub mod completion;
+pub mod confirm;
 pub mod dump;
 pub mod editor;
 pub mod files;

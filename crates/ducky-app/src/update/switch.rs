@@ -2,6 +2,7 @@ use crate::command::Command;
 use crate::loadable::Loadable;
 use crate::msg::Connection;
 use crate::state::{AppState, JobState, NoticeLevel, TableTab};
+use crate::update::run_confirmation::forget_confirmations;
 use crate::update::table::{reload_all_pages, table_views_mut};
 use crate::update::{notice, workspace_mut};
 
@@ -67,6 +68,7 @@ pub(crate) fn switched(
     workspace.session = connection.session;
     workspace.tools = connection.tools;
     workspace.catalog = Loadable::Loading;
+    forget_confirmations(workspace);
     let mut commands = vec![Command::LoadCatalog];
     for table in table_views_mut(workspace) {
         table.details = match table.tab {

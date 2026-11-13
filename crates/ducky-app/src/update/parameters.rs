@@ -3,7 +3,8 @@ use tui_input::InputRequest;
 
 use crate::command::Command;
 use crate::state::{AppState, Modal, ParameterForm, TabId};
-use crate::update::query::{is_run_refused, run};
+use crate::update::query::is_run_refused;
+use crate::update::run_confirmation;
 use crate::update::{step_index, workspace_mut};
 
 pub(crate) fn request_run(state: &mut AppState, tab_id: TabId, sql: String) -> Vec<Command> {
@@ -12,7 +13,7 @@ pub(crate) fn request_run(state: &mut AppState, tab_id: TabId, sql: String) -> V
     }
     let parameter_names = find_parameters(&sql);
     if parameter_names.is_empty() {
-        return run(state, tab_id, sql);
+        return run_confirmation::request(state, tab_id, sql);
     }
     let Some(query) =
         workspace_mut(&mut state.screen).and_then(|workspace| workspace.query_mut(tab_id))
@@ -57,5 +58,5 @@ pub(crate) fn submit(state: &mut AppState, form: ParameterForm) -> Vec<Command> 
         .parameter_values
         .extend(submitted_values.iter().cloned());
     let bound_sql = bind_parameters(&form.sql, &submitted_values);
-    run(state, form.tab_id, bound_sql)
+    run_confirmation::request(state, form.tab_id, bound_sql)
 }

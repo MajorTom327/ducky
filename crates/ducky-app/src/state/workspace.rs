@@ -115,6 +115,16 @@ impl Workspace {
             .unwrap_or_default()
     }
 
+    pub fn query(&self, tab_id: TabId) -> Option<&QueryView> {
+        self.tabs
+            .iter()
+            .find(|tab| tab.id == tab_id)
+            .and_then(|tab| match &tab.content {
+                TabContent::Query(query) => Some(query),
+                _ => None,
+            })
+    }
+
     pub(crate) fn active_tab_id(&self) -> Option<TabId> {
         self.active_tab().map(|tab| tab.id)
     }

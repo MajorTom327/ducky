@@ -43,6 +43,7 @@ pub struct QueryView {
     pub cursor: GridCursor,
     pub pane: QueryPane,
     pub ran_on_profile_label: Option<String>,
+    pub confirmed_profile_index: Option<usize>,
     pub parameter_values: Vec<(String, ParameterValue)>,
 }
 
@@ -57,6 +58,7 @@ impl QueryView {
             cursor: GridCursor::default(),
             pane: QueryPane::Editor,
             ran_on_profile_label: None,
+            confirmed_profile_index: None,
             parameter_values: Vec::new(),
         }
     }

@@ -3,7 +3,7 @@ mod support;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use crossterm::event::KeyCode;
-use ducky_app::{QueryView, RunState, TabContent, TableView};
+use ducky_app::{Modal, QueryView, RunState, TabContent, TableView};
 use ducky_core::{Profile, ProfileKind, TransactionMode};
 use ducky_postgres::PgSession;
 
@@ -192,15 +192,44 @@ async fn explore_query_and_save() {
 
     harness.press_code(KeyCode::F(5));
     harness.settle().await;
+    assert!(
+        matches!(harness.state.modal, Some(Modal::Confirm(_))),
+        "{:?}",
+        harness.state.modal
+    );
+    let screen = harness.screen();
+    assert!(
+        screen.contains(&format!(
+            "Run 2 statement(s) on STAGING · {STAGING_PROFILE_LABEL}"
+        )),
+        "{screen}"
+    );
+    assert_eq!(
+        active_query(&harness).ran_on_profile_label.as_deref(),
+        Some(PROFILE_LABEL)
+    );
+    harness.press_char('y');
+    harness.settle().await;
+    assert!(harness.state.modal.is_none());
     assert_eq!(
         active_query(&harness).ran_on_profile_label.as_deref(),
         Some(STAGING_PROFILE_LABEL)
     );
+    assert!(matches!(active_query(&harness).run, RunState::Finished(_)));
     let screen = harness.screen();
     assert!(
         screen.contains(&format!("· on {STAGING_PROFILE_LABEL} ")),
         "{screen}"
     );
+
+    harness.set_editor_text("select 42;");
+    harness.press_code(KeyCode::F(5));
+    harness.settle().await;
+    assert!(harness.state.modal.is_none(), "{:?}", harness.state.modal);
+    match &active_query(&harness).run {
+        RunState::Finished(report) => assert_eq!(report.results[0].sql, "select 42"),
+        other => panic!("second staging run did not finish: {other:?}"),
+    }
 
     harness.press_ctrl('w');
     assert_eq!(harness.workspace().tabs.len(), 1);

@@ -1,8 +1,7 @@
 mod support;
 
 use ducky_app::{
-    AppState, Command, ConfirmKind, FilesMsg, Focus, Loadable, Modal, ModalMsg, Msg, NoticeLevel,
-    QueryPane, TabContent, TabsMsg,
+    AppState, Command, FilesMsg, Focus, Loadable, Msg, NoticeLevel, QueryPane, TabContent, TabsMsg,
 };
 use ducky_core::TransactionMode;
 use support::{
@@ -132,20 +131,10 @@ fn files_messages_outside_files_view_are_ignored() {
 }
 
 #[test]
-fn execute_confirm_open_then_run() {
+fn execute_opens_then_runs_on_local() {
     let mut state = files_state();
-    assert!(send(&mut state, Msg::Files(FilesMsg::Execute)).is_empty());
-    let Some(Modal::Confirm(confirm)) = &state.modal else {
-        panic!("expected confirm");
-    };
-    assert_eq!(
-        confirm.kind,
-        ConfirmKind::ExecuteFile {
-            name: "a.sql".to_owned()
-        }
-    );
-    assert_eq!(confirm.message, "Execute a.sql against Local?");
-    let commands = send(&mut state, Msg::Modal(ModalMsg::Submit));
+    let commands = send(&mut state, Msg::Files(FilesMsg::Execute));
+    assert!(state.modal.is_none());
     assert_eq!(
         commands,
         vec![Command::OpenFile {

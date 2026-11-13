@@ -3,7 +3,7 @@ use ducky_core::FileEntry;
 use crate::command::Command;
 use crate::loadable::Loadable;
 use crate::msg::FilesMsg;
-use crate::state::{AppState, Confirm, ConfirmKind, FilesView, Modal, NoticeLevel, TabContent};
+use crate::state::{AppState, FilesView, NoticeLevel, TabContent};
 use crate::update::parameters::request_run;
 use crate::update::tabs::open_document;
 use crate::update::{clamp_index, notice, step_index, workspace_mut};
@@ -32,27 +32,13 @@ pub(crate) fn update(state: &mut AppState, msg: FilesMsg) -> Vec<Command> {
             files.selected_entry_index = next_index;
             load_preview(files)
         }
-        FilesMsg::Open => match files.selected_entry() {
+        FilesMsg::Open | FilesMsg::Execute => match files.selected_entry() {
             Some(entry) => vec![Command::OpenFile {
                 name: entry.name.clone(),
-                run_after_open: false,
+                run_after_open: msg == FilesMsg::Execute,
             }],
             None => Vec::new(),
         },
-        FilesMsg::Execute => {
-            if let Some(entry) = files.selected_entry() {
-                state.modal = Some(Modal::Confirm(Confirm {
-                    kind: ConfirmKind::ExecuteFile {
-                        name: entry.name.clone(),
-                    },
-                    message: format!(
-                        "Execute {} against {}?",
-                        entry.name, workspace.profile.label
-                    ),
-                }));
-            }
-            Vec::new()
-        }
         FilesMsg::Reload => {
             files.entries = Loadable::Loading;
             vec![Command::ListSqlFiles]

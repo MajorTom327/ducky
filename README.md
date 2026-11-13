@@ -87,6 +87,18 @@ Running it (`F5`, or executing a SQL file) opens a form with one field per param
 
 Each query tab remembers the last values, so after switching profile the same query reruns with the form prefilled. Results show the SQL that actually ran, with the values in place.
 
+## Run confirmation
+
+What happens on `F5` / `Ctrl+e` (and on `x` in SQL files) depends on the type of the connected profile:
+
+|Type|Before running|
+|---|---|
+|`local`|never asks|
+|`staging`|asks before the first run of each query tab; once confirmed, later runs of that tab run directly. Switching to another profile and back asks again|
+|`prod`|asks before every run|
+
+The confirmation shows `Run <n> statement(s) on STAGING|PROD · <label> (<host:port/database>)?`, the first three lines of the SQL (with parameters already filled in) and whether it runs as one transaction or in autocommit, framed in the profile's colour. `y` / `Enter` runs, `n` / `Esc` cancels (`Run cancelled`). Restoring a dump always asks, whatever the profile.
+
 ## Development
 
 |Recipe|Does|

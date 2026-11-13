@@ -1,14 +1,16 @@
-use ducky_app::{AppState, Confirm, Modal, Prompt};
+use ducky_app::{AppState, Modal, Prompt};
 use ratatui::Frame;
 use ratatui::layout::{Constraint, Layout, Rect};
 use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Span};
-use ratatui::widgets::{Block, Clear, Paragraph, Wrap};
+use ratatui::widgets::{Block, Clear, Paragraph};
 
 use crate::keys::help::HELP_ROWS;
 use crate::theme::Palette;
 use crate::tui_state::TuiState;
-use crate::views::{palette as palette_view, parameters, profiles, reference_picker, row_detail};
+use crate::views::{
+    confirm, palette as palette_view, parameters, profiles, reference_picker, row_detail,
+};
 
 const HELP_COLUMN_SPACING: u16 = 2;
 
@@ -42,12 +44,7 @@ pub fn render(
             render_prompt(frame, area, prompt, palette);
             area
         }
-        Modal::Confirm(confirm) => {
-            let area = popup_area(screen, 60, Constraint::Length(6));
-            frame.render_widget(Clear, area);
-            render_confirm(frame, area, confirm, palette);
-            area
-        }
+        Modal::Confirm(confirm) => confirm::render(frame, screen, state, confirm, palette),
         Modal::SchemaPicker {
             selected_schema_index,
         } => {
@@ -95,21 +92,6 @@ fn render_prompt(frame: &mut Frame, area: Rect, prompt: &Prompt, palette: &Palet
         .x
         .saturating_add(u16::try_from(cursor_offset).unwrap_or(u16::MAX));
     frame.set_cursor_position((cursor_x, inner_area.y));
-}
-
-fn render_confirm(frame: &mut Frame, area: Rect, confirm: &Confirm, palette: &Palette) {
-    let block = popup_block("Confirm", palette);
-    let lines = vec![
-        Line::raw(confirm.message.clone()),
-        Line::default(),
-        Line::styled("y / Enter confirm · n / Esc cancel", palette.muted()),
-    ];
-    frame.render_widget(
-        Paragraph::new(lines)
-            .wrap(Wrap { trim: false })
-            .block(block),
-        area,
-    );
 }
 
 fn render_schema_picker(
