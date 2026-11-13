@@ -92,3 +92,20 @@ fn not_found_lists_paths_in_order() {
         }
     );
 }
+
+#[test]
+fn only_working_dir_searched_without_xdg_or_home() {
+    let dir = tempfile::tempdir().unwrap();
+    let search_context = SearchContext {
+        explicit_path: None,
+        working_dir: dir.path().join("work"),
+        xdg_config_home: None,
+        home_dir: None,
+    };
+    assert_eq!(
+        resolve_config_path(&search_context).unwrap_err(),
+        ConfigError::NotFound {
+            searched_paths: vec![dir.path().join("work/ducky.toml")]
+        }
+    );
+}

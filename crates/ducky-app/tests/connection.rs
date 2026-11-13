@@ -5,9 +5,9 @@ use ducky_app::{
 };
 use ducky_core::RelationKind;
 use support::{
-    activate_relation, active_tab_id, active_table, catalog, connection, open_loaded_table,
-    profiles, relation, schema, send, storage, tools_available, tools_missing, workspace,
-    workspace_mut, workspace_state,
+    activate_relation, active_tab_id, active_table, assert_ignored_after_disconnect, catalog,
+    connection, open_loaded_table, profiles, relation, schema, send, storage, tools_available,
+    tools_missing, workspace, workspace_mut, workspace_state,
 };
 
 #[test]
@@ -226,4 +226,13 @@ fn catalog_reload_returns_focus_to_sidebar_when_last_tab_vanishes() {
     );
     assert!(workspace(&state).tabs.is_empty());
     assert_eq!(workspace(&state).focus, Focus::Sidebar);
+}
+
+#[test]
+fn disconnect_and_catalog_responses_are_ignored_on_the_profile_screen() {
+    assert_ignored_after_disconnect(vec![
+        Msg::Disconnect,
+        Msg::CatalogLoaded(Ok(catalog())),
+        Msg::CatalogLoaded(Err("connection closed".to_owned())),
+    ]);
 }

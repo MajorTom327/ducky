@@ -99,4 +99,15 @@ mod tests {
             }
         );
     }
+
+    #[test]
+    fn malformed_placeholder_is_invalid_url() {
+        assert_eq!(
+            expand_env("postgres://u:${PASSWORD@h/db", &lookup).unwrap_err(),
+            ConfigError::InvalidUrl {
+                label: String::new(),
+                reason: "unterminated `${`".to_owned()
+            }
+        );
+    }
 }

@@ -143,3 +143,10 @@ fn bind_without_parameters_returns_input() {
     let sql = "select 'a:b', arr[1:n] from t";
     assert_eq!(bind_parameters(sql, &[text(":n", "1")]), sql);
 }
+
+#[test]
+fn ignores_quoted_and_non_ascii_names_after_colon() {
+    let sql = "select :\"name\", :é";
+    assert!(find_parameters(sql).is_empty());
+    assert_eq!(bind_parameters(sql, &[text(":name", "x")]), sql);
+}

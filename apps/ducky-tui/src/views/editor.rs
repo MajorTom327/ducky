@@ -1,4 +1,4 @@
-use ducky_app::{Focus, QueryPane, QueryView};
+use ducky_app::{Focus, QueryPane, QueryView, TabId};
 use ducky_core::TransactionMode;
 use edtui::{EditorMode, EditorTheme, EditorView, LineNumbers};
 use ratatui::Frame;
@@ -12,10 +12,14 @@ use crate::theme::Palette;
 use crate::tui_state::{CursorShape, TuiState};
 use crate::views::{ViewContext, completion};
 
-pub fn render(frame: &mut Frame, area: Rect, context: &ViewContext, tui: &mut TuiState) {
-    let Some((tab_id, query)) = context.active_query() else {
-        return;
-    };
+pub fn render(
+    frame: &mut Frame,
+    area: Rect,
+    context: &ViewContext,
+    tab_id: TabId,
+    query: &QueryView,
+    tui: &mut TuiState,
+) {
     let palette = context.palette;
     let is_focused = context.workspace.focus == Focus::Main && query.pane == QueryPane::Editor;
     let editor = tui.editor(tab_id);

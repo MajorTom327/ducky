@@ -281,6 +281,23 @@ fn palette_filters_items_by_the_typed_query() {
 }
 
 #[test]
+fn palette_without_matches_says_so() {
+    let mut state = workspace_state(available_tools());
+    send(&mut state, [Msg::OpenPalette]);
+    send(
+        &mut state,
+        "qqqqzz"
+            .chars()
+            .map(|character| Msg::Modal(ModalMsg::Input(InputRequest::InsertChar(character)))),
+    );
+    let mut tui = TuiState::new(false);
+    let screen_rows = rows(&render(&state, &mut tui, WIDTH, HEIGHT));
+    assert!(screen_rows.iter().any(|row| row.contains("› qqqqzz")));
+    assert!(screen_rows.iter().any(|row| row.contains(" No matches")));
+    assert!(!screen_rows.iter().any(|row| row.contains("New SQL query")));
+}
+
+#[test]
 fn palette_keys_edit_move_submit_and_cancel() {
     let mut state = workspace_state(available_tools());
     send(&mut state, [Msg::OpenPalette]);

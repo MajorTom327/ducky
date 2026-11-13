@@ -137,3 +137,57 @@ async fn connect_with_unknown_env_var_fails() {
         other => panic!("unexpected message {other:?}"),
     }
 }
+
+#[tokio::test]
+#[ignore = "needs DUCKY_TEST_DATABASE_URL"]
+async fn cancel_script_interrupts_the_running_script() {
+    let directory = tempfile::tempdir().expect("tempdir");
+    let (mut runtime, mut receiver) = connected_runtime(&directory);
+    assert!(matches!(
+        next_message(&mut receiver).await,
+        Msg::Connected { result: Ok(_), .. }
+    ));
+
+    runtime.dispatch(Command::RunScript {
+        tab_id: 1,
+        sql: "select pg_sleep(30)".to_owned(),
+        mode: TransactionMode::Transaction,
+    });
+    tokio::time::sleep(Duration::from_millis(200)).await;
+    runtime.dispatch(Command::CancelScript);
+    let message = tokio::time::timeout(Duration::from_secs(5), receiver.recv())
+        .await
+        .expect("cancelled within 5 s")
+        .expect("the channel stays open");
+    match message {
+        Msg::ScriptFinished { tab_id, report } => {
+            assert_eq!(tab_id, 1);
+            let failure = report.failure.expect("statement cancelled");
+            assert_eq!(failure.statement_index, 0);
+            assert!(
+                failure.message.to_lowercase().contains("cancel"),
+                "{}",
+                failure.message
+            );
+        }
+        other => panic!("unexpected message {other:?}"),
+    }
+}
+
+#[tokio::test]
+#[ignore = "needs DUCKY_TEST_DATABASE_URL"]
+async fn disconnect_drops_the_active_connection() {
+    let directory = tempfile::tempdir().expect("tempdir");
+    let (mut runtime, mut receiver) = connected_runtime(&directory);
+    assert!(matches!(
+        next_message(&mut receiver).await,
+        Msg::Connected { result: Ok(_), .. }
+    ));
+
+    runtime.dispatch(Command::Disconnect);
+    runtime.dispatch(Command::LoadCatalog);
+    assert_eq!(
+        next_message(&mut receiver).await,
+        Msg::CatalogLoaded(Err("Not connected".to_owned()))
+    );
+}

@@ -131,9 +131,6 @@ pub(crate) fn is_run_refused(state: &mut AppState, sql: &str) -> bool {
 }
 
 pub(crate) fn run(state: &mut AppState, tab_id: TabId, sql: String) -> Vec<Command> {
-    if is_run_refused(state, &sql) {
-        return Vec::new();
-    }
     let Some(workspace) = workspace_mut(&mut state.screen) else {
         return Vec::new();
     };

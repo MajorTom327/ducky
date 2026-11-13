@@ -1,7 +1,8 @@
 mod support;
 
 use ducky_app::{
-    AppState, Command, Focus, GridCursor, Modal, ModalMsg, Msg, NoticeLevel, TableMsg, TableTab,
+    AppState, Command, Focus, GridCursor, Loadable, Modal, ModalMsg, Msg, NoticeLevel, TableMsg,
+    TableTab,
 };
 use ducky_core::{
     Catalog, Cell, ForeignKeyLink, Page, RelationKind, RelationRef, ResultSet, Schema,
@@ -369,4 +370,45 @@ fn find_referencing_on_a_null_key_notifies() {
     let commands = send(&mut state, Msg::Table(TableMsg::FindReferencing));
     assert!(commands.is_empty());
     assert_eq!(notice_text(&state), "region is NULL, nothing to follow");
+}
+
+fn clear_page_rows(state: &mut AppState) {
+    let tab_id = active_tab_id(state);
+    if let Loadable::Ready(page) = &mut table_tab_mut(state, tab_id).page {
+        page.result_set.rows.clear();
+    }
+}
+
+fn assert_nothing_followed(state: &AppState) {
+    assert_eq!(workspace(state).tabs.len(), 1);
+    assert!(state.modal.is_none());
+    assert!(state.notice.is_none());
+}
+
+#[test]
+fn following_links_from_an_empty_page_does_nothing() {
+    let mut state = linked_state();
+    open_orders(&mut state, cell("3"));
+    clear_page_rows(&mut state);
+    assert!(send(&mut state, Msg::Table(TableMsg::GoToReferenced)).is_empty());
+    assert_nothing_followed(&state);
+    assert!(send(&mut state, Msg::Table(TableMsg::FindReferencing)).is_empty());
+    assert_nothing_followed(&state);
+}
+
+#[test]
+fn find_referencing_needs_the_data_tab_and_a_ready_catalog() {
+    let mut state = linked_state();
+    open_orders(&mut state, cell("3"));
+    send(&mut state, Msg::Table(TableMsg::ToggleTab));
+    assert_eq!(active_table(&state).tab, TableTab::Structure);
+    assert!(send(&mut state, Msg::Table(TableMsg::FindReferencing)).is_empty());
+    assert_nothing_followed(&state);
+    send(&mut state, Msg::Table(TableMsg::ToggleTab));
+    send(
+        &mut state,
+        Msg::CatalogLoaded(Err("connection reset".to_owned())),
+    );
+    assert!(send(&mut state, Msg::Table(TableMsg::FindReferencing)).is_empty());
+    assert_nothing_followed(&state);
 }

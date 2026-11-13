@@ -143,10 +143,17 @@ fn render_text(workspace: &Workspace) -> String {
         storage: &storage,
         palette: &workspace_palette,
     };
+    let Some(Tab {
+        id: tab_id,
+        content: TabContent::Table(table_view),
+    }) = workspace.active_tab()
+    else {
+        panic!("expected an active table tab");
+    };
     let mut tui = TuiState::new(false);
     let mut terminal = Terminal::new(TestBackend::new(100, 30)).expect("terminal");
     terminal
-        .draw(|frame| table::render(frame, frame.area(), &context, &mut tui))
+        .draw(|frame| table::render(frame, frame.area(), &context, *tab_id, table_view, &mut tui))
         .expect("draw");
     buffer_text(terminal.backend().buffer())
 }
@@ -559,4 +566,91 @@ fn structure_keys_scroll_locally() {
         handle(&workspace, &mut tui, key(KeyCode::Char('t'))),
         vec![Msg::Table(TableMsg::ToggleTab)]
     );
+}
+
+#[test]
+fn structure_tab_marks_empty_columns_and_unflagged_indexes() {
+    let mut view = table_view("dropped_table");
+    view.tab = TableTab::Structure;
+    view.details = Loadable::Ready(RelationDetails {
+        indexes: vec![Index {
+            name: "orders_status_idx".to_owned(),
+            definition: "CREATE INDEX orders_status_idx ON public.orders USING btree (status)"
+                .to_owned(),
+            is_unique: false,
+            is_primary: false,
+        }],
+        foreign_keys: Vec::new(),
+        view_definition: None,
+    });
+    let text = render_text(&workspace(view));
+    let lines: Vec<&str> = text.lines().map(str::trim).collect();
+    let columns_line = lines
+        .iter()
+        .position(|line| line.contains("Columns"))
+        .expect("columns section");
+    assert!(lines[columns_line + 1].contains("none"));
+    let index_line = lines
+        .iter()
+        .find(|line| line.contains("orders_status_idx"))
+        .expect("index row");
+    assert!(!index_line.contains("UNIQUE"));
+    assert!(!index_line.contains("PRIMARY"));
+    assert_contains(&text, "CREATE INDEX orders_status_idx");
+}
+
+#[test]
+fn data_tab_shows_no_rows_and_loading_states() {
+    let mut empty_view = table_view("customers");
+    if let Loadable::Ready(page) = &mut empty_view.page {
+        page.result_set.rows.clear();
+        page.has_next_page = false;
+    }
+    assert_contains(&render_text(&workspace(empty_view)), "no rows");
+    let mut loading_view = table_view("customers");
+    loading_view.page = Loadable::Loading;
+    let text = render_text(&workspace(loading_view));
+    assert_contains(&text, "Loading rows");
+    assert!(!text.contains("customer1@example.com"));
+}
+
+#[test]
+fn row_detail_truncates_long_names_and_wraps_long_values() {
+    let long_name = format!("a_{}", "n".repeat(40));
+    let row_detail = RowDetail {
+        columns: vec![long_name.clone(), "notes".to_owned()],
+        values: vec![
+            Some("w".repeat(100)),
+            Some("first paragraph\n\nsecond paragraph".to_owned()),
+        ],
+        selected_field_index: 0,
+    };
+    let workspace_palette = palette(Some(ProfileKind::Local));
+    let mut terminal = Terminal::new(TestBackend::new(100, 30)).expect("terminal");
+    terminal
+        .draw(|frame| {
+            row_detail::render(frame, frame.area(), &row_detail, &workspace_palette);
+        })
+        .expect("draw");
+    let text = buffer_text(terminal.backend().buffer());
+    let lines: Vec<&str> = text.lines().collect();
+    assert!(!text.contains(&long_name));
+    let name_row = lines
+        .iter()
+        .position(|line| line.contains("a_nnn"))
+        .expect("long name row");
+    assert!(lines[name_row].contains("n…  w"));
+    let continuation = lines[name_row + 1];
+    assert!(continuation.contains("www"));
+    assert!(!continuation.contains("a_n"));
+    let first_paragraph = lines
+        .iter()
+        .position(|line| line.contains("first paragraph"))
+        .expect("first paragraph");
+    assert!(
+        lines[first_paragraph + 1]
+            .trim_matches(|character: char| character == '│' || character.is_whitespace())
+            .is_empty()
+    );
+    assert!(lines[first_paragraph + 2].contains("second paragraph"));
 }

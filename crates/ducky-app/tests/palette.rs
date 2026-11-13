@@ -1,12 +1,13 @@
 mod support;
 
 use ducky_app::{
-    AppState, Command, Focus, Modal, ModalMsg, Msg, PaletteAction, PaletteItem, TabContent, TabsMsg,
+    AppState, Command, Focus, Modal, ModalMsg, Msg, PaletteAction, PaletteItem, Screen, TabContent,
+    TabsMsg,
 };
 use ducky_core::{Catalog, RelationKind, RelationRef};
 use support::{
-    activate_relation, active_tab_id, active_table, connected_state, new_query, relation, schema,
-    send, tools_missing, workspace, workspace_mut, workspace_state,
+    activate_relation, active_tab_id, active_table, connected_state, new_query, profiles, relation,
+    schema, send, tools_missing, workspace, workspace_mut, workspace_state,
 };
 use tui_input::InputRequest;
 
@@ -330,4 +331,64 @@ fn submit_without_items_only_closes() {
     assert!(send(&mut state, Msg::Modal(ModalMsg::Submit)).is_empty());
     assert!(state.modal.is_none());
     assert!(workspace(&state).tabs.is_empty());
+}
+
+fn submit_action(state: &mut AppState, query: &str) -> Vec<Command> {
+    send(state, Msg::OpenPalette);
+    type_query(state, query);
+    send(state, Msg::Modal(ModalMsg::Submit))
+}
+
+fn active_content(state: &AppState) -> Option<&TabContent> {
+    workspace(state).active_tab().map(|tab| &tab.content)
+}
+
+#[test]
+fn loading_catalog_lists_tabs_and_actions_only() {
+    let state = connected_state(support::tools_available());
+    let items = workspace(&state).palette_items("");
+    assert!(
+        items
+            .iter()
+            .all(|item| !matches!(item.action, PaletteAction::OpenRelation(_)))
+    );
+    assert_eq!(labels(&items).first(), Some(&"New SQL query"));
+    assert_eq!(labels(&items).last(), Some(&"Quit"));
+}
+
+#[test]
+fn tab_actions_submit_their_message() {
+    let mut state = workspace_state();
+    assert!(submit_action(&mut state, "new sql query").is_empty());
+    assert!(matches!(active_content(&state), Some(TabContent::Query(_))));
+    assert_eq!(workspace(&state).focus, Focus::Main);
+    assert!(submit_action(&mut state, "dump database").is_empty());
+    assert!(matches!(active_content(&state), Some(TabContent::Dump)));
+    assert_eq!(
+        submit_action(&mut state, "restore dump"),
+        vec![Command::ListDumps]
+    );
+    assert!(matches!(active_content(&state), Some(TabContent::Restore)));
+    assert_eq!(workspace(&state).tabs.len(), 3);
+}
+
+#[test]
+fn connection_actions_submit_their_message() {
+    let mut state = workspace_state();
+    assert_eq!(
+        submit_action(&mut state, "refresh catalog"),
+        vec![Command::LoadCatalog]
+    );
+    assert_eq!(
+        submit_action(&mut state, "reconnect"),
+        vec![Command::Connect {
+            profile_index: 0,
+            profile: profiles()[0].clone(),
+        }]
+    );
+    assert_eq!(
+        submit_action(&mut state, "disconnect"),
+        vec![Command::Disconnect]
+    );
+    assert!(matches!(state.screen, Screen::Profiles(_)));
 }

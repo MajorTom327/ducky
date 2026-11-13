@@ -147,28 +147,27 @@ fn row_lines(
         .enumerate()
         .skip(first_row_position)
         .take(visible_row_count)
-        .map(|(row_position, row)| match row {
+        .filter_map(|(row_position, row)| match row {
             ProfileRow::Project(project_name) => {
                 let member_count = rows[row_position + 1..]
                     .iter()
                     .take_while(|next_row| matches!(next_row, ProfileRow::Profile(_)))
                     .count();
-                Line::from(vec![
+                Some(Line::from(vec![
                     Span::raw(" "),
                     Span::styled(project_name.clone(), palette.title()),
                     Span::styled(format!(" {member_count}"), palette.muted()),
-                ])
+                ]))
             }
-            ProfileRow::Profile(profile_index) => match profiles.get(*profile_index) {
-                Some(profile) => profile_line(
+            ProfileRow::Profile(profile_index) => profiles.get(*profile_index).map(|profile| {
+                profile_line(
                     profile,
                     Some(*profile_index) == selected_profile_index,
                     Some(*profile_index) == connected_profile_index,
                     row_width,
                     palette,
-                ),
-                None => Line::default(),
-            },
+                )
+            }),
         })
         .collect()
 }

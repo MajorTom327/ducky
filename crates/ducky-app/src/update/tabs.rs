@@ -42,7 +42,7 @@ pub(crate) fn update(state: &mut AppState, msg: TabsMsg) -> Vec<Command> {
                 );
                 return Vec::new();
             }
-            close_tab(workspace, tab_id);
+            close_active_tab(workspace);
             Vec::new()
         }
         TabsMsg::NewQuery => {
@@ -70,11 +70,9 @@ pub(crate) fn update(state: &mut AppState, msg: TabsMsg) -> Vec<Command> {
     }
 }
 
-fn close_tab(workspace: &mut Workspace, tab_id: TabId) {
-    let Some(tab_index) = workspace.tab_index(tab_id) else {
-        return;
-    };
-    workspace.tabs.remove(tab_index);
+fn close_active_tab(workspace: &mut Workspace) {
+    let tab_index = workspace.active_tab_index;
+    let tab_id = workspace.tabs.remove(tab_index).id;
     if workspace
         .pending_save
         .as_ref()

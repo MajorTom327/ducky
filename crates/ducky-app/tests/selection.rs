@@ -302,3 +302,33 @@ fn edit_without_a_ready_page_does_nothing() {
     assert!(table_message(&mut state, TableMsg::EditSelectedRows).is_empty());
     assert_eq!(workspace(&state).tabs.len(), tab_count);
 }
+
+#[test]
+fn marking_waits_for_the_page() {
+    let mut state = workspace_state();
+    activate_relation(&mut state, "customers");
+    assert!(table_message(&mut state, TableMsg::ToggleRowMark).is_empty());
+    assert!(active_table(&state).marked_row_indexes.is_empty());
+}
+
+#[test]
+fn marking_and_editing_an_empty_page_do_nothing() {
+    let mut state = workspace_state();
+    load_rows(&mut state, &["id", "name"], Vec::new());
+    assert!(table_message(&mut state, TableMsg::ToggleRowMark).is_empty());
+    assert!(active_table(&state).marked_row_indexes.is_empty());
+    assert_eq!(active_table(&state).cursor, GridCursor::default());
+    assert!(table_message(&mut state, TableMsg::EditSelectedRows).is_empty());
+    assert_eq!(workspace(&state).tabs.len(), 1);
+    assert!(state.notice.is_none());
+}
+
+#[test]
+fn editing_rows_from_the_structure_tab_does_nothing() {
+    let mut state = workspace_state();
+    open_loaded_table(&mut state, false);
+    table_message(&mut state, TableMsg::ToggleTab);
+    assert!(table_message(&mut state, TableMsg::EditSelectedRows).is_empty());
+    assert_eq!(workspace(&state).tabs.len(), 1);
+    assert!(state.notice.is_none());
+}

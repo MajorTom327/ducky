@@ -154,3 +154,14 @@ fn tool_tabs_are_singletons() {
     assert_eq!(titles, ["Dump", "Restore", "SQL files"]);
     assert!(matches!(workspace.tabs[2].content, TabContent::Files));
 }
+
+#[test]
+fn query_lookup_only_returns_open_query_tabs() {
+    let mut state = workspace_state();
+    activate_relation(&mut state, "customers");
+    let table_tab_id = active_tab_id(&state);
+    let query_tab_id = new_query(&mut state);
+    assert!(workspace(&state).query(table_tab_id).is_none());
+    assert!(workspace(&state).query(query_tab_id).is_some());
+    assert!(workspace(&state).query(query_tab_id + 1).is_none());
+}

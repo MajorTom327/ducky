@@ -20,7 +20,18 @@ pub fn handle_editor(workspace: &Workspace, tui: &mut TuiState, key: KeyEvent) -
         refresh_completion(editor, workspace, true);
         return Vec::new();
     }
-    if editor.completion.is_some() && handle_completion_key(editor, key) {
+    if let Some(popup) = editor.completion.as_mut()
+        && let Some(action) = completion_action(key)
+    {
+        match action {
+            CompletionAction::Accept => {
+                accept_completion(editor);
+                refresh_highlights(editor);
+            }
+            CompletionAction::Close => editor.completion = None,
+            CompletionAction::Next => popup.select_next(),
+            CompletionAction::Previous => popup.select_previous(),
+        }
         return Vec::new();
     }
     if editor.state.mode == EditorMode::Normal
@@ -97,23 +108,23 @@ fn script_messages(editor: &EditorPanel, key: KeyEvent) -> Option<Vec<Msg>> {
     Some(vec![Msg::Query(query_msg)])
 }
 
-fn handle_completion_key(editor: &mut EditorPanel, key: KeyEvent) -> bool {
-    let Some(popup) = editor.completion.as_mut() else {
-        return false;
-    };
+enum CompletionAction {
+    Accept,
+    Close,
+    Next,
+    Previous,
+}
+
+fn completion_action(key: KeyEvent) -> Option<CompletionAction> {
     match key.code {
-        KeyCode::Tab => {
-            accept_completion(editor);
-            refresh_highlights(editor);
-        }
-        KeyCode::Down => popup.select_next(),
-        KeyCode::Up => popup.select_previous(),
-        KeyCode::Esc => editor.completion = None,
-        _ if is_ctrl(key, 'n') => popup.select_next(),
-        _ if is_ctrl(key, 'p') => popup.select_previous(),
-        _ => return false,
+        KeyCode::Tab => Some(CompletionAction::Accept),
+        KeyCode::Esc => Some(CompletionAction::Close),
+        KeyCode::Down => Some(CompletionAction::Next),
+        KeyCode::Up => Some(CompletionAction::Previous),
+        _ if is_ctrl(key, 'n') => Some(CompletionAction::Next),
+        _ if is_ctrl(key, 'p') => Some(CompletionAction::Previous),
+        _ => None,
     }
-    true
 }
 
 fn grid_move(key: KeyEvent) -> Option<GridMove> {

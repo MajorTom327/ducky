@@ -354,3 +354,26 @@ fn reference_picker_keys_move_submit_and_cancel() {
         vec![Msg::Modal(ModalMsg::Cancel)]
     );
 }
+
+#[test]
+fn link_label_qualifies_cross_schema_sources_and_lists_composite_columns() {
+    let same_schema = ducky_tui::views::reference_picker::link_label(
+        &relation_ref("public", "orders"),
+        &customer_link("orders_customer_id_fkey", "customer_id"),
+    );
+    assert_eq!(same_schema, "orders.customer_id → customers.id");
+    let composite = ForeignKeyLink {
+        name: "events_order_fkey".to_owned(),
+        columns: vec!["order_id".to_owned(), "line_number".to_owned()],
+        referenced: relation_ref("public", "order_lines"),
+        referenced_columns: vec!["order_id".to_owned(), "number".to_owned()],
+    };
+    let cross_schema = ducky_tui::views::reference_picker::link_label(
+        &relation_ref("analytics", "events"),
+        &composite,
+    );
+    assert_eq!(
+        cross_schema,
+        "analytics.events.(order_id, line_number) → order_lines.(order_id, number)"
+    );
+}

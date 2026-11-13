@@ -6,8 +6,9 @@ use ducky_app::{
 };
 use ducky_core::{ScriptFailure, ScriptReport, TransactionMode};
 use support::{
-    active_query, active_tab_id, affected_result, file_entry, new_query, query_tab, query_tab_mut,
-    report, rows_result, send, workspace, workspace_mut, workspace_state,
+    activate_relation, active_query, active_tab_id, affected_result,
+    assert_ignored_after_disconnect, file_entry, new_query, query_tab, query_tab_mut, report,
+    rows_result, send, workspace, workspace_mut, workspace_state,
 };
 use tui_input::InputRequest;
 
@@ -465,4 +466,111 @@ fn save_as_prompt_is_prefilled_with_document_name() {
         panic!("expected prompt");
     };
     assert_eq!(prompt.input.value(), "a.sql");
+}
+
+#[test]
+fn query_messages_and_responses_are_ignored_on_the_profile_screen() {
+    assert_ignored_after_disconnect(vec![
+        Msg::Query(QueryMsg::Run {
+            sql: "select 1".to_owned(),
+        }),
+        Msg::Query(QueryMsg::Cancel),
+        Msg::ScriptFinished {
+            tab_id: 1,
+            report: report(
+                TransactionMode::Transaction,
+                vec![affected_result("delete from orders", 1)],
+            ),
+        },
+        Msg::FileSaved {
+            name: "a.sql".to_owned(),
+            result: Ok(file_entry("a.sql")),
+        },
+    ]);
+}
+
+#[test]
+fn toggling_the_transaction_mode_twice_restores_it() {
+    let mut state = query_state();
+    send(&mut state, Msg::Query(QueryMsg::ToggleTransactionMode));
+    assert_eq!(
+        active_query(&state).transaction_mode,
+        TransactionMode::AutoCommit
+    );
+    send(&mut state, Msg::Query(QueryMsg::ToggleTransactionMode));
+    assert_eq!(
+        active_query(&state).transaction_mode,
+        TransactionMode::Transaction
+    );
+}
+
+#[test]
+fn grid_actions_are_ignored_before_any_result() {
+    let mut state = query_state();
+    assert!(send(&mut state, Msg::Query(QueryMsg::Move(GridMove::Down))).is_empty());
+    assert!(send(&mut state, Msg::Query(QueryMsg::CopyCell)).is_empty());
+    assert!(send(&mut state, Msg::Query(QueryMsg::OpenRowDetail)).is_empty());
+    assert_eq!(active_query(&state).cursor, GridCursor::default());
+    assert!(state.modal.is_none());
+    assert!(state.notice.is_none());
+}
+
+#[test]
+fn query_messages_are_ignored_on_a_table_tab() {
+    let mut state = workspace_state();
+    activate_relation(&mut state, "customers");
+    assert!(run(&mut state, "select 1").is_empty());
+    assert!(send(&mut state, Msg::Query(QueryMsg::ToggleTransactionMode)).is_empty());
+    assert!(
+        send(
+            &mut state,
+            Msg::Query(QueryMsg::SaveAs {
+                content: "select 1".to_owned(),
+            })
+        )
+        .is_empty()
+    );
+    assert!(state.modal.is_none());
+    assert!(state.notice.is_none());
+    assert_eq!(workspace(&state).running_script_tab_id, None);
+}
+
+#[test]
+fn already_exists_without_a_pending_save_only_notifies() {
+    let mut state = query_state();
+    let commands = send(
+        &mut state,
+        Msg::FileSaved {
+            name: "a.sql".to_owned(),
+            result: Err(SaveFailure::AlreadyExists),
+        },
+    );
+    assert!(commands.is_empty());
+    assert!(state.modal.is_none());
+    assert_eq!(
+        notice_text(&state),
+        (NoticeLevel::Error, "a.sql already exists".to_owned())
+    );
+}
+
+#[test]
+fn selected_result_is_none_until_the_script_finishes() {
+    let mut state = query_state();
+    assert!(active_query(&state).selected_result().is_none());
+    run(&mut state, "select 1");
+    assert_eq!(active_query(&state).run, RunState::Running);
+    assert!(active_query(&state).selected_result().is_none());
+    finish(
+        &mut state,
+        report(
+            TransactionMode::Transaction,
+            vec![rows_result("select 1", 1)],
+        ),
+    );
+    assert_eq!(
+        active_query(&state)
+            .selected_result()
+            .map(|statement_result| statement_result.sql.as_str()),
+        Some("select 1")
+    );
 }

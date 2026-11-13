@@ -3,7 +3,7 @@ use std::process::ExitCode;
 
 use clap::Parser;
 use crossterm::cursor::SetCursorStyle;
-use crossterm::event::{DisableBracketedPaste, EnableBracketedPaste};
+use crossterm::event::{DisableBracketedPaste, EnableBracketedPaste, EventStream};
 use crossterm::execute;
 use ducky_app::{
     AppState, Msg, ProfilePicker, ProfileRow, ProfilesMsg, Screen, profile_kind_name, profile_rows,
@@ -12,7 +12,7 @@ use ducky_config::{Config, ConfigError, SearchContext, load, resolve_config_path
 use ducky_core::Profile;
 use ducky_runtime::Runtime;
 use ducky_tui::cli::Args;
-use ducky_tui::event_loop;
+use ducky_tui::event_loop::{self, TerminalIo};
 use ducky_tui::profile_lookup::{ProfileLookupError, resolve_profile};
 use ducky_tui::tui_state::TuiState;
 
@@ -64,15 +64,13 @@ async fn main() -> anyhow::Result<ExitCode> {
     let mut terminal = ratatui::init();
     let outcome = match execute!(stdout(), EnableBracketedPaste) {
         Ok(()) => {
-            let outcome = event_loop::run(
-                &mut terminal,
-                state,
-                tui,
-                runtime,
-                receiver,
-                startup_messages,
-            )
-            .await;
+            let terminal_io = TerminalIo {
+                terminal: &mut terminal,
+                events: EventStream::new(),
+                cursor_writer: stdout(),
+            };
+            let outcome =
+                event_loop::run(terminal_io, state, tui, runtime, receiver, startup_messages).await;
             let terminal_reset = execute!(
                 stdout(),
                 DisableBracketedPaste,

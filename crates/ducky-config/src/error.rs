@@ -32,3 +32,22 @@ fn display_paths(paths: &[PathBuf]) -> String {
         .collect::<Vec<_>>()
         .join(", ")
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn not_found_lists_every_searched_path() {
+        let error = ConfigError::NotFound {
+            searched_paths: vec![
+                PathBuf::from("/work/ducky.toml"),
+                PathBuf::from("/home/me/.config/ducky/config.toml"),
+            ],
+        };
+        assert_eq!(
+            error.to_string(),
+            "no configuration file found (searched: /work/ducky.toml, /home/me/.config/ducky/config.toml)"
+        );
+    }
+}

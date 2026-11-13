@@ -390,3 +390,29 @@ fn picker_row_without_label_shows_badge_and_target() {
     assert!(prod_row.contains("PROD"), "{prod_row}");
     assert!(!prod_row.contains("Shop prod"), "{prod_row}");
 }
+
+#[test]
+fn start_screen_shows_the_wrapped_connection_error_and_connecting_state() {
+    let mut state = AppState::new(profiles(), storage());
+    let error_text = format!("FATAL: password authentication failed {}", "x".repeat(150));
+    if let Screen::Profiles(picker) = &mut state.screen {
+        picker.connection_error = Some(format!("{error_text}\nHINT: check the password"));
+        picker.connecting_profile_index = Some(0);
+    }
+    let screen_rows = rows(&render(&state));
+    let (error_row, _) = row_containing(&screen_rows, "FATAL: password authentication failed");
+    assert!(screen_rows[usize::from(error_row) + 1].contains("xxx"));
+    row_containing(&screen_rows, "HINT: check the password");
+    row_containing(&screen_rows, " · Connecting…");
+}
+
+#[test]
+fn navigate_mode_does_not_place_the_cursor_in_the_filter() {
+    let mut state = AppState::new(profiles(), storage());
+    let mut terminal = render(&state);
+    let filter_cursor = terminal.get_cursor_position().expect("cursor");
+    send(&mut state, [Msg::Profiles(ProfilesMsg::FocusList)]);
+    let mut terminal_after = render(&state);
+    let navigate_cursor = terminal_after.get_cursor_position().expect("cursor");
+    assert_ne!(filter_cursor, navigate_cursor);
+}

@@ -104,3 +104,11 @@ fn multi_byte_columns_are_counted_in_chars() {
         ]
     );
 }
+
+#[test]
+fn unterminated_prefixed_string_leaves_the_tail_unstyled() {
+    assert_eq!(
+        highlight("select E'abc"),
+        vec![span(position(0, 0), position(0, 6), TokenKind::Keyword)]
+    );
+}

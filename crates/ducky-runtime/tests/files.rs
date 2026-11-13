@@ -149,6 +149,43 @@ async fn database_commands_without_connection_answer_not_connected() {
         other => panic!("unexpected message {other:?}"),
     }
 
+    let request = ducky_core::PageRequest {
+        relation: ducky_core::RelationRef {
+            schema: "public".to_owned(),
+            name: "customers".to_owned(),
+        },
+        page_index: 0,
+        page_size: 100,
+        sort: None,
+        filter: None,
+    };
+    runtime.dispatch(Command::LoadPage(request.clone()));
+    assert_eq!(
+        next_message(&mut receiver).await,
+        Msg::PageLoaded {
+            request: request.clone(),
+            result: Err("Not connected".to_owned()),
+        }
+    );
+
+    runtime.dispatch(Command::LoadDetails(request.relation.clone()));
+    assert_eq!(
+        next_message(&mut receiver).await,
+        Msg::DetailsLoaded {
+            relation: request.relation,
+            result: Err("Not connected".to_owned()),
+        }
+    );
+
+    runtime.dispatch(Command::CancelScript);
+    assert_eq!(
+        next_message(&mut receiver).await,
+        Msg::Notified(ducky_app::Notice {
+            level: ducky_app::NoticeLevel::Error,
+            text: "Not connected".to_owned(),
+        })
+    );
+
     runtime.dispatch(Command::StartDump {
         custom_file_name: None,
     });
@@ -157,6 +194,52 @@ async fn database_commands_without_connection_answer_not_connected() {
         Msg::JobFinished {
             job: ducky_app::JobKind::Dump,
             result: Err("Not connected".to_owned()),
+        }
+    );
+
+    runtime.dispatch(Command::StartRestore {
+        file_name: "backup.dump".to_owned(),
+        options: ducky_core::RestoreOptions::default(),
+    });
+    assert_eq!(
+        next_message(&mut receiver).await,
+        Msg::JobFinished {
+            job: ducky_app::JobKind::Restore,
+            result: Err("Not connected".to_owned()),
+        }
+    );
+}
+
+#[tokio::test]
+async fn file_errors_are_reported_as_text() {
+    let directory = tempfile::tempdir().expect("tempdir");
+    let (mut runtime, mut receiver) = runtime_in(&directory);
+
+    runtime.dispatch(Command::OpenFile {
+        name: "missing".to_owned(),
+        run_after_open: false,
+    });
+    assert_eq!(
+        next_message(&mut receiver).await,
+        Msg::FileOpened {
+            name: "missing".to_owned(),
+            run_after_open: false,
+            result: Err("missing.sql was not found".to_owned()),
+        }
+    );
+
+    runtime.dispatch(Command::SaveFile {
+        name: "../escape".to_owned(),
+        content: "select 1;".to_owned(),
+        overwrite: false,
+    });
+    assert_eq!(
+        next_message(&mut receiver).await,
+        Msg::FileSaved {
+            name: "../escape".to_owned(),
+            result: Err(SaveFailure::Other(
+                "Invalid file name: ../escape".to_owned()
+            )),
         }
     );
 }

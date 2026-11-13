@@ -13,10 +13,14 @@ use crate::widgets::loading::{LoadSlot, render_error, render_loadable};
 
 const FAILED_PAGE_HINT: &str = "/ edit filter · Esc clear filter · r reload";
 
-pub fn render(frame: &mut Frame, area: Rect, context: &ViewContext, tui: &mut TuiState) {
-    let Some((tab_id, table)) = context.active_table() else {
-        return;
-    };
+pub fn render(
+    frame: &mut Frame,
+    area: Rect,
+    context: &ViewContext,
+    tab_id: TabId,
+    table: &TableView,
+    tui: &mut TuiState,
+) {
     let palette = context.palette;
     let is_focused = context.workspace.focus == Focus::Main;
     let mut block = Block::bordered()

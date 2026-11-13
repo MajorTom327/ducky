@@ -19,10 +19,12 @@ pub fn editor_highlights(sql: &str) -> Vec<Highlight> {
     let mut highlights = Vec::new();
     for span in highlight(sql) {
         let style = token_style(span.kind);
-        for row in span.start.line..=span.end.line {
-            let Some(&line_length) = line_lengths.get(row) else {
-                break;
-            };
+        let span_rows = line_lengths
+            .iter()
+            .enumerate()
+            .take(span.end.line + 1)
+            .skip(span.start.line);
+        for (row, &line_length) in span_rows {
             let start_column = match row == span.start.line {
                 true => span.start.column,
                 false => 0,

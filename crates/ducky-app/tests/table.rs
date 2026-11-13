@@ -4,10 +4,10 @@ use ducky_app::{
     AppState, Command, GridCursor, GridMove, Loadable, Modal, ModalMsg, Msg, NoticeLevel,
     PromptKind, TableMsg, TableTab, TableView, TabsMsg,
 };
-use ducky_core::{RelationDetails, RelationRef, Sort, SortDirection};
+use ducky_core::{PageRequest, RelationDetails, RelationRef, Sort, SortDirection};
 use support::{
-    activate_relation, active_tab_id, active_table, open_loaded_table, page, send, table_tab,
-    table_tab_mut, workspace_state,
+    activate_relation, active_tab_id, active_table, assert_ignored_after_disconnect,
+    open_loaded_table, page, send, table_tab, table_tab_mut, workspace_state,
 };
 use tui_input::InputRequest;
 
@@ -302,4 +302,44 @@ fn details_loaded_reaches_background_tab() {
         table_tab(&state, customers_tab_id).details,
         Loadable::Ready(details)
     );
+}
+
+#[test]
+fn table_messages_and_responses_are_ignored_on_the_profile_screen() {
+    let relation = RelationRef {
+        schema: "public".to_owned(),
+        name: "customers".to_owned(),
+    };
+    assert_ignored_after_disconnect(vec![
+        Msg::Table(TableMsg::Reload),
+        Msg::PageLoaded {
+            request: PageRequest {
+                relation: relation.clone(),
+                page_index: 0,
+                page_size: 100,
+                sort: None,
+                filter: None,
+            },
+            result: Ok(page(3, false)),
+        },
+        Msg::DetailsLoaded {
+            relation,
+            result: Ok(RelationDetails {
+                indexes: Vec::new(),
+                foreign_keys: Vec::new(),
+                view_definition: None,
+            }),
+        },
+    ]);
+}
+
+#[test]
+fn copy_and_sort_wait_for_the_page() {
+    let mut state = workspace_state();
+    activate_relation(&mut state, "customers");
+    assert!(send(&mut state, Msg::Table(TableMsg::CopyCell)).is_empty());
+    assert!(send(&mut state, Msg::Table(TableMsg::CycleSort)).is_empty());
+    assert!(state.notice.is_none());
+    assert_eq!(table(&state).request.sort, None);
+    assert_eq!(table(&state).page, Loadable::Loading);
 }

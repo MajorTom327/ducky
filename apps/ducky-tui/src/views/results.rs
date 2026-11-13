@@ -15,10 +15,14 @@ use crate::widgets::loading::{LoadSlot, render_loading, render_message};
 const SQL_PREVIEW_CHARS: usize = 24;
 const STATEMENT_SEPARATOR: &str = " ";
 
-pub fn render(frame: &mut Frame, area: Rect, context: &ViewContext, tui: &mut TuiState) {
-    let Some((tab_id, query)) = context.active_query() else {
-        return;
-    };
+pub fn render(
+    frame: &mut Frame,
+    area: Rect,
+    context: &ViewContext,
+    tab_id: TabId,
+    query: &QueryView,
+    tui: &mut TuiState,
+) {
     let palette = context.palette;
     let is_focused = context.workspace.focus == Focus::Main && query.pane == QueryPane::Results;
     let mut block = Block::bordered()

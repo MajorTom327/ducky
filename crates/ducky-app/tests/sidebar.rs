@@ -4,7 +4,10 @@ use ducky_app::{
     Command, Focus, Loadable, Modal, Msg, PromptKind, SidebarItem, SidebarMsg, TableTab, TabsMsg,
 };
 use ducky_core::{DEFAULT_PAGE_SIZE, PageRequest, RelationKind, RelationRef};
-use support::{activate_relation, active_table, send, workspace, workspace_mut, workspace_state};
+use support::{
+    activate_relation, active_table, connected_state, send, tools_available, workspace,
+    workspace_mut, workspace_state,
+};
 
 fn relation_names(state: &ducky_app::AppState) -> Vec<String> {
     workspace(state)
@@ -143,4 +146,12 @@ fn activating_a_relation_uses_the_configured_page_size() {
         [Command::LoadPage(request)] => assert_eq!(request.page_size, 25),
         other => panic!("expected one LoadPage, got {other:?}"),
     }
+}
+
+#[test]
+fn activate_without_items_does_nothing() {
+    let mut state = connected_state(tools_available());
+    assert!(send(&mut state, Msg::Sidebar(SidebarMsg::Activate)).is_empty());
+    assert!(workspace(&state).tabs.is_empty());
+    assert_eq!(workspace(&state).focus, Focus::Sidebar);
 }

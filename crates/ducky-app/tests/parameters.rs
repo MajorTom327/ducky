@@ -7,7 +7,8 @@ use ducky_app::{
 use ducky_core::TransactionMode;
 use ducky_sql::ParameterValue;
 use support::{
-    active_query, active_tab_id, file_entry, new_query, query_tab_mut, send, workspace_state,
+    active_query, active_tab_id, file_entry, new_query, query_tab_mut, report, send, workspace,
+    workspace_state,
 };
 use tui_input::InputRequest;
 
@@ -236,4 +237,65 @@ fn executing_a_file_with_parameters_opens_the_form() {
     assert_eq!(form.tab_id, active_tab_id(&state));
     assert_eq!(form.sql, "select :id");
     assert_eq!(form.fields.len(), 1);
+}
+
+#[test]
+fn selected_field_follows_navigation() {
+    let mut state = query_state();
+    run(&mut state, PARAMETER_SQL);
+    let selected_name =
+        |state: &AppState| form(state).selected_field().map(|field| field.name.clone());
+    assert_eq!(selected_name(&state).as_deref(), Some(":id"));
+    send(&mut state, Msg::Modal(ModalMsg::Next));
+    assert_eq!(selected_name(&state).as_deref(), Some(":status"));
+}
+
+#[test]
+fn submit_after_closing_the_tab_runs_nothing() {
+    let mut state = query_state();
+    run(&mut state, PARAMETER_SQL);
+    send(&mut state, Msg::Tabs(TabsMsg::Close));
+    type_text(&mut state, "42");
+    assert!(send(&mut state, Msg::Modal(ModalMsg::Submit)).is_empty());
+    assert!(state.modal.is_none());
+    assert_eq!(workspace(&state).running_script_tab_id, None);
+}
+
+#[test]
+fn resubmitting_replaces_only_the_submitted_values() {
+    let mut state = query_state();
+    let tab_id = active_tab_id(&state);
+    run(&mut state, "select :id, :status");
+    type_text(&mut state, "1");
+    send(&mut state, Msg::Modal(ModalMsg::Next));
+    type_text(&mut state, "open");
+    send(&mut state, Msg::Modal(ModalMsg::Submit));
+    send(
+        &mut state,
+        Msg::ScriptFinished {
+            tab_id,
+            report: report(TransactionMode::Transaction, Vec::new()),
+        },
+    );
+    run(&mut state, "select :id");
+    type_text(&mut state, "2");
+    let commands = send(&mut state, Msg::Modal(ModalMsg::Submit));
+    assert_eq!(
+        commands,
+        vec![Command::RunScript {
+            tab_id,
+            sql: "select '12'".to_owned(),
+            mode: TransactionMode::Transaction,
+        }]
+    );
+    assert_eq!(
+        active_query(&state).parameter_values,
+        vec![
+            (
+                ":status".to_owned(),
+                ParameterValue::Text("open".to_owned())
+            ),
+            (":id".to_owned(), ParameterValue::Text("12".to_owned())),
+        ]
+    );
 }

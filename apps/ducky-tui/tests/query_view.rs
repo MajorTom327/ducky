@@ -494,3 +494,139 @@ fn ctrl_hjkl_move_the_focus_even_while_typing_in_the_editor() {
     }
     assert_eq!(tui.editor(FIRST_TAB_ID).text(), "select");
 }
+
+#[test]
+fn editor_and_results_keys_ignore_non_query_tabs() {
+    let mut state = query_state();
+    let mut tui = TuiState::new(false);
+    workspace_mut(&mut state).tabs[0].content = TabContent::Files;
+    let key = KeyEvent::new(KeyCode::F(5), KeyModifiers::NONE);
+    assert!(handle_editor(workspace(&state), &mut tui, key).is_empty());
+    assert!(handle_results(workspace(&state), &mut tui, key).is_empty());
+    assert!(
+        ducky_tui::keys::query::handle_paste(workspace(&state), &mut tui, "x".to_owned())
+            .is_empty()
+    );
+}
+
+#[test]
+fn paste_inserts_text_and_closes_completion() {
+    let state = query_state();
+    let mut tui = TuiState::new(false);
+    type_in_insert_mode(&state, &mut tui, "select * from cu");
+    assert!(tui.editor(FIRST_TAB_ID).completion.is_some());
+    let messages =
+        ducky_tui::keys::query::handle_paste(workspace(&state), &mut tui, "stomers".to_owned());
+    assert!(messages.is_empty());
+    let editor = tui.editor(FIRST_TAB_ID);
+    assert!(editor.completion.is_none());
+    assert!(editor.text().contains("stomers"));
+}
+
+#[test]
+fn ctrl_space_forces_completion_and_arrows_move_the_selection() {
+    let state = query_state();
+    let mut tui = TuiState::new(false);
+    type_in_insert_mode(&state, &mut tui, "select * from ");
+    tui.editor(FIRST_TAB_ID).completion = None;
+    let messages = press(&state, &mut tui, KeyCode::Char(' '), KeyModifiers::CONTROL);
+    assert!(messages.is_empty());
+    let popup = tui.editor(FIRST_TAB_ID).completion.as_ref().expect("popup");
+    assert!(popup.completion.items.len() > 1);
+    assert_eq!(popup.selected_item_index, 0);
+    press(&state, &mut tui, KeyCode::Down, KeyModifiers::NONE);
+    let selected = |tui: &mut TuiState| {
+        tui.editor(FIRST_TAB_ID)
+            .completion
+            .as_ref()
+            .expect("popup")
+            .selected_item_index
+    };
+    assert_eq!(selected(&mut tui), 1);
+    press(&state, &mut tui, KeyCode::Up, KeyModifiers::NONE);
+    assert_eq!(selected(&mut tui), 0);
+    let text_before = tui.editor(FIRST_TAB_ID).text();
+    press(&state, &mut tui, KeyCode::Char('x'), KeyModifiers::NONE);
+    assert_eq!(tui.editor(FIRST_TAB_ID).text(), format!("{text_before}x"));
+}
+
+#[test]
+fn results_arrows_enter_and_copy_map_to_query_messages() {
+    let state = query_state();
+    let mut tui = TuiState::new(false);
+    let cases = [
+        (KeyCode::Left, Msg::Query(QueryMsg::Move(GridMove::Left))),
+        (KeyCode::Right, Msg::Query(QueryMsg::Move(GridMove::Right))),
+        (KeyCode::Up, Msg::Query(QueryMsg::Move(GridMove::Up))),
+        (KeyCode::Down, Msg::Query(QueryMsg::Move(GridMove::Down))),
+        (KeyCode::Enter, Msg::Query(QueryMsg::OpenRowDetail)),
+        (KeyCode::Char('y'), Msg::Query(QueryMsg::CopyCell)),
+    ];
+    for (code, expected) in cases {
+        assert_eq!(
+            press_in_results(&state, &mut tui, code, KeyModifiers::NONE),
+            vec![expected],
+            "{code:?}"
+        );
+    }
+    assert!(press_in_results(&state, &mut tui, KeyCode::Char('z'), KeyModifiers::NONE).is_empty());
+}
+
+#[test]
+fn editor_mode_badge_shows_visual_and_search_modes() {
+    let state = query_state();
+    let mut tui = TuiState::new(false);
+    press(&state, &mut tui, KeyCode::Char('v'), KeyModifiers::NONE);
+    assert!(screen_text(&state, &mut tui).contains(" VISUAL "));
+    press(&state, &mut tui, KeyCode::Esc, KeyModifiers::NONE);
+    press(&state, &mut tui, KeyCode::Char('/'), KeyModifiers::NONE);
+    assert!(screen_text(&state, &mut tui).contains(" SEARCH "));
+}
+
+#[test]
+fn running_script_shows_the_cancel_hint() {
+    let mut state = query_state();
+    active_query_mut(&mut state).run = RunState::Running;
+    let mut tui = TuiState::new(false);
+    assert!(screen_text(&state, &mut tui).contains("Loading script (Ctrl+c cancels)"));
+}
+
+#[test]
+fn report_without_results_shows_only_the_failure() {
+    let mut state = query_state();
+    active_query_mut(&mut state).run = RunState::Finished(ScriptReport {
+        mode: TransactionMode::Transaction,
+        results: Vec::new(),
+        failure: Some(ScriptFailure {
+            statement_index: 0,
+            sql: "BEGIN".to_owned(),
+            message: "ERROR: connection lost".to_owned(),
+        }),
+        elapsed: Duration::from_millis(1),
+    });
+    let mut tui = TuiState::new(false);
+    let text = screen_text(&state, &mut tui);
+    assert!(text.contains("Statement 1 failed"));
+    assert!(text.contains("ERROR: connection lost"));
+    assert!(!text.contains("affected"));
+}
+
+#[test]
+fn statement_labels_scroll_to_keep_the_selected_result_visible() {
+    let mut state = query_state();
+    let query = active_query_mut(&mut state);
+    query.run = RunState::Finished(ScriptReport {
+        mode: TransactionMode::Transaction,
+        results: (1..=12)
+            .map(|index| rows_result(&format!("select 'statement number {index:02}'"), "v"))
+            .collect(),
+        failure: None,
+        elapsed: Duration::from_millis(3),
+    });
+    query.selected_result_index = 11;
+    let mut tui = TuiState::new(false);
+    let text = screen_text(&state, &mut tui);
+    assert!(text.contains(" 12 select 'statement number… 1 row "));
+    assert!(text.contains(" 11 select 'statement number… 1 row "));
+    assert!(!text.contains(" 1 select 'statement number… 1 row "));
+}

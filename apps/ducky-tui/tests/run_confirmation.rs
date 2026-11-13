@@ -147,3 +147,38 @@ fn confirm_keys_submit_and_cancel() {
         );
     }
 }
+
+#[test]
+fn confirm_popup_names_the_transaction_mode() {
+    let mut state = prod_state_with_confirm();
+    update(&mut state, Msg::Modal(ModalMsg::Cancel));
+    update(&mut state, Msg::Query(QueryMsg::ToggleTransactionMode));
+    update(
+        &mut state,
+        Msg::Query(QueryMsg::Run {
+            sql: SQL.to_owned(),
+        }),
+    );
+    let rows = screen_rows(&render(&state));
+    assert!(rows.iter().any(|row| row.contains("Mode: one transaction")));
+}
+
+#[test]
+fn overwrite_confirm_shows_the_message_without_sql_or_mode() {
+    let mut state = prod_state_with_confirm();
+    state.modal = Some(Modal::Confirm(Confirm {
+        kind: ConfirmKind::OverwriteFile,
+        message: "report.sql already exists. Overwrite?".to_owned(),
+    }));
+    let rows = screen_rows(&render(&state));
+    assert!(
+        rows.iter()
+            .any(|row| row.contains("report.sql already exists. Overwrite?"))
+    );
+    assert!(
+        rows.iter()
+            .any(|row| row.contains("y / Enter confirm · n / Esc cancel"))
+    );
+    assert!(!rows.iter().any(|row| row.contains("Mode:")));
+    assert!(!rows.iter().any(|row| row.contains("select 1;")));
+}

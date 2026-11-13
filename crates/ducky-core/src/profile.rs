@@ -103,5 +103,10 @@ mod tests {
             ..unlabelled_profile
         };
         assert_eq!(prod_profile.display_name(), "shop prod");
+        let local_profile = Profile {
+            kind: ProfileKind::Local,
+            ..prod_profile
+        };
+        assert_eq!(local_profile.display_name(), "shop local");
     }
 }

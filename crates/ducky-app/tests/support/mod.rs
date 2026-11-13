@@ -282,3 +282,26 @@ pub fn file_entry(name: &str) -> FileEntry {
         modified_at: None,
     }
 }
+
+pub fn disconnected_state() -> AppState {
+    let mut state = workspace_state();
+    send(&mut state, Msg::Disconnect);
+    state
+}
+
+pub fn assert_ignored_after_disconnect(messages: Vec<Msg>) {
+    for msg in messages {
+        let mut state = disconnected_state();
+        let msg_text = format!("{msg:?}");
+        assert!(
+            send(&mut state, msg).is_empty(),
+            "{msg_text} emitted commands"
+        );
+        assert!(
+            matches!(&state.screen, Screen::Profiles(picker) if picker.selected_profile_index == 0),
+            "{msg_text} left the profile screen"
+        );
+        assert!(state.modal.is_none(), "{msg_text} opened a modal");
+        assert!(state.notice.is_none(), "{msg_text} set a notice");
+    }
+}

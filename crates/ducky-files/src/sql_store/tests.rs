@@ -82,3 +82,23 @@ fn preview_truncates_at_line_limit() {
     assert_eq!(preview.lines().count(), PREVIEW_LINE_LIMIT);
     assert_eq!(preview.lines().last(), Some("select 199;"));
 }
+
+#[test]
+fn load_directory_named_like_a_file_is_not_found() {
+    let (temp_dir, store) = store();
+    std::fs::create_dir_all(temp_dir.path().join("sql/folder.sql")).unwrap();
+    assert_eq!(
+        store.load("folder"),
+        Err(FilesError::NotFound("folder.sql".to_owned()))
+    );
+}
+
+#[test]
+fn sql_dir_that_is_a_file_reports_io_errors() {
+    let temp_dir = tempfile::tempdir().unwrap();
+    let blocking_file = temp_dir.path().join("sql");
+    std::fs::write(&blocking_file, "x").unwrap();
+    let store = SqlStore::new(blocking_file);
+    assert!(matches!(store.list(), Err(FilesError::Io(_))));
+    assert!(matches!(store.load("a"), Err(FilesError::Io(_))));
+}

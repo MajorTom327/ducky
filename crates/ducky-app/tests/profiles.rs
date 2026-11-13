@@ -293,3 +293,34 @@ fn modal_navigation_and_cancel() {
     assert!(state.modal.is_none());
     assert_eq!(workspace(&state).profile_index, 1);
 }
+
+#[test]
+fn profile_messages_are_ignored_behind_another_modal() {
+    let mut state = AppState::new(profiles(), storage());
+    send(&mut state, Msg::OpenHelp);
+    assert!(send(&mut state, Msg::Profiles(ProfilesMsg::Next)).is_empty());
+    assert!(send(&mut state, Msg::Profiles(ProfilesMsg::Connect)).is_empty());
+    assert_eq!(picker_index(&state), 0);
+    assert!(picker(&state).connecting_profile_index.is_none());
+    assert!(matches!(state.modal, Some(Modal::Help)));
+}
+
+#[test]
+fn connect_in_the_modal_picker_without_a_match_keeps_it_open() {
+    let mut state = AppState::new(profiles(), storage());
+    send(&mut state, Msg::Profiles(ProfilesMsg::Connect));
+    send(
+        &mut state,
+        Msg::Connected {
+            profile_index: 0,
+            result: Ok(connection(tools_available())),
+        },
+    );
+    send(&mut state, Msg::OpenProfilePicker);
+    type_filter(&mut state, "zzz");
+    assert!(send(&mut state, Msg::Profiles(ProfilesMsg::Connect)).is_empty());
+    assert!(send(&mut state, Msg::Modal(ModalMsg::Submit)).is_empty());
+    assert!(matches!(state.modal, Some(Modal::ProfilePicker(_))));
+    assert_eq!(workspace(&state).switching_profile_index, None);
+    assert!(state.notice.is_none());
+}

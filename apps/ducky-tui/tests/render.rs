@@ -10,14 +10,17 @@ use ducky_core::{
     Catalog, Column, PgTools, Profile, ProfileKind, Relation, RelationKind, ResultSet, Schema,
     SessionInfo, StoragePaths, ToolStatus,
 };
+use ducky_sql::TokenKind;
 use ducky_tui::keys::handle_key;
-use ducky_tui::theme::palette;
+use ducky_tui::theme::{palette, token_style};
 use ducky_tui::tui_state::TuiState;
 use ducky_tui::views::draw;
 use ducky_tui::views::sidebar::compact_count;
 use ducky_tui::widgets::grid::{GridOptions, GridViewport, render_grid};
+use ducky_tui::widgets::sql_text::highlighted_sql;
 use ratatui::Terminal;
 use ratatui::backend::TestBackend;
+use ratatui::layout::Rect;
 use ratatui::style::Color;
 
 const WIDTH: u16 = 120;
@@ -227,6 +230,42 @@ fn compact_counts_use_k_and_m_suffixes() {
     assert_eq!(compact_count(1_234), "1.2k");
     assert_eq!(compact_count(250_000), "250k");
     assert_eq!(compact_count(3_400_000), "3.4M");
+    assert_eq!(compact_count(5_600_000_000), "5.6G");
+    assert_eq!(compact_count(-1), "0");
+}
+
+#[test]
+fn sidebar_labels_mviews_foreign_tables_and_truncates_long_names() {
+    let mut state = workspace_state(ProfileKind::Local, available_tools());
+    let workspace = workspace_mut(&mut state);
+    let Loadable::Ready(catalog) = &mut workspace.catalog else {
+        panic!("expected a ready catalog");
+    };
+    let public_relations = &mut catalog.schemas[1].relations;
+    public_relations.push(relation("daily_rollup", RelationKind::MaterializedView));
+    public_relations.push(relation("remote_events", RelationKind::ForeignTable));
+    public_relations.push(relation(
+        "a_relation_name_far_too_long_for_the_sidebar",
+        RelationKind::Table,
+    ));
+    let mut tui = TuiState::new(false);
+    let terminal = render(&state, &mut tui, WIDTH, HEIGHT);
+    let sidebar_rows: Vec<String> = (0..HEIGHT)
+        .map(|y| row_text(&terminal, y).chars().take(32).collect())
+        .collect();
+    let row_with = |needle: &str| {
+        sidebar_rows
+            .iter()
+            .find(|row| row.contains(needle))
+            .cloned()
+            .unwrap_or_else(|| panic!("no sidebar row with {needle}"))
+    };
+    assert!(row_with("daily_rollup").contains("mview │"));
+    assert!(row_with("remote_events").contains("foreign │"));
+    let long_row = row_with("a_relation_name");
+    assert!(long_row.contains("…"));
+    assert!(long_row.contains("250 │"));
+    assert!(!long_row.contains("sidebar"));
 }
 
 fn render_result_set(
@@ -445,4 +484,135 @@ fn sidebar_escape_clears_only_an_active_filter() {
         handle_key(&state, &mut tui, key(KeyCode::Esc)),
         vec![Msg::Sidebar(SidebarMsg::ClearFilter)]
     );
+}
+
+fn numbered_rows(row_count: usize) -> ResultSet {
+    ResultSet {
+        columns: vec!["value".to_owned()],
+        rows: (1..=row_count)
+            .map(|index| vec![Some(format!("value_{index:02}"))])
+            .collect(),
+        is_truncated: false,
+    }
+}
+
+#[test]
+fn grid_marks_truncated_results() {
+    let mut result_set = numbered_rows(3);
+    result_set.is_truncated = true;
+    let text = render_result_set(
+        &result_set,
+        GridCursor::default(),
+        &mut GridViewport::default(),
+    );
+    assert!(text.contains("Showing first 3 rows"));
+}
+
+#[test]
+fn grid_scrolls_rows_down_and_back_up_with_the_cursor() {
+    let result_set = numbered_rows(30);
+    let mut viewport = GridViewport::default();
+    let text = render_result_set(
+        &result_set,
+        GridCursor {
+            row_index: 25,
+            column_index: 0,
+        },
+        &mut viewport,
+    );
+    assert!(text.contains("value_26"));
+    assert!(!text.contains("value_01"));
+    assert!(viewport.first_row_index > 0);
+    let text = render_result_set(&result_set, GridCursor::default(), &mut viewport);
+    assert_eq!(viewport.first_row_index, 0);
+    assert!(text.contains("value_01"));
+    assert!(!text.contains("value_26"));
+}
+
+#[test]
+fn grid_scrolls_columns_back_left_with_the_cursor() {
+    let columns: Vec<String> = (0..20).map(|index| format!("column_{index:02}")).collect();
+    let row = columns.iter().map(|_| Some("v".to_owned())).collect();
+    let result_set = ResultSet {
+        columns,
+        rows: vec![row],
+        is_truncated: false,
+    };
+    let mut viewport = GridViewport {
+        first_row_index: 0,
+        first_column_index: 15,
+    };
+    let text = render_result_set(
+        &result_set,
+        GridCursor {
+            row_index: 0,
+            column_index: 2,
+        },
+        &mut viewport,
+    );
+    assert_eq!(viewport.first_column_index, 2);
+    assert!(text.contains("column_02"));
+    assert!(!text.contains("column_01"));
+}
+
+#[test]
+fn grid_in_an_empty_area_draws_nothing_and_keeps_the_viewport() {
+    let mut terminal = Terminal::new(TestBackend::new(20, 4)).expect("terminal");
+    let grid_palette = palette(None);
+    let mut viewport = GridViewport {
+        first_row_index: 7,
+        first_column_index: 3,
+    };
+    terminal
+        .draw(|frame| {
+            render_grid(
+                frame,
+                Rect::new(0, 0, 20, 0),
+                &numbered_rows(30),
+                &mut viewport,
+                GridOptions {
+                    cursor: GridCursor::default(),
+                    sort: None,
+                    first_row_number: 1,
+                    is_focused: true,
+                    linked_columns: &[],
+                    selected_row_indexes: &[],
+                },
+                &grid_palette,
+            )
+        })
+        .expect("draw");
+    assert!(screen_text(&terminal).trim().is_empty());
+    assert_eq!(
+        viewport,
+        GridViewport {
+            first_row_index: 7,
+            first_column_index: 3,
+        }
+    );
+}
+
+#[test]
+fn highlighted_sql_splits_multi_line_spans_and_keeps_trailing_text() {
+    let text = highlighted_sql("select /* first\nsecond */ id  ");
+    assert_eq!(text.lines.len(), 2);
+    let comment_style = token_style(TokenKind::Comment);
+    let first_line = &text.lines[0];
+    assert_eq!(first_line.spans[0].content, "select");
+    assert_eq!(first_line.spans[0].style, token_style(TokenKind::Keyword));
+    let first_comment = first_line.spans.last().expect("comment span");
+    assert_eq!(first_comment.content, "/* first");
+    assert_eq!(first_comment.style, comment_style);
+    let second_line = &text.lines[1];
+    assert_eq!(second_line.spans[0].content, "second */");
+    assert_eq!(second_line.spans[0].style, comment_style);
+    let rendered: String = second_line
+        .spans
+        .iter()
+        .map(|span| span.content.as_ref())
+        .collect();
+    assert_eq!(rendered, "second */ id  ");
+    let trailing = second_line.spans.last().expect("trailing span");
+    assert_eq!(trailing.content, "  ");
+    assert_eq!(trailing.style, ratatui::style::Style::default());
 }

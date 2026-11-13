@@ -2,10 +2,10 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use ducky_core::{
-    PageRequest, RelationKind, RelationRef, ScriptReport, Sort, SortDirection, StatementOutcome,
-    TransactionMode,
+    PageRequest, RelationDetails, RelationKind, RelationRef, ScriptReport, Sort, SortDirection,
+    StatementOutcome, TransactionMode,
 };
-use ducky_postgres::{MAX_RESULT_ROWS, PgSession};
+use ducky_postgres::{MAX_RESULT_ROWS, PgError, PgSession};
 
 static SCHEMA_COUNTER: AtomicUsize = AtomicUsize::new(0);
 
@@ -461,5 +461,199 @@ async fn load_page_reads_geometry_columns_as_geojson() {
             Some(r#"{"type":"Point","coordinates":[2.35,48.85]}"#.to_owned()),
         ]]
     );
+    schema.drop_schema().await;
+}
+
+#[tokio::test]
+async fn connect_failure_reports_the_underlying_cause() {
+    let error = PgSession::connect("postgres://ducky@127.0.0.1:1/ducky?sslmode=disable")
+        .await
+        .expect_err("nothing listens on port 1");
+    let PgError::Connect(message) = error else {
+        panic!("expected a connect error, got {error:?}");
+    };
+    assert!(
+        message.starts_with("error connecting to server: "),
+        "{message}"
+    );
+    assert!(message.to_lowercase().contains("refused"), "{message}");
+}
+
+#[tokio::test]
+#[ignore]
+async fn database_errors_include_detail_and_hint() {
+    let schema =
+        TestSchema::create(&["CREATE TABLE {schema}.entries (id integer PRIMARY KEY)"]).await;
+    let duplicate = schema
+        .run(
+            &[
+                "INSERT INTO {schema}.entries VALUES (1)",
+                "INSERT INTO {schema}.entries VALUES (1)",
+            ],
+            TransactionMode::AutoCommit,
+        )
+        .await;
+    let duplicate_message = duplicate.failure.expect("duplicate key").message;
+    assert!(
+        duplicate_message.ends_with("\nDETAIL: Key (id)=(1) already exists."),
+        "{duplicate_message}"
+    );
+    let hinted = schema
+        .run(
+            &["DO $$ BEGIN RAISE EXCEPTION 'boom' USING HINT = 'retry later'; END $$"],
+            TransactionMode::AutoCommit,
+        )
+        .await;
+    assert_eq!(
+        hinted.failure.expect("raise fails").message,
+        "ERROR: boom\nHINT: retry later"
+    );
+    schema.drop_schema().await;
+}
+
+#[tokio::test]
+#[ignore]
+async fn deferred_constraint_failure_is_reported_at_commit() {
+    let schema = TestSchema::create(&[
+        "CREATE TABLE {schema}.entries (id integer PRIMARY KEY DEFERRABLE INITIALLY DEFERRED)",
+    ])
+    .await;
+    let report = schema
+        .run(
+            &[
+                "INSERT INTO {schema}.entries VALUES (1)",
+                "INSERT INTO {schema}.entries VALUES (1)",
+            ],
+            TransactionMode::Transaction,
+        )
+        .await;
+    assert_eq!(report.results.len(), 2);
+    let failure = report.failure.expect("commit fails");
+    assert_eq!(failure.statement_index, 2);
+    assert_eq!(failure.sql, "COMMIT");
+    assert!(
+        failure.message.contains("duplicate key"),
+        "{}",
+        failure.message
+    );
+    assert_eq!(schema.count_rows("entries").await, "0");
+    schema.drop_schema().await;
+}
+
+#[tokio::test]
+#[ignore]
+async fn aborted_transaction_left_open_makes_begin_fail() {
+    let schema = TestSchema::create(&[]).await;
+    let left_open = schema
+        .run(&["BEGIN", "SELECT 1 / 0"], TransactionMode::AutoCommit)
+        .await;
+    assert_eq!(
+        left_open.failure.map(|failure| failure.statement_index),
+        Some(1)
+    );
+    let report = schema
+        .run(&["SELECT 1"], TransactionMode::Transaction)
+        .await;
+    assert!(report.results.is_empty());
+    let failure = report.failure.expect("BEGIN fails");
+    assert_eq!(failure.statement_index, 0);
+    assert_eq!(failure.sql, "BEGIN");
+    assert!(
+        failure.message.contains("current transaction is aborted"),
+        "{}",
+        failure.message
+    );
+    let rolled_back = schema.run(&["ROLLBACK"], TransactionMode::AutoCommit).await;
+    assert_eq!(rolled_back.failure, None);
+    schema.drop_schema().await;
+}
+
+#[tokio::test]
+#[ignore]
+async fn lost_connection_reports_the_failed_rollback() {
+    let database_url =
+        std::env::var("DUCKY_TEST_DATABASE_URL").expect("DUCKY_TEST_DATABASE_URL is set");
+    let session = PgSession::connect(&database_url)
+        .await
+        .expect("connects to the test database");
+    let report = session
+        .run_script(
+            &["SELECT pg_terminate_backend(pg_backend_pid())".to_owned()],
+            TransactionMode::Transaction,
+        )
+        .await;
+    let failure = report.failure.expect("backend terminated");
+    assert_eq!(failure.statement_index, 0);
+    assert!(
+        failure.message.starts_with("FATAL: terminating connection"),
+        "{}",
+        failure.message
+    );
+    assert!(
+        failure
+            .message
+            .ends_with("\nROLLBACK failed: connection closed"),
+        "{}",
+        failure.message
+    );
+}
+
+#[tokio::test]
+#[ignore]
+async fn empty_script_runs_nothing() {
+    let schema = TestSchema::create(&[]).await;
+    let report = schema.run(&[], TransactionMode::Transaction).await;
+    assert_eq!(report.mode, TransactionMode::Transaction);
+    assert!(report.results.is_empty());
+    assert_eq!(report.failure, None);
+    let follow_up = schema
+        .run(&["SELECT 1"], TransactionMode::Transaction)
+        .await;
+    assert_eq!(follow_up.failure, None);
+    schema.drop_schema().await;
+}
+
+#[tokio::test]
+#[ignore]
+async fn invalid_page_filter_returns_the_database_error() {
+    let schema =
+        TestSchema::create(&["CREATE TABLE {schema}.entries (id integer PRIMARY KEY)"]).await;
+    let request = PageRequest {
+        relation: schema.relation("entries"),
+        page_index: 0,
+        page_size: 10,
+        sort: None,
+        filter: Some("missing_column = 1".to_owned()),
+    };
+    let error = schema
+        .session
+        .load_page(&request)
+        .await
+        .expect_err("unknown column");
+    assert_eq!(
+        error,
+        PgError::Query("ERROR: column \"missing_column\" does not exist".to_owned())
+    );
+    schema.drop_schema().await;
+}
+
+#[tokio::test]
+#[ignore]
+async fn details_of_a_missing_relation_are_empty() {
+    let schema = TestSchema::create(&[]).await;
+    let details = schema
+        .session
+        .load_relation_details(&schema.relation("missing"))
+        .await
+        .expect("details query succeeds");
+    assert_eq!(
+        details,
+        RelationDetails {
+            indexes: Vec::new(),
+            foreign_keys: Vec::new(),
+            view_definition: None,
+        }
+    );
+    assert_eq!(format!("{:?}", schema.session), "PgSession { .. }");
     schema.drop_schema().await;
 }

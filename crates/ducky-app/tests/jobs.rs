@@ -6,7 +6,8 @@ use ducky_app::{
 };
 use ducky_core::{PgTools, RestoreOptions};
 use support::{
-    connected_state, file_entry, send, tools_available, tools_missing, workspace, workspace_state,
+    assert_ignored_after_disconnect, connected_state, file_entry, send, tools_available,
+    tools_missing, workspace, workspace_state,
 };
 
 fn state_on(tabs_msg: TabsMsg, tools: PgTools) -> AppState {
@@ -210,4 +211,31 @@ fn dump_messages_are_ignored_outside_the_dump_tab() {
     let mut state = state_on(TabsMsg::OpenRestore, tools_available());
     assert!(send(&mut state, Msg::Dump(DumpMsg::Start)).is_empty());
     assert_eq!(workspace(&state).dump.job, JobState::Idle);
+}
+
+#[test]
+fn job_messages_and_responses_are_ignored_on_the_profile_screen() {
+    assert_ignored_after_disconnect(vec![
+        Msg::Dump(DumpMsg::Start),
+        Msg::Restore(RestoreMsg::Start),
+        Msg::DumpsListed(Ok(vec![file_entry("a.dump")])),
+        Msg::JobLogged {
+            job: JobKind::Dump,
+            line: "pg_dump: done".to_owned(),
+        },
+        Msg::JobFinished {
+            job: JobKind::Restore,
+            result: Ok("Restored".to_owned()),
+        },
+    ]);
+}
+
+#[test]
+fn restore_messages_are_ignored_while_the_dump_tab_is_active() {
+    let mut state = state_on(TabsMsg::OpenDump, tools_available());
+    assert!(send(&mut state, Msg::Restore(RestoreMsg::ToggleClean)).is_empty());
+    assert!(send(&mut state, Msg::Restore(RestoreMsg::Reload)).is_empty());
+    let restore = &workspace(&state).restore;
+    assert_eq!(restore.options, RestoreOptions::default());
+    assert_eq!(restore.entries, Loadable::Idle);
 }

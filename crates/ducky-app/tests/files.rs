@@ -5,8 +5,8 @@ use ducky_app::{
 };
 use ducky_core::TransactionMode;
 use support::{
-    active_query, active_tab_id, file_entry, new_query, query_tab, query_tab_mut, send, workspace,
-    workspace_state,
+    active_query, active_tab_id, assert_ignored_after_disconnect, file_entry, new_query, query_tab,
+    query_tab_mut, send, workspace, workspace_state,
 };
 
 fn files_state() -> AppState {
@@ -236,4 +236,44 @@ fn open_files_tab_is_a_singleton_and_lists_once_ready() {
     let workspace = workspace(&state);
     assert_eq!(workspace.tabs.len(), 2);
     assert_eq!(workspace.active_tab_index, 0);
+}
+
+#[test]
+fn file_messages_and_responses_are_ignored_on_the_profile_screen() {
+    assert_ignored_after_disconnect(vec![
+        Msg::Files(FilesMsg::Next),
+        Msg::Files(FilesMsg::Reload),
+        Msg::SqlFilesListed(Ok(vec![file_entry("a.sql")])),
+        Msg::FilePreviewLoaded {
+            name: "a.sql".to_owned(),
+            result: Ok("select 1".to_owned()),
+        },
+        Msg::FileOpened {
+            name: "a.sql".to_owned(),
+            run_after_open: true,
+            result: Ok("select 1".to_owned()),
+        },
+    ]);
+}
+
+#[test]
+fn navigation_is_ignored_while_the_list_is_loading() {
+    let mut state = workspace_state();
+    send(&mut state, Msg::Tabs(TabsMsg::OpenFiles));
+    assert!(send(&mut state, Msg::Files(FilesMsg::Next)).is_empty());
+    let files = &workspace(&state).files;
+    assert_eq!(files.entries, Loadable::Loading);
+    assert_eq!(files.selected_entry_index, 0);
+    assert_eq!(files.preview, Loadable::Idle);
+}
+
+#[test]
+fn open_and_execute_do_nothing_on_an_empty_list() {
+    let mut state = workspace_state();
+    send(&mut state, Msg::Tabs(TabsMsg::OpenFiles));
+    send(&mut state, Msg::SqlFilesListed(Ok(Vec::new())));
+    assert!(send(&mut state, Msg::Files(FilesMsg::Open)).is_empty());
+    assert!(send(&mut state, Msg::Files(FilesMsg::Execute)).is_empty());
+    assert!(state.modal.is_none());
+    assert_eq!(workspace(&state).tabs.len(), 1);
 }

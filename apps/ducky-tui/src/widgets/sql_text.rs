@@ -54,9 +54,6 @@ fn styled_line(source_line: &str, mut line_segments: Vec<Segment>) -> Line<'stat
     let mut spans = Vec::new();
     let mut current_column = 0;
     for segment in line_segments {
-        if segment.start_column < current_column {
-            continue;
-        }
         if segment.start_column > current_column {
             spans.push(Span::raw(collect(
                 &characters,

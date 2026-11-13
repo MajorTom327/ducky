@@ -4,7 +4,14 @@ use ducky_app::{
     Command, DumpMsg, Modal, ModalMsg, Msg, NoticeLevel, PromptKind, QueryMsg, RowDetail,
     SidebarMsg, TabsMsg,
 };
-use support::{new_query, send, workspace, workspace_mut, workspace_state};
+use std::time::Duration;
+
+use ducky_app::{SaveFailure, TableMsg};
+use ducky_core::{ResultSet, StatementOutcome, StatementResult, TransactionMode};
+use support::{
+    activate_relation, active_tab_id, new_query, report, send, table_tab, workspace, workspace_mut,
+    workspace_state,
+};
 use tui_input::InputRequest;
 
 fn type_text(state: &mut ducky_app::AppState, text: &str) {
@@ -183,5 +190,112 @@ fn modal_messages_without_modal_are_ignored() {
     let mut state = workspace_state();
     assert!(send(&mut state, Msg::Modal(ModalMsg::Submit)).is_empty());
     assert!(send(&mut state, Msg::Modal(ModalMsg::CopyValue)).is_empty());
+    assert!(state.modal.is_none());
+}
+
+#[test]
+fn input_and_navigation_are_ignored_by_modals_without_them() {
+    let mut state = workspace_state();
+    send(&mut state, Msg::OpenHelp);
+    assert!(
+        send(
+            &mut state,
+            Msg::Modal(ModalMsg::Input(InputRequest::InsertChar('x')))
+        )
+        .is_empty()
+    );
+    assert!(send(&mut state, Msg::Modal(ModalMsg::Next)).is_empty());
+    assert!(matches!(state.modal, Some(Modal::Help)));
+    assert_eq!(workspace(&state).sidebar.filter, "");
+}
+
+#[test]
+fn copy_value_of_a_row_without_columns_copies_nothing() {
+    let mut state = workspace_state();
+    let tab_id = new_query(&mut state);
+    send(
+        &mut state,
+        Msg::Query(QueryMsg::Run {
+            sql: "select from orders".to_owned(),
+        }),
+    );
+    let zero_column_result = StatementResult {
+        sql: "select from orders".to_owned(),
+        outcome: StatementOutcome::Rows(ResultSet {
+            columns: Vec::new(),
+            rows: vec![Vec::new()],
+            is_truncated: false,
+        }),
+        elapsed: Duration::from_millis(1),
+    };
+    send(
+        &mut state,
+        Msg::ScriptFinished {
+            tab_id,
+            report: report(TransactionMode::Transaction, vec![zero_column_result]),
+        },
+    );
+    state.notice = None;
+    send(&mut state, Msg::Query(QueryMsg::OpenRowDetail));
+    assert!(matches!(
+        &state.modal,
+        Some(Modal::RowDetail(row_detail)) if row_detail.columns.is_empty()
+    ));
+    assert!(send(&mut state, Msg::Modal(ModalMsg::CopyValue)).is_empty());
+    assert!(state.notice.is_none());
+}
+
+#[test]
+fn table_filter_submitted_after_leaving_the_table_is_dropped() {
+    let mut state = workspace_state();
+    activate_relation(&mut state, "customers");
+    let table_tab_id = active_tab_id(&state);
+    send(&mut state, Msg::Table(TableMsg::StartFilter));
+    type_text(&mut state, "id = 1");
+    send(&mut state, Msg::Tabs(TabsMsg::NewQuery));
+    assert!(send(&mut state, Msg::Modal(ModalMsg::Submit)).is_empty());
+    assert!(state.modal.is_none());
+    assert_eq!(table_tab(&state, table_tab_id).request.filter, None);
+}
+
+#[test]
+fn save_as_submitted_after_closing_the_tab_saves_nothing() {
+    let mut state = workspace_state();
+    new_query(&mut state);
+    send(
+        &mut state,
+        Msg::Query(QueryMsg::SaveAs {
+            content: "select 1".to_owned(),
+        }),
+    );
+    send(&mut state, Msg::Tabs(TabsMsg::Close));
+    type_text(&mut state, "report");
+    assert!(send(&mut state, Msg::Modal(ModalMsg::Submit)).is_empty());
+    assert!(state.modal.is_none());
+    assert!(workspace(&state).pending_save.is_none());
+}
+
+#[test]
+fn overwrite_confirmed_after_closing_the_tab_saves_nothing() {
+    let mut state = workspace_state();
+    new_query(&mut state);
+    send(
+        &mut state,
+        Msg::Query(QueryMsg::SaveAs {
+            content: "select 1".to_owned(),
+        }),
+    );
+    type_text(&mut state, "report");
+    send(&mut state, Msg::Modal(ModalMsg::Submit));
+    send(
+        &mut state,
+        Msg::FileSaved {
+            name: "report".to_owned(),
+            result: Err(SaveFailure::AlreadyExists),
+        },
+    );
+    assert!(matches!(state.modal, Some(Modal::Confirm(_))));
+    send(&mut state, Msg::Tabs(TabsMsg::Close));
+    assert!(send(&mut state, Msg::Modal(ModalMsg::Submit)).is_empty());
     assert!(state.modal.is_none());
 }

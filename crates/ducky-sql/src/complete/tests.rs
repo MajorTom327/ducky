@@ -205,3 +205,63 @@ fn cursor_in_middle_uses_text_before_cursor() {
     assert_eq!(completion.replace_start, 14);
     assert_eq!(completion.items[0].label, "customers");
 }
+
+#[test]
+fn quoted_schema_qualifier_lists_its_relations() {
+    let completion = complete_at_cursor("select * from \"analytics\".|");
+    assert_eq!(labels(&completion), vec!["events"]);
+}
+
+#[test]
+fn dot_without_qualifier_has_no_items() {
+    assert!(complete_at_cursor("select (.|").items.is_empty());
+    assert!(complete_at_cursor("select x\".|").items.is_empty());
+}
+
+#[test]
+fn as_alias_qualified_column() {
+    let completion = complete_at_cursor("select c.em| from customers as c");
+    assert_eq!(labels(&completion), vec!["email"]);
+}
+
+#[test]
+fn unknown_relations_contribute_no_columns() {
+    let completion = complete_at_cursor("select | from missing join orders on true");
+    assert_eq!(labels(&completion), vec!["customer_id", "id", "status"]);
+}
+
+#[test]
+fn relation_detail_names_each_kind() {
+    let relation_kinds = [
+        ("a_view", RelationKind::View),
+        ("b_matview", RelationKind::MaterializedView),
+        ("c_foreign", RelationKind::ForeignTable),
+    ];
+    let catalog = Catalog {
+        schemas: vec![Schema {
+            name: "public".to_owned(),
+            relations: relation_kinds
+                .iter()
+                .map(|(name, kind)| Relation {
+                    kind: *kind,
+                    ..table(name, Vec::new())
+                })
+                .collect(),
+        }],
+    };
+    let completion = complete("select * from ", 14, &catalog, "public");
+    let details: Vec<Option<&str>> = completion
+        .items
+        .iter()
+        .take(3)
+        .map(|item| item.detail.as_deref())
+        .collect();
+    assert_eq!(
+        details,
+        vec![
+            Some("view"),
+            Some("materialized view"),
+            Some("foreign table")
+        ]
+    );
+}

@@ -22,7 +22,7 @@ pub mod table;
 pub mod tabs;
 pub mod welcome;
 
-use ducky_app::{AppState, QueryView, Screen, TabContent, TabId, TableView, Workspace};
+use ducky_app::{AppState, Screen, TabContent, TabId, TableView, Workspace};
 use ducky_core::StoragePaths;
 use ratatui::Frame;
 use ratatui::layout::Rect;
@@ -43,14 +43,6 @@ impl ViewContext<'_> {
         let tab = self.workspace.active_tab()?;
         match &tab.content {
             TabContent::Table(table) => Some((tab.id, table)),
-            _ => None,
-        }
-    }
-
-    pub fn active_query(&self) -> Option<(TabId, &QueryView)> {
-        let tab = self.workspace.active_tab()?;
-        match &tab.content {
-            TabContent::Query(query) => Some((tab.id, query)),
             _ => None,
         }
     }
@@ -105,8 +97,8 @@ fn render_main(frame: &mut Frame, area: Rect, context: &ViewContext, tui: &mut T
         return;
     };
     match &tab.content {
-        TabContent::Table(_) => table::render(frame, area, context, tui),
-        TabContent::Query(_) => query::render(frame, area, context, tui),
+        TabContent::Table(table) => table::render(frame, area, context, tab.id, table, tui),
+        TabContent::Query(query) => query::render(frame, area, context, tab.id, query, tui),
         TabContent::Files => files::render(frame, area, context, tui),
         TabContent::Dump => dump::render(frame, area, context, tui),
         TabContent::Restore => restore::render(frame, area, context, tui),

@@ -4,7 +4,10 @@ use ducky_app::{
     Command, Focus, Loadable, Modal, Msg, Notice, NoticeLevel, PaneDirection, QueryPane,
     SidebarMsg, TabsMsg,
 };
-use support::{active_query, new_query, send, workspace, workspace_mut, workspace_state};
+use support::{
+    active_query, assert_ignored_after_disconnect, new_query, send, workspace, workspace_mut,
+    workspace_state,
+};
 
 #[test]
 fn quit_sets_should_quit() {
@@ -142,4 +145,14 @@ fn workspace_messages_are_ignored_on_profiles_screen() {
     assert!(send(&mut state, Msg::OpenPalette).is_empty());
     assert!(state.modal.is_none());
     assert!(state.workspace().is_none());
+}
+
+#[test]
+fn workspace_wide_messages_are_ignored_on_the_profile_screen() {
+    assert_ignored_after_disconnect(vec![
+        Msg::OpenSchemaPicker,
+        Msg::ToggleFocus,
+        Msg::FocusPane(PaneDirection::Left),
+        Msg::FocusPane(PaneDirection::Right),
+    ]);
 }

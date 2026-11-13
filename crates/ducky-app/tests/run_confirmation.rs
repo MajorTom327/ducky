@@ -287,3 +287,15 @@ fn confirm_rechecks_the_running_guard() {
     assert_eq!(notice.level, NoticeLevel::Error);
     assert_eq!(notice.text, "A script is already running");
 }
+
+#[test]
+fn confirming_after_closing_the_tab_runs_nothing() {
+    let mut state = state_on(PROD_INDEX);
+    new_query(&mut state);
+    run(&mut state, "select 1");
+    confirm(&state);
+    send(&mut state, Msg::Tabs(TabsMsg::Close));
+    assert!(submit(&mut state).is_empty());
+    assert!(state.modal.is_none());
+    assert_eq!(workspace(&state).running_script_tab_id, None);
+}
