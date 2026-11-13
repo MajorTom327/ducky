@@ -30,7 +30,7 @@ pub fn render(frame: &mut Frame, area: Rect, context: &ViewContext, _tui: &mut T
             "Server",
             format!("PostgreSQL {}", workspace.session.server_version),
         ),
-        ("Profile", workspace.profile.label.clone()),
+        ("Profile", workspace.profile.display_name()),
     ];
     let mut lines: Vec<Line> = session_facts
         .into_iter()

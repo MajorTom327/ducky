@@ -9,7 +9,7 @@ cargo run -p ducky-tui -- [--config PATH] [--profile LABEL|PROJECT/LABEL] [--no-
 just dev            # uses dev/ducky.dev.toml against the compose database
 ```
 
-`--profile` connects on startup to the profile with that label, or `project/label` (unknown profile: the profiles are listed grouped by project, exit code 2). `--no-effects` disables the tachyonfx animations. A missing or invalid config prints the error, the searched paths and an example config, then exits with code 1.
+`--profile` connects on startup to the profile matching `LABEL`, `PROJECT/LABEL` or `PROJECT/TYPE` (unknown profile: the profiles are listed grouped by project; several matches: the matching profiles are listed; exit code 2 in both cases). `--no-effects` disables the tachyonfx animations. A missing or invalid config prints the error, the searched paths and an example config, then exits with code 1.
 
 ## Configuration
 
@@ -25,24 +25,23 @@ dump_dir = "dumps"   # default "dumps", relative to the config file
 page_size = 50       # rows per table page, 1–5000, default 50
 
 [[profiles]]
-label = "Soiltrackers local"
-project = "soiltrackers"         # optional, groups profiles in the picker
+label = "Shop local"
+project = "shop"         # optional, groups profiles in the picker
 type = "local"
-url = "postgres://postgres:postgres@localhost:5432/soiltrackers"
+url = "postgres://postgres:postgres@localhost:5432/shop"
 
 [[profiles]]
-label = "Soiltrackers prod"
-project = "soiltrackers"
+project = "shop"
 type = "prod"
 tags = ["eu", "readonly"]        # optional, extra words to filter on
-url = "postgres://app:${PROD_DB_PASSWORD}@prod.example.com:5432/soiltrackers?sslmode=require"
+url = "postgres://app:${PROD_DB_PASSWORD}@prod.example.com:5432/shop?sslmode=require"
 ```
 
 - `project` (optional) groups profiles: the picker lists projects in order of first appearance, each with its profiles in file order, then profiles without a project under `Other`. A blank project counts as none.
 - `tags` (optional) are trimmed and lowercased, duplicates dropped; an empty tag is rejected. The picker shows them as `#eu #readonly`.
 - `type` is `local` (green), `staging` (orange) or `prod` (red); the header and focus colours follow it.
 - `${VAR}` in `url` is expanded from the environment at connect time; an unset variable fails the connection.
-- Labels must be non-empty and unique across the whole file (projects do not scope them); urls start with `postgres://` or `postgresql://`. Unknown keys are rejected. `page_size` outside 1–5000 is rejected.
+- `label` is optional when `project` is set: the profile is then named `<project> <type>` (`shop prod`) in notices and confirmations, and its picker row shows only the badge and target. A profile needs a label or a project; labels may repeat; urls start with `postgres://` or `postgresql://`. Unknown keys are rejected. `page_size` outside 1–5000 is rejected.
 - `sslmode`: `disable`; `prefer`/`allow`/absent; `require` (encrypted, unverified); `verify-ca`/`verify-full` (verified against native roots).
 
 See `ducky.example.toml`.
@@ -53,13 +52,13 @@ Dump and restore need `pg_dump` and `pg_restore` in `PATH` (macOS: `brew install
 
 ## Usage
 
-Startup opens the profile picker (` Connect `): a filter line, then the profiles grouped by project, each row with its type badge in the type colour, its label, its `#tags` and its target (`host:port/database` from the url, `${VAR}` left as written). Typing filters: every space-separated word must appear in the project, label, type, tags or target (`soil prod`, `eu`, `5440`). `↓`/`↑`, `Tab`, `Ctrl+j`/`Ctrl+k` move, `Enter` connects; `Esc` leaves the filter for the list, where `j`/`k`, `g`/`G` move and `/` or `i` return to the filter.
+Startup opens the profile picker (` Connect `): a filter line, then the profiles grouped by project, each row with its type badge in the type colour, its label, its `#tags` and its target (`host:port/database` from the url, `${VAR}` left as written). Typing filters: every space-separated word must appear in the project, label, type, tags or target (`shop prod`, `eu`, `5440`). `↓`/`↑`, `Tab`, `Ctrl+j`/`Ctrl+k` move, `Enter` connects; `Esc` leaves the filter for the list, where `j`/`k`, `g`/`G` move and `/` or `i` return to the filter.
 
 Every main view opens in a tab: one tab per opened relation (reused when reopened), numbered `Query N` SQL tabs (`Ctrl+n`), and single `SQL files`, `Dump` and `Restore` tabs. The sidebar lists the relations of the current schema with their estimated row count or kind. `Ctrl+p` opens "go to anything": open tabs, actions (including `Switch profile…`) and the relations of every schema. Only one script runs at a time across all query tabs. See [key bindings](docs/keybindings.md).
 
 Quit with `Ctrl+q` anywhere, `q` outside the editor, the `Space q q` sequence, or `:q` (`:` opens go to anything with `:` typed, outside editor insert mode).
 
-To run the same query on another database, open the same picker as a popup with `Space p` or `Switch profile…` in go to anything (the connected profile is marked `●`), filter and press `Enter`: the workspace reconnects to that profile and keeps every tab, query text and result; the catalog and table tabs reload, and the results title shows the profile each script ran on (` · on Dev local `). Switching waits for running scripts, dumps and restores to finish; a failed connection keeps the current profile. The header shows the project before the profile (` ducky │ soiltrackers │ [PROD] Soiltrackers prod │ … `).
+To run the same query on another database, open the same picker as a popup with `Space p` or `Switch profile…` in go to anything (the connected profile is marked `●`), filter and press `Enter`: the workspace reconnects to that profile and keeps every tab, query text and result; the catalog and table tabs reload, and the results title shows the profile each script ran on (` · on Dev local `). Switching waits for running scripts, dumps and restores to finish; a failed connection keeps the current profile. The header shows the project before the profile (` ducky │ shop │ [PROD] Shop prod │ … `).
 
 Foreign keys are navigable from table data (foreign-key columns end with ` →` in the header). On a foreign-key cell, `gd` (go to referenced row) opens the referenced table in a new tab filtered on that key (`where "id" = '42'`). `gr` (find referencing rows) opens, in a new tab, the rows of another table whose foreign key points at the current row; when several foreign keys reference the table, a picker lists them (`orders.customer_id → customers.id`). A tab with the same table and filter is reused, and the sidebar follows the schema of the opened table.
 
@@ -97,7 +96,7 @@ What happens on `F5` / `Ctrl+e` (and on `x` in SQL files) depends on the type of
 |`staging`|asks before the first run of each query tab; once confirmed, later runs of that tab run directly. Switching to another profile and back asks again|
 |`prod`|asks before every run|
 
-The confirmation shows `Run <n> statement(s) on STAGING|PROD · <label> (<host:port/database>)?`, the first three lines of the SQL (with parameters already filled in) and whether it runs as one transaction or in autocommit, framed in the profile's colour. `y` / `Enter` runs, `n` / `Esc` cancels (`Run cancelled`). Restoring a dump always asks, whatever the profile.
+The confirmation shows `Run <n> statement(s) on STAGING|PROD · <name> (<host:port/database>)?`, the first three lines of the SQL (with parameters already filled in) and whether it runs as one transaction or in autocommit, framed in the profile's colour. `y` / `Enter` runs, `n` / `Esc` cancels (`Run cancelled`). Restoring a dump always asks, whatever the profile.
 
 ## Development
 

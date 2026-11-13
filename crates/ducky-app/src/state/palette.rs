@@ -149,7 +149,7 @@ fn action_items(workspace: &Workspace) -> Vec<PaletteItem> {
         ("Switch schema", None, PaletteAction::ChooseSchema),
         (
             "Switch profile…",
-            Some(workspace.profile.label.clone()),
+            Some(workspace.profile.display_name()),
             PaletteAction::SwitchProfile,
         ),
         ("Refresh catalog", None, PaletteAction::RefreshCatalog),

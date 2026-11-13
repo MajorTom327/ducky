@@ -5,32 +5,31 @@ dump_dir = "dumps"
 # Rows per page when browsing a table (1 to 5000, default 50).
 page_size = 50
 
-# label: unique across the file.
+# label: optional when project is set (the profile is then named "<project> <type>"); labels may repeat.
 # type: local (green), staging (orange) or prod (red).
 # project (optional): groups profiles in the picker.
 # tags (optional): extra words to filter on, shown as #tag.
 [[profiles]]
-label = "Soiltrackers local"
-project = "soiltrackers"
+label = "Shop local"
+project = "shop"
 type = "local"
-url = "postgres://postgres:postgres@localhost:5432/soiltrackers"
+url = "postgres://postgres:postgres@localhost:5432/shop"
 
 # ${VAR} is expanded from the environment at connect time.
 [[profiles]]
-label = "Soiltrackers staging"
-project = "soiltrackers"
+label = "Shop staging"
+project = "shop"
 type = "staging"
-url = "postgres://app:${STAGING_DB_PASSWORD}@staging.example.com:5432/soiltrackers?sslmode=require"
+url = "postgres://app:${STAGING_DB_PASSWORD}@staging.example.com:5432/shop?sslmode=require"
 
 [[profiles]]
-label = "Soiltrackers prod"
-project = "soiltrackers"
+project = "shop"
 type = "prod"
 tags = ["eu", "readonly"]
-url = "postgres://app:${PROD_DB_PASSWORD}@prod.example.com:5432/soiltrackers?sslmode=require"
+url = "postgres://app:${PROD_DB_PASSWORD}@prod.example.com:5432/shop?sslmode=require"
 
 [[profiles]]
-label = "Project B local"
-project = "project-b"
+label = "Analytics local"
+project = "analytics"
 type = "local"
-url = "postgres://postgres:postgres@localhost:5432/project_b"
+url = "postgres://postgres:postgres@localhost:5432/analytics"

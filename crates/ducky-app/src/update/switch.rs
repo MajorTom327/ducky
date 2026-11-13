@@ -33,7 +33,7 @@ pub(crate) fn switch_profile(state: &mut AppState, profile_index: usize) -> Vec<
     workspace.switching_profile_index = Some(profile_index);
     state.notice = notice(
         NoticeLevel::Info,
-        format!("Connecting to {}…", profile.label),
+        format!("Connecting to {}…", profile.display_name()),
     );
     vec![Command::Connect {
         profile_index,
@@ -58,7 +58,7 @@ pub(crate) fn switched(
         Err(message) => {
             state.notice = notice(
                 NoticeLevel::Error,
-                format!("Could not connect to {}: {message}", profile.label),
+                format!("Could not connect to {}: {message}", profile.display_name()),
             );
             return Vec::new();
         }
@@ -81,7 +81,7 @@ pub(crate) fn switched(
     }
     state.notice = notice(
         NoticeLevel::Success,
-        format!("Switched to {}", profile.label),
+        format!("Switched to {}", profile.display_name()),
     );
     commands.extend(reload_all_pages(workspace));
     commands

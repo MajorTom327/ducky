@@ -8,7 +8,7 @@ use crate::theme::{Palette, kind_badge};
 pub fn render(frame: &mut Frame, area: Rect, state: &AppState, palette: &Palette) {
     let text = match state.workspace() {
         Some(workspace) => format!(
-            " ducky │ {}{} {} │ {}@{} │ PostgreSQL {} ",
+            " ducky │ {}{}{} │ {}@{} │ PostgreSQL {} ",
             workspace
                 .profile
                 .project
@@ -16,7 +16,10 @@ pub fn render(frame: &mut Frame, area: Rect, state: &AppState, palette: &Palette
                 .map(|project| format!("{project} │ "))
                 .unwrap_or_default(),
             kind_badge(workspace.profile.kind),
-            workspace.profile.label,
+            match workspace.profile.label.is_empty() {
+                true => String::new(),
+                false => format!(" {}", workspace.profile.label),
+            },
             workspace.session.user,
             workspace.session.database,
             workspace.session.server_version,

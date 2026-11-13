@@ -86,27 +86,45 @@ fn no_profiles() {
 }
 
 #[test]
-fn empty_label() {
+fn missing_label_and_project() {
     let text = [profile("A", URL, "local"), profile("  ", URL, "local")].concat();
     let (_dir, result) = load_text(&text);
     assert_eq!(
         result.unwrap_err(),
-        ConfigError::EmptyLabel {
+        ConfigError::MissingLabel {
             profile_position: 2
         }
     );
 }
 
 #[test]
-fn duplicate_label() {
-    let text = [profile("A", URL, "local"), profile(" A ", URL, "prod")].concat();
+fn label_omitted_with_project() {
+    let text = format!("[[profiles]]\nproject = \"shop\"\nurl = \"{URL}\"\ntype = \"prod\"\n");
+    let (_dir, result) = load_text(&text);
+    let config = result.unwrap();
+    assert_eq!(config.profiles[0].label, "");
+    assert_eq!(config.profiles[0].display_name(), "shop prod");
+}
+
+#[test]
+fn label_and_analyticsoth_omitted() {
+    let text = format!("[[profiles]]\nurl = \"{URL}\"\ntype = \"prod\"\n");
     let (_dir, result) = load_text(&text);
     assert_eq!(
         result.unwrap_err(),
-        ConfigError::DuplicateLabel {
-            label: "A".to_owned()
+        ConfigError::MissingLabel {
+            profile_position: 1
         }
     );
+}
+
+#[test]
+fn duplicate_labels_are_allowed() {
+    let text = [profile("A", URL, "local"), profile(" A ", URL, "prod")].concat();
+    let (_dir, result) = load_text(&text);
+    let config = result.unwrap();
+    assert_eq!(config.profiles.len(), 2);
+    assert_eq!(config.profiles[1].label, "A");
 }
 
 #[test]
@@ -144,12 +162,12 @@ fn relative_and_absolute_storage_dirs() {
 #[test]
 fn project_and_tags_are_normalised() {
     let text = format!(
-        "{}project = \"  soiltrackers \"\ntags = [\" EU \", \"readonly\", \"eu\", \"ReadOnly\"]\n",
+        "{}project = \"  shop \"\ntags = [\" EU \", \"readonly\", \"eu\", \"ReadOnly\"]\n",
         profile("A", URL, "prod")
     );
     let (_dir, result) = load_text(&text);
     let config = result.unwrap();
-    assert_eq!(config.profiles[0].project.as_deref(), Some("soiltrackers"));
+    assert_eq!(config.profiles[0].project.as_deref(), Some("shop"));
     assert_eq!(config.profiles[0].tags, ["eu", "readonly"]);
 }
 

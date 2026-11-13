@@ -17,13 +17,13 @@ page_size = 50       # optional, rows per table page, 1–5000
 
 [[profiles]]
 label = "Prod"
-project = "soiltrackers"   # optional, trimmed, blank = none
+project = "shop"   # optional, trimmed, blank = none
 type = "prod"              # local | staging | prod
 tags = ["eu", "readonly"]  # optional, trimmed, lowercased, deduplicated
 url = "postgres://app:${PROD_DB_PASSWORD}@db/app?sslmode=require"
 ```
 
-Labels are unique across the file. An empty tag is rejected with `ConfigError::EmptyTag { label }`.
+`label` is optional when `project` is set; a profile with neither a label nor a project is rejected with `ConfigError::MissingLabel { profile_position }`. Labels may repeat. Errors name a profile by `Profile::display_name()`. An empty tag is rejected with `ConfigError::EmptyTag { label }`.
 
 `${VAR}` is validated at load time and expanded at connect time with `expand_env`.
 

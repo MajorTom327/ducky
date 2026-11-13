@@ -24,20 +24,15 @@ fn profile(label: &str, project: Option<&str>, kind: ProfileKind, tags: &[&str])
 fn grouped_profiles() -> Vec<Profile> {
     vec![
         profile("scratch", None, ProfileKind::Local, &[]),
-        profile("soil-local", Some("soiltrackers"), ProfileKind::Local, &[]),
-        profile("b-local", Some("project-b"), ProfileKind::Local, &[]),
+        profile("shop-local", Some("shop"), ProfileKind::Local, &[]),
+        profile("b-local", Some("analytics"), ProfileKind::Local, &[]),
         profile(
-            "soil-prod",
-            Some("soiltrackers"),
+            "shop-prod",
+            Some("shop"),
             ProfileKind::Prod,
             &["eu", "readonly"],
         ),
-        profile(
-            "soil-staging",
-            Some("soiltrackers"),
-            ProfileKind::Staging,
-            &[],
-        ),
+        profile("shop-staging", Some("shop"), ProfileKind::Staging, &[]),
     ]
 }
 
@@ -71,11 +66,11 @@ fn rows_group_profiles_by_project_in_order_of_first_appearance() {
     assert_eq!(
         profile_rows(&grouped_profiles(), ""),
         vec![
-            project("soiltrackers"),
+            project("shop"),
             ProfileRow::Profile(1),
             ProfileRow::Profile(3),
             ProfileRow::Profile(4),
-            project("project-b"),
+            project("analytics"),
             ProfileRow::Profile(2),
             project("Other"),
             ProfileRow::Profile(0),
@@ -95,16 +90,16 @@ fn rows_without_any_project_have_no_header() {
 fn filter_terms_match_project_label_kind_tag_and_target() {
     let profiles = grouped_profiles();
     assert_eq!(
-        profile_rows(&profiles, "SOIL prod"),
-        vec![project("soiltrackers"), ProfileRow::Profile(3)]
+        profile_rows(&profiles, "SHOP prod"),
+        vec![project("shop"), ProfileRow::Profile(3)]
     );
     assert_eq!(
         profile_rows(&profiles, "readonly eu"),
-        vec![project("soiltrackers"), ProfileRow::Profile(3)]
+        vec![project("shop"), ProfileRow::Profile(3)]
     );
     assert_eq!(
-        profile_rows(&profiles, "project-b local"),
-        vec![project("project-b"), ProfileRow::Profile(2)]
+        profile_rows(&profiles, "analytics local"),
+        vec![project("analytics"), ProfileRow::Profile(2)]
     );
     assert_eq!(
         profile_rows(&profiles, "scratch.example.com:5432"),
@@ -112,9 +107,9 @@ fn filter_terms_match_project_label_kind_tag_and_target() {
     );
     assert_eq!(
         profile_rows(&profiles, "staging"),
-        vec![project("soiltrackers"), ProfileRow::Profile(4)]
+        vec![project("shop"), ProfileRow::Profile(4)]
     );
-    assert!(profile_rows(&profiles, "soil nothing").is_empty());
+    assert!(profile_rows(&profiles, "shop nothing").is_empty());
 }
 
 #[test]
@@ -147,7 +142,7 @@ fn filtering_reselects_the_first_match_or_keeps_a_visible_selection() {
     let mut state = AppState::new(grouped_profiles(), storage());
     send(&mut state, Msg::Profiles(ProfilesMsg::Next));
     assert_eq!(picker_index(&state), 3);
-    type_filter(&mut state, "soil");
+    type_filter(&mut state, "shop");
     assert_eq!(picker_index(&state), 3);
     type_filter(&mut state, " stag");
     assert_eq!(picker_index(&state), 4);

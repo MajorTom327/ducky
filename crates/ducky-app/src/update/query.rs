@@ -137,7 +137,7 @@ pub(crate) fn run(state: &mut AppState, tab_id: TabId, sql: String) -> Vec<Comma
     let Some(workspace) = workspace_mut(&mut state.screen) else {
         return Vec::new();
     };
-    let profile_label = workspace.profile.label.clone();
+    let profile_label = workspace.profile.display_name();
     let Some(query) = workspace.query_mut(tab_id) else {
         return Vec::new();
     };

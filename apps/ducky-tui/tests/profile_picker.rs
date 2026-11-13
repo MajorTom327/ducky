@@ -27,24 +27,24 @@ fn profile(label: &str, project: Option<&str>, kind: ProfileKind, url: &str) -> 
 }
 
 fn profiles() -> Vec<Profile> {
-    let mut soil_prod = profile(
-        "Soil prod",
-        Some("soiltrackers"),
+    let mut shop_prod = profile(
+        "Shop prod",
+        Some("shop"),
         ProfileKind::Prod,
-        "postgres://app:${PW}@prod.example.com:5432/soil?sslmode=require",
+        "postgres://app:${PW}@prod.example.com:5432/shop?sslmode=require",
     );
-    soil_prod.tags = vec!["eu".to_owned(), "readonly".to_owned()];
+    shop_prod.tags = vec!["eu".to_owned(), "readonly".to_owned()];
     vec![
         profile(
-            "Soil local",
-            Some("soiltrackers"),
+            "Shop local",
+            Some("shop"),
             ProfileKind::Local,
-            "postgres://app@localhost:5440/soil",
+            "postgres://app@localhost:5440/shop",
         ),
-        soil_prod,
+        shop_prod,
         profile(
             "B local",
-            Some("project-b"),
+            Some("analytics"),
             ProfileKind::Local,
             "postgres://b@localhost/b",
         ),
@@ -71,7 +71,7 @@ fn workspace_state() -> AppState {
         profiles()[1].clone(),
         Connection {
             session: SessionInfo {
-                database: "soil".to_owned(),
+                database: "shop".to_owned(),
                 user: "app".to_owned(),
                 server_version: "18.1".to_owned(),
             },
@@ -158,12 +158,12 @@ fn start_screen_groups_profiles_with_badges_tags_targets_and_count() {
     for expected_text in [
         "Connect",
         "type to filter",
-        "soiltrackers 2",
-        "project-b 1",
+        "shop 2",
+        "analytics 1",
         "Other 1",
         "#eu #readonly",
-        "prod.example.com:5432/soil",
-        "localhost:5440/soil",
+        "prod.example.com:5432/shop",
+        "localhost:5440/shop",
         "4 of 4",
     ] {
         assert!(
@@ -171,35 +171,35 @@ fn start_screen_groups_profiles_with_badges_tags_targets_and_count() {
             "{expected_text}\n{screen_text}"
         );
     }
-    let (prod_row_index, prod_row) = row_containing(&screen_rows, "Soil prod");
-    assert!(prod_row.contains("PROD    Soil prod"), "{prod_row}");
+    let (prod_row_index, prod_row) = row_containing(&screen_rows, "Shop prod");
+    assert!(prod_row.contains("PROD    Shop prod"), "{prod_row}");
     assert!(!prod_row.contains('●'), "{prod_row}");
     let badge_column = column_of(prod_row, "PROD");
     assert_eq!(
         terminal.backend().buffer()[(badge_column, prod_row_index)].fg,
         palette(Some(ProfileKind::Prod)).accent
     );
-    let (local_row_index, local_row) = row_containing(&screen_rows, "Soil local");
+    let (local_row_index, local_row) = row_containing(&screen_rows, "Shop local");
     assert_eq!(
-        terminal.backend().buffer()[(column_of(local_row, "Soil local"), local_row_index)].bg,
+        terminal.backend().buffer()[(column_of(local_row, "Shop local"), local_row_index)].bg,
         palette(Some(ProfileKind::Local)).accent
     );
-    let soiltrackers_row = row_containing(&screen_rows, "soiltrackers 2").0;
-    let project_b_row = row_containing(&screen_rows, "project-b 1").0;
+    let shop_row = row_containing(&screen_rows, "shop 2").0;
+    let analytics_row = row_containing(&screen_rows, "analytics 1").0;
     let other_row = row_containing(&screen_rows, "Other 1").0;
-    assert!(soiltrackers_row < prod_row_index && prod_row_index < project_b_row);
-    assert!(project_b_row < other_row);
+    assert!(shop_row < prod_row_index && prod_row_index < analytics_row);
+    assert!(analytics_row < other_row);
 }
 
 #[test]
 fn filtering_narrows_rows_and_count() {
     let mut state = AppState::new(profiles(), storage());
-    type_filter(&mut state, "soil eu");
+    type_filter(&mut state, "shop eu");
     let screen_text = rows(&render(&state)).join("\n");
     assert!(screen_text.contains("1 of 4"), "{screen_text}");
-    assert!(screen_text.contains("Soil prod"), "{screen_text}");
-    assert!(!screen_text.contains("Soil local"), "{screen_text}");
-    assert!(!screen_text.contains("project-b"), "{screen_text}");
+    assert!(screen_text.contains("Shop prod"), "{screen_text}");
+    assert!(!screen_text.contains("Shop local"), "{screen_text}");
+    assert!(!screen_text.contains("analytics"), "{screen_text}");
     type_filter(&mut state, "zzz");
     let screen_text = rows(&render(&state)).join("\n");
     assert!(screen_text.contains("No matching profile"), "{screen_text}");
@@ -213,9 +213,9 @@ fn switch_modal_marks_the_connected_profile() {
     let screen_rows = rows(&render(&state));
     let (title_row_index, _) = row_containing(&screen_rows, "Switch profile");
     let popup_rows = &screen_rows[usize::from(title_row_index)..];
-    let (_, prod_row) = row_containing(popup_rows, "Soil prod");
+    let (_, prod_row) = row_containing(popup_rows, "Shop prod");
     assert!(prod_row.contains("● PROD"), "{prod_row}");
-    let (_, local_row) = row_containing(popup_rows, "Soil local");
+    let (_, local_row) = row_containing(popup_rows, "Shop local");
     assert!(!local_row.contains('●'), "{local_row}");
 }
 
@@ -224,7 +224,7 @@ fn header_shows_the_project_of_the_connected_profile() {
     let state = workspace_state();
     let header = rows(&render(&state)).remove(0);
     assert!(
-        header.contains("ducky │ soiltrackers │ [PROD] Soil prod │ app@soil"),
+        header.contains("ducky │ shop │ [PROD] Shop prod │ app@shop"),
         "{header}"
     );
 }
@@ -360,4 +360,33 @@ fn space_p_opens_the_profile_picker() {
     let screen_text = rows(&render(&state)).join("\n");
     assert!(screen_text.contains("Switch profile"), "{screen_text}");
     assert!(screen_text.contains("type to filter"), "{screen_text}");
+}
+
+fn unlabelled_prod_state() -> AppState {
+    let mut state = workspace_state();
+    state.profiles[1].label = String::new();
+    if let Screen::Workspace(workspace) = &mut state.screen {
+        workspace.profile.label = String::new();
+    }
+    state
+}
+
+#[test]
+fn header_keeps_the_badge_when_the_label_is_empty() {
+    let header = rows(&render(&unlabelled_prod_state())).remove(0);
+    assert!(
+        header.contains("ducky │ shop │ [PROD] │ app@shop"),
+        "{header}"
+    );
+}
+
+#[test]
+fn picker_row_without_label_shows_badge_and_target() {
+    let mut profiles_without_label = profiles();
+    profiles_without_label[1].label = String::new();
+    let state = AppState::new(profiles_without_label, storage());
+    let screen_rows = rows(&render(&state));
+    let (_, prod_row) = row_containing(&screen_rows, "prod.example.com:5432/shop");
+    assert!(prod_row.contains("PROD"), "{prod_row}");
+    assert!(!prod_row.contains("Shop prod"), "{prod_row}");
 }

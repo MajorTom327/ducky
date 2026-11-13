@@ -75,7 +75,7 @@ fn confirmation_message(workspace: &Workspace, sql: &str) -> String {
     format!(
         "Run {} statement(s) on {kind_word} · {} ({})?",
         split_statements(sql).len(),
-        workspace.profile.label,
+        workspace.profile.display_name(),
         workspace.profile.target()
     )
 }

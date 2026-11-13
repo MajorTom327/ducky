@@ -1,4 +1,3 @@
-use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 
 use ducky_core::{DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE, Profile, ProfileKind, StoragePaths};
@@ -28,6 +27,7 @@ struct RawConfig {
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct RawProfile {
+    #[serde(default)]
     label: String,
     url: String,
     #[serde(rename = "type")]
@@ -69,31 +69,29 @@ pub fn load(config_path: &Path) -> Result<Config, ConfigError> {
             path: config_path.to_path_buf(),
         });
     }
-    let mut seen_labels = HashSet::new();
     let mut profiles = Vec::with_capacity(raw_config.profiles.len());
     for (index, raw_profile) in raw_config.profiles.into_iter().enumerate() {
         let label = raw_profile.label.trim().to_owned();
-        if label.is_empty() {
-            return Err(ConfigError::EmptyLabel {
-                profile_position: index + 1,
-            });
-        }
-        if !seen_labels.insert(label.clone()) {
-            return Err(ConfigError::DuplicateLabel { label });
-        }
-        validate_url(&label, &raw_profile.url)?;
-        let tags = normalize_tags(&label, raw_profile.tags)?;
         let project = raw_profile
             .project
             .map(|raw_project| raw_project.trim().to_owned())
             .filter(|trimmed_project| !trimmed_project.is_empty());
-        profiles.push(Profile {
+        if label.is_empty() && project.is_none() {
+            return Err(ConfigError::MissingLabel {
+                profile_position: index + 1,
+            });
+        }
+        let mut profile = Profile {
             label,
             url: raw_profile.url,
             kind: raw_profile.kind.into(),
             project,
-            tags,
-        });
+            tags: Vec::new(),
+        };
+        let display_name = profile.display_name();
+        validate_url(&display_name, &profile.url)?;
+        profile.tags = normalize_tags(&display_name, raw_profile.tags)?;
+        profiles.push(profile);
     }
     let page_size = raw_config.page_size.unwrap_or(DEFAULT_PAGE_SIZE);
     if !(1..=MAX_PAGE_SIZE).contains(&page_size) {

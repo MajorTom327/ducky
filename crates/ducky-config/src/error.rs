@@ -13,10 +13,8 @@ pub enum ConfigError {
     Parse { path: PathBuf, reason: String },
     #[error("{} defines no profiles", path.display())]
     NoProfiles { path: PathBuf },
-    #[error("profile #{profile_position} has an empty label")]
-    EmptyLabel { profile_position: usize },
-    #[error("profile label `{label}` is used more than once")]
-    DuplicateLabel { label: String },
+    #[error("profile #{profile_position} needs a label or a project")]
+    MissingLabel { profile_position: usize },
     #[error("profile `{label}` has an invalid url: {reason}")]
     InvalidUrl { label: String, reason: String },
     #[error("profile `{label}` has an empty tag")]

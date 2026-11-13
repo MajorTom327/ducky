@@ -13,6 +13,7 @@ use ducky_core::Profile;
 use ducky_runtime::Runtime;
 use ducky_tui::cli::Args;
 use ducky_tui::event_loop;
+use ducky_tui::profile_lookup::{ProfileLookupError, resolve_profile};
 use ducky_tui::tui_state::TuiState;
 
 const EXAMPLE_CONFIG: &str = include_str!("../../../ducky.example.toml");
@@ -29,10 +30,21 @@ async fn main() -> anyhow::Result<ExitCode> {
     };
     let startup_profile_index = match &args.profile {
         None => None,
-        Some(requested_profile) => match find_profile(&config.profiles, requested_profile) {
-            Some(profile_index) => Some(profile_index),
-            None => {
+        Some(requested_profile) => match resolve_profile(&config.profiles, requested_profile) {
+            Ok(profile_index) => Some(profile_index),
+            Err(ProfileLookupError::NotFound) => {
                 print_unknown_profile(requested_profile, &config);
+                return Ok(ExitCode::from(2));
+            }
+            Err(ProfileLookupError::Ambiguous {
+                matching_profile_indexes,
+            }) => {
+                eprintln!(
+                    "ducky: `{requested_profile}` matches several profiles in {} (use PROJECT/LABEL or PROJECT/TYPE)",
+                    config.source.display()
+                );
+                eprintln!("Matching profiles:");
+                print_profile_list(&config.profiles, &matching_profile_indexes);
                 return Ok(ExitCode::from(2));
             }
         },
@@ -95,37 +107,37 @@ fn print_config_error(error: &ConfigError) {
     eprintln!("\nExample configuration (ducky.example.toml):\n\n{EXAMPLE_CONFIG}");
 }
 
-fn find_profile(profiles: &[Profile], requested_profile: &str) -> Option<usize> {
-    profiles
-        .iter()
-        .position(|profile| profile.label == requested_profile)
-        .or_else(|| {
-            let (project_name, label) = requested_profile.split_once('/')?;
-            profiles.iter().position(|profile| {
-                profile.label == label && profile.project.as_deref() == Some(project_name)
-            })
-        })
-}
-
 fn print_unknown_profile(requested_profile: &str, config: &Config) {
     eprintln!(
-        "ducky: no profile `{requested_profile}` in {} (use LABEL or PROJECT/LABEL)",
+        "ducky: no profile `{requested_profile}` in {} (use LABEL, PROJECT/LABEL or PROJECT/TYPE)",
         config.source.display()
     );
     eprintln!("Available profiles:");
-    let rows = profile_rows(&config.profiles, "");
+    let all_profile_indexes: Vec<usize> = (0..config.profiles.len()).collect();
+    print_profile_list(&config.profiles, &all_profile_indexes);
+}
+
+fn print_profile_list(profiles: &[Profile], listed_profile_indexes: &[usize]) {
+    let rows = profile_rows(profiles, "");
     let has_project_headers = rows.iter().any(|row| matches!(row, ProfileRow::Project(_)));
+    let mut pending_project_header = None;
     for row in rows {
         match row {
-            ProfileRow::Project(project_name) => eprintln!("  {project_name}"),
+            ProfileRow::Project(project_name) => pending_project_header = Some(project_name),
             ProfileRow::Profile(profile_index) => {
-                let Some(profile) = config.profiles.get(profile_index) else {
+                if !listed_profile_indexes.contains(&profile_index) {
+                    continue;
+                }
+                let Some(profile) = profiles.get(profile_index) else {
                     continue;
                 };
+                if let Some(project_name) = pending_project_header.take() {
+                    eprintln!("  {project_name}");
+                }
                 let indent = if has_project_headers { "    " } else { "  " };
                 eprintln!(
                     "{indent}{} ({}, {})",
-                    profile.label,
+                    profile.display_name(),
                     profile_kind_name(profile.kind),
                     profile.target()
                 );
