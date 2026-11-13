@@ -76,6 +76,7 @@ pub fn relation(name: &str, kind: RelationKind) -> Relation {
         kind,
         estimated_row_count: Some(10),
         columns: vec![column("id"), column("name")],
+        foreign_keys: Vec::new(),
     }
 }
 

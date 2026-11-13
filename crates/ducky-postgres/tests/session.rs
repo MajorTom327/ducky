@@ -144,6 +144,51 @@ async fn catalog_lists_tables_views_and_columns() {
 
 #[tokio::test]
 #[ignore]
+async fn catalog_lists_foreign_key_links_in_key_order() {
+    let schema = TestSchema::create(&[
+        "CREATE TABLE {schema}.customers (id serial PRIMARY KEY, email text)",
+        "CREATE TABLE {schema}.orders (id serial PRIMARY KEY, customer_id integer REFERENCES {schema}.customers (id))",
+        "CREATE TABLE {schema}.slots (day date, position integer, PRIMARY KEY (day, position))",
+        "CREATE TABLE {schema}.bookings (id serial PRIMARY KEY, slot_position integer, slot_day date, CONSTRAINT bookings_slot_fkey FOREIGN KEY (slot_position, slot_day) REFERENCES {schema}.slots (position, day))",
+    ])
+    .await;
+    let catalog = schema.session.load_catalog().await.expect("catalog");
+    let orders = catalog
+        .relation(&schema.relation("orders"))
+        .expect("orders listed");
+    assert_eq!(orders.foreign_keys.len(), 1);
+    let customer_link = &orders.foreign_keys[0];
+    assert_eq!(customer_link.columns, ["customer_id"]);
+    assert_eq!(customer_link.referenced, schema.relation("customers"));
+    assert_eq!(customer_link.referenced_columns, ["id"]);
+    let bookings = catalog
+        .relation(&schema.relation("bookings"))
+        .expect("bookings listed");
+    assert_eq!(bookings.foreign_keys.len(), 1);
+    assert_eq!(bookings.foreign_keys[0].name, "bookings_slot_fkey");
+    assert_eq!(
+        bookings.foreign_keys[0].columns,
+        ["slot_position", "slot_day"]
+    );
+    assert_eq!(
+        bookings.foreign_keys[0].referenced_columns,
+        ["position", "day"]
+    );
+    let referencing_customers = catalog.referencing(&schema.relation("customers"));
+    assert_eq!(referencing_customers.len(), 1);
+    assert_eq!(referencing_customers[0].0, schema.relation("orders"));
+    assert!(
+        catalog
+            .relation(&schema.relation("customers"))
+            .expect("customers listed")
+            .foreign_keys
+            .is_empty()
+    );
+    schema.drop_schema().await;
+}
+
+#[tokio::test]
+#[ignore]
 async fn details_return_indexes_foreign_keys_and_view_definition() {
     let schema = TestSchema::create(&[
         "CREATE TABLE {schema}.parents (id serial PRIMARY KEY, label text)",

@@ -4,7 +4,7 @@ use crate::state::{
     AppState, Confirm, ConfirmKind, JobState, Modal, NoticeLevel, PendingSave, Prompt, PromptKind,
 };
 use crate::update::table::apply_filter;
-use crate::update::{notice, palette, parameters, step_index, workspace_mut};
+use crate::update::{notice, palette, parameters, references, step_index, workspace_mut};
 
 pub(crate) fn update(state: &mut AppState, msg: ModalMsg) -> Vec<Command> {
     match msg {
@@ -51,6 +51,10 @@ pub(crate) fn update(state: &mut AppState, msg: ModalMsg) -> Vec<Command> {
             }
             Some(Modal::Palette(command_palette)) => palette::submit(state, &command_palette),
             Some(Modal::Parameters(form)) => parameters::submit(state, form),
+            Some(Modal::ReferencePicker {
+                links,
+                selected_link_index,
+            }) => references::submit_picker(state, links, selected_link_index),
             Some(Modal::RowDetail(_) | Modal::Help) | None => Vec::new(),
         },
         ModalMsg::Cancel => {
@@ -100,6 +104,13 @@ pub(crate) fn update(state: &mut AppState, msg: ModalMsg) -> Vec<Command> {
                         step_index(*selected_schema_index, schema_count, is_forward);
                 }
                 Some(Modal::Parameters(form)) => parameters::step(form, is_forward),
+                Some(Modal::ReferencePicker {
+                    links,
+                    selected_link_index,
+                }) => {
+                    *selected_link_index =
+                        step_index(*selected_link_index, links.len(), is_forward);
+                }
                 Some(Modal::RowDetail(row_detail)) => {
                     row_detail.selected_field_index = step_index(
                         row_detail.selected_field_index,

@@ -20,6 +20,7 @@ const COLUMN_GAP: &str = "  ";
 const HEADER_ROW_COUNT: usize = 2;
 const GUTTER_HEADER: &str = "#";
 const NULL_CELL: Cell = None;
+const LINK_SUFFIX: &str = " →";
 
 #[derive(Debug, Clone, Copy)]
 pub struct GridOptions<'a> {
@@ -27,6 +28,7 @@ pub struct GridOptions<'a> {
     pub sort: Option<&'a Sort>,
     pub first_row_number: usize,
     pub is_focused: bool,
+    pub linked_columns: &'a [String],
 }
 
 pub fn render_grid(
@@ -56,7 +58,10 @@ pub fn render_grid(
         .columns
         .iter()
         .enumerate()
-        .map(|(column_index, name)| grid_column(name, column_index, options.sort, &visible_rows))
+        .map(|(column_index, name)| {
+            let is_linked = options.linked_columns.contains(name);
+            grid_column(name, column_index, options.sort, is_linked, &visible_rows)
+        })
         .collect();
     let last_row_number =
         options.first_row_number + viewport.first_row_index + visible_rows.len().saturating_sub(1);
@@ -130,11 +135,23 @@ fn header_line(columns: &[GridColumn], gutter_width: usize, palette: &Palette) -
         palette.muted(),
     )];
     for column in columns {
+        let suffix = if column.is_linked { LINK_SUFFIX } else { "" };
+        let suffix_width = suffix.chars().count();
+        let label = truncate(&column.header, column.width.saturating_sub(suffix_width));
+        let padding = " ".repeat(
+            column
+                .width
+                .saturating_sub(label.chars().count() + suffix_width),
+        );
+        let (leading_padding, trailing_padding) = match column.is_numeric {
+            true => (padding, String::new()),
+            false => (String::new(), padding),
+        };
         spans.push(Span::raw(COLUMN_GAP));
-        spans.push(Span::styled(
-            fit(&column.header, column.width, column.is_numeric),
-            header_style,
-        ));
+        spans.push(Span::raw(leading_padding));
+        spans.push(Span::styled(label, header_style));
+        spans.push(Span::styled(suffix, palette.muted()));
+        spans.push(Span::raw(trailing_padding));
     }
     Line::from(spans)
 }
@@ -189,15 +206,19 @@ fn cell_text(cell: &Cell) -> String {
     }
 }
 
-fn fit(text: &str, width: usize, is_right_aligned: bool) -> String {
-    let fitted = match text.chars().count() > width {
+fn truncate(text: &str, width: usize) -> String {
+    match text.chars().count() > width {
         true => {
             let mut truncated: String = text.chars().take(width.saturating_sub(1)).collect();
             truncated.push('…');
             truncated
         }
         false => text.to_owned(),
-    };
+    }
+}
+
+fn fit(text: &str, width: usize, is_right_aligned: bool) -> String {
+    let fitted = truncate(text, width);
     match is_right_aligned {
         true => format!("{fitted:>width$}"),
         false => format!("{fitted:<width$}"),

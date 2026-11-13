@@ -102,6 +102,14 @@ fn activate_or_push(workspace: &mut Workspace, content: TabContent) {
     workspace.focus = Focus::Main;
 }
 
+pub(crate) fn reveal_schema(workspace: &mut Workspace, schema_name: &str) {
+    if workspace.schema_name != schema_name {
+        workspace.schema_name = schema_name.to_owned();
+        workspace.sidebar.selected_item_index = 0;
+        workspace.sidebar.filter.clear();
+    }
+}
+
 pub(crate) fn open_relation(
     workspace: &mut Workspace,
     relation: RelationRef,

@@ -57,6 +57,7 @@ fn relation(name: &str, kind: RelationKind) -> Relation {
             default_expression: None,
             is_primary_key: true,
         }],
+        foreign_keys: Vec::new(),
     }
 }
 
@@ -244,6 +245,7 @@ fn render_result_set(
                     sort: None,
                     first_row_number: 1,
                     is_focused: true,
+                    linked_columns: &[],
                 },
                 &grid_palette,
             )

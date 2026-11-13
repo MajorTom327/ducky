@@ -4,6 +4,7 @@ use ducky_core::{Catalog, Column, Relation, RelationKind, Schema};
 use tokio_postgres::{Client, Row};
 
 use crate::error::{PgError, query_error};
+use crate::foreign_keys::{FOREIGN_KEY_LINKS_SQL, links_from_rows};
 use crate::rows::column_value;
 
 const RELATIONS_SQL: &str = "
@@ -38,9 +39,10 @@ WHERE a.attnum > 0
 ORDER BY n.nspname, c.relname, a.attnum";
 
 pub(crate) async fn load_catalog(client: &Client) -> Result<Catalog, PgError> {
-    let (relation_rows, column_rows) = tokio::try_join!(
+    let (relation_rows, column_rows, foreign_key_rows) = tokio::try_join!(
         client.query(RELATIONS_SQL, &[]),
-        client.query(COLUMNS_SQL, &[])
+        client.query(COLUMNS_SQL, &[]),
+        client.query(FOREIGN_KEY_LINKS_SQL, &[])
     )
     .map_err(query_error)?;
     let mut schemas: Vec<Schema> = Vec::new();
@@ -75,6 +77,15 @@ pub(crate) async fn load_catalog(client: &Client) -> Result<Catalog, PgError> {
                 .push(column_from_row(row)?);
         }
     }
+    for owned_link in links_from_rows(&foreign_key_rows)? {
+        if let Some(&(schema_index, relation_index)) =
+            relation_positions.get(&(owned_link.owner.schema, owned_link.owner.name))
+        {
+            schemas[schema_index].relations[relation_index]
+                .foreign_keys
+                .push(owned_link.link);
+        }
+    }
     Ok(Catalog { schemas })
 }
 
@@ -97,6 +108,7 @@ fn relation_from_row(row: &Row) -> Result<Option<Relation>, PgError> {
             .filter(|tuples| *tuples >= 0.0)
             .map(|tuples| tuples as i64),
         columns: Vec::new(),
+        foreign_keys: Vec::new(),
     }))
 }
 

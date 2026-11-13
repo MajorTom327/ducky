@@ -3,6 +3,7 @@ mod catalog;
 mod connect;
 mod details;
 mod error;
+mod foreign_keys;
 mod page_columns;
 mod rows;
 mod script;

@@ -1,4 +1,4 @@
-use ducky_core::Cell;
+use ducky_core::{Cell, ForeignKeyLink, RelationRef};
 use tui_input::Input;
 
 use crate::state::palette::CommandPalette;
@@ -9,10 +9,16 @@ pub enum Modal {
     Prompt(Prompt),
     Confirm(Confirm),
     RowDetail(RowDetail),
-    SchemaPicker { selected_schema_index: usize },
+    SchemaPicker {
+        selected_schema_index: usize,
+    },
     Help,
     Palette(CommandPalette),
     Parameters(ParameterForm),
+    ReferencePicker {
+        links: Vec<(RelationRef, ForeignKeyLink)>,
+        selected_link_index: usize,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

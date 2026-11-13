@@ -54,6 +54,8 @@ Quit with `Ctrl+q` anywhere, `q` outside the editor, the `Space q q` sequence, o
 
 To run the same query on another database, pick `Switch to <profile>` in go to anything: the workspace reconnects to that profile and keeps every tab, query text and result; the catalog and table tabs reload, and the results title shows the profile each script ran on (` · on Dev local `). Switching waits for running scripts, dumps and restores to finish; a failed connection keeps the current profile.
 
+Foreign keys are navigable from table data (foreign-key columns end with ` →` in the header). On a foreign-key cell, `gd` (go to referenced row) opens the referenced table in a new tab filtered on that key (`where "id" = '42'`). `gr` (find referencing rows) opens, in a new tab, the rows of another table whose foreign key points at the current row; when several foreign keys reference the table, a picker lists them (`orders.customer_id → customers.id`). A tab with the same table and filter is reused, and the sidebar follows the schema of the opened table.
+
 When browsing a table, PostGIS `geometry` and `geography` columns are shown as GeoJSON (`{"type":"Point","coordinates":[2.35,48.85]}`) in the grid, the row detail and copied values. Query tabs show exactly what your SQL returns; use `ST_AsGeoJSON` or `ST_AsText` there. Long values use the free width of the grid before being cut with `…`.
 
 ## Query parameters

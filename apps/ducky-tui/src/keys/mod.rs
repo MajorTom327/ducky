@@ -11,11 +11,12 @@ pub mod table;
 
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use ducky_app::{
-    AppState, Focus, Msg, PaneDirection, QueryMsg, QueryPane, Screen, TabContent, TabId, TabsMsg,
-    Workspace,
+    AppState, Focus, Msg, PaneDirection, QueryMsg, QueryPane, Screen, TabContent, TabId, TableTab,
+    TabsMsg, Workspace,
 };
 use edtui::EditorMode;
 
+use crate::keys::sequence::GridPane;
 use crate::tui_state::TuiState;
 
 pub fn handle_key(state: &AppState, tui: &mut TuiState, key: KeyEvent) -> Vec<Msg> {
@@ -57,6 +58,17 @@ pub fn focused_editor_tab(workspace: &Workspace) -> Option<TabId> {
     }
 }
 
+fn focused_grid_pane(workspace: &Workspace) -> Option<GridPane> {
+    if workspace.focus != Focus::Main {
+        return None;
+    }
+    match &workspace.active_tab()?.content {
+        TabContent::Table(table) if table.tab == TableTab::Data => Some(GridPane::TableData),
+        TabContent::Query(query) if query.pane == QueryPane::Results => Some(GridPane::Results),
+        _ => None,
+    }
+}
+
 fn route_key(state: &AppState, tui: &mut TuiState, key: KeyEvent) -> Vec<Msg> {
     if is_ctrl(key, 'q') {
         return vec![Msg::Quit];
@@ -87,12 +99,12 @@ fn route_key(state: &AppState, tui: &mut TuiState, key: KeyEvent) -> Vec<Msg> {
     }
     if let Some(tab_id) = editor_tab_id {
         let is_normal_mode = tui.editor(tab_id).state.mode == EditorMode::Normal;
-        if is_normal_mode && let Some(sequence_messages) = sequence::handle(tui, key) {
+        if is_normal_mode && let Some(sequence_messages) = sequence::handle(tui, key, None) {
             return sequence_messages;
         }
         return query::handle_editor(workspace, tui, key);
     }
-    if let Some(sequence_messages) = sequence::handle(tui, key) {
+    if let Some(sequence_messages) = sequence::handle(tui, key, focused_grid_pane(workspace)) {
         return sequence_messages;
     }
     if let Some(navigation_messages) = navigation_messages(key) {

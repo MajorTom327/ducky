@@ -122,6 +122,7 @@ fn render_report(
                 sort: None,
                 first_row_number: 1,
                 is_focused,
+                linked_columns: &[],
             },
             palette,
         ),

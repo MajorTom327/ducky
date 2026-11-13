@@ -17,5 +17,9 @@ pub fn quote_identifier_if_needed(identifier: &str) -> String {
     }
 }
 
+pub fn quote_literal(value: &str) -> String {
+    format!("'{}'", value.replace('\'', "''"))
+}
+
 #[cfg(test)]
 mod tests;

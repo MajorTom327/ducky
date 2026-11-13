@@ -123,11 +123,25 @@ fn render_data(
     ) else {
         return;
     };
+    let linked_columns: Vec<String> = context
+        .workspace
+        .catalog
+        .ready()
+        .and_then(|catalog| catalog.relation(&table.relation))
+        .map(|relation| {
+            relation
+                .foreign_keys
+                .iter()
+                .flat_map(|link| link.columns.iter().cloned())
+                .collect()
+        })
+        .unwrap_or_default();
     let options = GridOptions {
         cursor: table.cursor,
         sort: table.request.sort.as_ref(),
         first_row_number: first_row_number(table),
         is_focused: context.workspace.focus == Focus::Main,
+        linked_columns: &linked_columns,
     };
     render_grid(
         frame,

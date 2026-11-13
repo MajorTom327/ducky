@@ -36,6 +36,7 @@ fn table(name: &str, columns: Vec<Column>) -> Relation {
         kind: RelationKind::Table,
         estimated_row_count: None,
         columns,
+        foreign_keys: Vec::new(),
     }
 }
 

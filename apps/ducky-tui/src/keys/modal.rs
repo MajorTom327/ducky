@@ -12,7 +12,7 @@ pub fn handle(modal: &Modal, tui: &mut TuiState, key: KeyEvent) -> Vec<Msg> {
         Modal::Prompt(_) => prompt_message(key),
         Modal::Confirm(_) => confirm_message(key),
         Modal::RowDetail(_) => row_detail_message(key),
-        Modal::SchemaPicker { .. } => schema_picker_message(key),
+        Modal::SchemaPicker { .. } | Modal::ReferencePicker { .. } => picker_message(key),
         Modal::Help => help_message(tui, key),
         Modal::Palette(_) => palette_message(key),
         Modal::Parameters(_) => parameters_message(key),
@@ -86,7 +86,7 @@ fn row_detail_message(key: KeyEvent) -> Option<ModalMsg> {
     }
 }
 
-fn schema_picker_message(key: KeyEvent) -> Option<ModalMsg> {
+fn picker_message(key: KeyEvent) -> Option<ModalMsg> {
     match key.code {
         KeyCode::Down => Some(ModalMsg::Next),
         KeyCode::Up => Some(ModalMsg::Previous),

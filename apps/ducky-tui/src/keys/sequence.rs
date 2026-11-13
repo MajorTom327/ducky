@@ -1,5 +1,5 @@
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
-use ducky_app::{ModalMsg, Msg, TabsMsg};
+use ducky_app::{GridMove, ModalMsg, Msg, QueryMsg, TableMsg, TabsMsg};
 use tui_input::InputRequest;
 
 use crate::keys::help::KeyHint;
@@ -12,9 +12,16 @@ pub enum KeyPrefix {
     Leader,
     LeaderBuffer,
     LeaderQuit,
+    Go,
 }
 
-pub fn handle(tui: &mut TuiState, key: KeyEvent) -> Option<Vec<Msg>> {
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum GridPane {
+    TableData,
+    Results,
+}
+
+pub fn handle(tui: &mut TuiState, key: KeyEvent, grid_pane: Option<GridPane>) -> Option<Vec<Msg>> {
     let character = match key.code {
         KeyCode::Char(character)
             if !key
@@ -30,6 +37,7 @@ pub fn handle(tui: &mut TuiState, key: KeyEvent) -> Option<Vec<Msg>> {
             '[' => Some(KeyPrefix::Previous),
             ']' => Some(KeyPrefix::Next),
             ' ' => Some(KeyPrefix::Leader),
+            'g' if grid_pane.is_some() => Some(KeyPrefix::Go),
             ':' => {
                 return Some(vec![
                     Msg::OpenPalette,
@@ -53,6 +61,17 @@ pub fn handle(tui: &mut TuiState, key: KeyEvent) -> Option<Vec<Msg>> {
         }
         (KeyPrefix::LeaderBuffer, Some('d')) => Msg::Tabs(TabsMsg::Close),
         (KeyPrefix::LeaderQuit, Some('q')) => Msg::Quit,
+        (KeyPrefix::Go, Some('g')) => match grid_pane {
+            Some(GridPane::TableData) => Msg::Table(TableMsg::Move(GridMove::FirstRow)),
+            Some(GridPane::Results) => Msg::Query(QueryMsg::Move(GridMove::FirstRow)),
+            None => return Some(Vec::new()),
+        },
+        (KeyPrefix::Go, Some('d')) if grid_pane == Some(GridPane::TableData) => {
+            Msg::Table(TableMsg::GoToReferenced)
+        }
+        (KeyPrefix::Go, Some('r')) if grid_pane == Some(GridPane::TableData) => {
+            Msg::Table(TableMsg::FindReferencing)
+        }
         _ => return Some(Vec::new()),
     };
     Some(vec![message])
@@ -70,5 +89,11 @@ pub fn pending_hints(prefix: KeyPrefix) -> &'static [KeyHint] {
         ],
         KeyPrefix::LeaderBuffer => &[("Space b", "…"), ("d", "close tab"), ("Esc", "cancel")],
         KeyPrefix::LeaderQuit => &[("Space q", "…"), ("q", "quit"), ("Esc", "cancel")],
+        KeyPrefix::Go => &[
+            ("g", "…"),
+            ("g", "first row"),
+            ("d", "referenced row"),
+            ("r", "referencing rows"),
+        ],
     }
 }

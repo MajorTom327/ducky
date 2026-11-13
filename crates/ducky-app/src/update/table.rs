@@ -8,7 +8,7 @@ use crate::state::{
     Workspace,
 };
 use crate::update::grid::{cell_text, clamp_cursor, move_cursor};
-use crate::update::{notice, workspace_mut};
+use crate::update::{notice, references, workspace_mut};
 
 pub(crate) fn update(state: &mut AppState, msg: TableMsg) -> Vec<Command> {
     let Some(workspace) = workspace_mut(&mut state.screen) else {
@@ -18,6 +18,8 @@ pub(crate) fn update(state: &mut AppState, msg: TableMsg) -> Vec<Command> {
         return Vec::new();
     };
     match msg {
+        TableMsg::GoToReferenced => references::go_to_referenced(state),
+        TableMsg::FindReferencing => references::find_referencing(state),
         TableMsg::ToggleTab => toggle_tab(table),
         TableMsg::Move(grid_move) => {
             if let Some(page) = table.page.ready() {

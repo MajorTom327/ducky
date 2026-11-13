@@ -1,5 +1,6 @@
 use sqlparser::tokenizer::Token;
 
+use crate::identifier::quote_literal;
 use crate::tokens::{SqlToken, tokenize};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -33,19 +34,13 @@ pub fn bind_parameters(sql: &str, values: &[(String, ParameterValue)]) -> String
         };
         bound_sql.push_str(&sql[copied_until..occurrence.start]);
         match value {
-            ParameterValue::Text(text) => push_string_literal(&mut bound_sql, text),
+            ParameterValue::Text(text) => bound_sql.push_str(&quote_literal(text)),
             ParameterValue::Raw(raw_sql) => bound_sql.push_str(raw_sql),
         }
         copied_until = occurrence.end;
     }
     bound_sql.push_str(&sql[copied_until..]);
     bound_sql
-}
-
-fn push_string_literal(bound_sql: &mut String, text: &str) {
-    bound_sql.push('\'');
-    bound_sql.push_str(&text.replace('\'', "''"));
-    bound_sql.push('\'');
 }
 
 fn parameter_occurrences(sql: &str) -> Vec<ParameterOccurrence> {

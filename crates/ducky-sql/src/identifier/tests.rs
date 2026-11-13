@@ -25,3 +25,9 @@ fn quote_identifier_if_needed_quotes_other_names() {
     assert_eq!(quote_identifier_if_needed(""), "\"\"");
     assert_eq!(quote_identifier_if_needed("é"), "\"é\"");
 }
+
+#[test]
+fn quote_literal_doubles_inner_single_quotes() {
+    assert_eq!(quote_literal("it's"), "'it''s'");
+    assert_eq!(quote_literal(""), "''");
+}

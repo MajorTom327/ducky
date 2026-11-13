@@ -40,7 +40,6 @@ fn data_char_message(key: KeyEvent) -> Option<TableMsg> {
         ('l', TableMsg::Move(GridMove::Right)),
         ('j', TableMsg::Move(GridMove::Down)),
         ('k', TableMsg::Move(GridMove::Up)),
-        ('g', TableMsg::Move(GridMove::FirstRow)),
         ('G', TableMsg::Move(GridMove::LastRow)),
         ('0', TableMsg::Move(GridMove::FirstColumn)),
         ('$', TableMsg::Move(GridMove::LastColumn)),

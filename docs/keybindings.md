@@ -76,12 +76,14 @@ Source of truth: `apps/ducky-tui/src/keys/help.rs` (`HELP_ROWS`, shown with `F1`
 |Key|Action|
 |---|---|
 |`h j k l / arrows`|move the cursor|
-|`g / G`|first / last row|
+|`gg / G`|first / last row|
 |`0 / $`|first / last column|
 |`n`|next page|
 |`p`|previous page|
 |`o`|cycle the sort of the column|
 |`/`|edit the WHERE filter|
+|`gd`|go to referenced row|
+|`gr`|find referencing rows|
 |`Esc`|clear the filter, then sidebar|
 |`Enter`|row detail|
 |`y`|copy the cell|
@@ -117,7 +119,7 @@ Source of truth: `apps/ducky-tui/src/keys/help.rs` (`HELP_ROWS`, shown with `F1`
 |Key|Action|
 |---|---|
 |`h j k l / arrows`|move the cursor|
-|`g G 0 $`|first / last row or column|
+|`gg G 0 $`|first / last row or column|
 |`p / n`|previous / next statement|
 |`Enter`|row detail|
 |`y`|copy the cell|
@@ -202,6 +204,14 @@ Source of truth: `apps/ducky-tui/src/keys/help.rs` (`HELP_ROWS`, shown with `F1`
 |`Enter`|choose|
 |`Esc`|cancel|
 
+## Reference picker
+
+|Key|Action|
+|---|---|
+|`j / k`|next / previous foreign key|
+|`Enter`|open the referencing rows|
+|`Esc`|cancel|
+
 ## Help
 
 |Key|Action|
@@ -215,6 +225,7 @@ Source of truth: `apps/ducky-tui/src/keys/help.rs` (`HELP_ROWS`, shown with `F1`
 
 - Global keys work in every pane, including the editor in insert mode.
 - `[b`, `]b`, `Space b d` and `Space q q` are key sequences, accepted everywhere except in editor insert mode. The pending prefix is shown in the status bar; any other key cancels it.
+- `gg`, `gd` and `gr` are `g` sequences of the table data tab (`gg` also in the results pane): `gd` (go to referenced row) opens the table referenced by the foreign key under the cursor in a new tab filtered on the referenced key, `gr` (find referencing rows) opens the rows of another table whose foreign key points at the current row, through a picker when several foreign keys do. Foreign-key columns end with a muted ` →` in the grid header.
 - `:` opens go to anything with `:` already typed, everywhere except in editor insert mode (where it types `:`). A query starting with `:` lists only the items that have a command alias (`:q` quits); other queries match `Quit` by its label.
 - Go to anything lists `Switch to <profile>` for every profile except the connected one, with the profile type in its colour. Picking one reconnects the workspace: tabs, query text and results stay open, the catalog and every table tab reload from the new profile, and the results title shows the profile a script ran on (` 12 ms · one transaction · on Dev local `). Switching is refused while a script, a dump or a restore runs; if the connection fails, the current profile stays connected.
 - `1`–`9`, `H` / `L`, `Tab`, `?` and `q` apply outside the SQL editor.

@@ -41,7 +41,7 @@ Responses carry their request (`PageLoaded { request }`, `DetailsLoaded { relati
 
 ## Tabs and focus
 
-`Workspace` holds `tabs: Vec<Tab>` and `active_tab_index`. A `Tab` has a `TabId` and a `TabContent`: `Table(TableView)` (one per relation, reused when reopened), `Query(QueryView)` (numbered `Query N` unless named after a file), or the singletons `Files`, `Dump`, `Restore`. Per-tab state (page, cursor, document, run state) lives in the tab; `TabsMsg` opens, switches and closes tabs. The sidebar lists only the relations of `schema_name`.
+`Workspace` holds `tabs: Vec<Tab>` and `active_tab_index`. A `Tab` has a `TabId` and a `TabContent`: `Table(TableView)` (one per relation from the sidebar or the palette, reused when reopened; foreign-key navigation adds one per relation and filter), `Query(QueryView)` (numbered `Query N` unless named after a file), or the singletons `Files`, `Dump`, `Restore`. Per-tab state (page, cursor, document, run state) lives in the tab; `TabsMsg` opens, switches and closes tabs. The sidebar lists only the relations of `schema_name`.
 
 `Msg::OpenPalette` opens `Modal::Palette(CommandPalette)`; `Workspace::palette_items(profiles, query)` lists `PaletteItem`s whose `PaletteAction` switches to a tab, runs an action (new query, SQL files, dump, restore, schema, refresh, reconnect, disconnect, help, quit), switches to another profile or opens a relation of any schema. An item may carry a `command_alias` (`Quit` has `:q`): a query starting with `:` lists only the items whose alias starts with it. `Msg::FocusPane(PaneDirection)` moves focus between sidebar, main pane, editor and results.
 
@@ -52,6 +52,8 @@ Responses carry their request (`PageLoaded { request }`, `DetailsLoaded { relati
 Only one script runs at a time: `running_script_tab_id` records the query tab that issued `Command::RunScript { tab_id, .. }`; `Run` from any tab is refused while it is set, and `ScriptFinished { tab_id, .. }` clears it and stores the report in that tab (if still open).
 
 `QueryMsg::Run` (and `FileOpened { run_after_open: true }`) first applies the running / blank guards, then `ducky_sql::find_parameters`: without parameters it emits `RunScript`; otherwise it opens `Modal::Parameters(ParameterForm { tab_id, sql, fields, selected_field_index })`, one `ParameterField { name, input, is_raw }` per parameter prefilled from the tab's `QueryView::parameter_values`. `ModalMsg::Input` / `Next` / `Previous` / `ToggleRaw` edit the form; `Submit` merges the values into `parameter_values`, closes the form and runs `ducky_sql::bind_parameters(sql, values)` through the same guarded path, so reports hold the bound SQL.
+
+`load_catalog` fills `Relation::foreign_keys` with `ForeignKeyLink { name, columns, referenced, referenced_columns }` (key order); `Catalog::referencing(relation)` derives the incoming links. `TableMsg::GoToReferenced` and `TableMsg::FindReferencing` (keys `gd` / `gr`) read the cursor row of the active data tab, build a filter with `ducky_sql::quote_identifier` / `quote_literal` (`"col" = 'value'` joined with ` AND `) and open a new `Table` tab on it, or activate a tab with the same relation and filter; several incoming links go through `Modal::ReferencePicker`. These tabs are plain filtered table tabs: the filter can be edited or cleared like any other.
 
 Table pages use `AppState::page_size` (set with `AppState::with_page_size` from the config's `page_size`, default `DEFAULT_PAGE_SIZE`).
 

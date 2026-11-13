@@ -126,7 +126,6 @@ fn grid_move(key: KeyEvent) -> Option<GridMove> {
         _ if is_plain_char(key, 'l') => GridMove::Right,
         _ if is_plain_char(key, 'k') => GridMove::Up,
         _ if is_plain_char(key, 'j') => GridMove::Down,
-        _ if is_plain_char(key, 'g') => GridMove::FirstRow,
         _ if is_plain_char(key, 'G') => GridMove::LastRow,
         _ if is_plain_char(key, '0') => GridMove::FirstColumn,
         _ if is_plain_char(key, '$') => GridMove::LastColumn,

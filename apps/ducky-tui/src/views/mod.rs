@@ -9,6 +9,7 @@ pub mod palette;
 pub mod parameters;
 pub mod profiles;
 pub mod query;
+pub mod reference_picker;
 pub mod restore;
 pub mod results;
 pub mod row_detail;

@@ -2,7 +2,7 @@ use crate::command::Command;
 use crate::msg::{Msg, TabsMsg};
 use crate::state::{AppState, CommandPalette, Focus, Modal, PaletteAction};
 use crate::update::switch::switch_profile;
-use crate::update::tabs::open_relation;
+use crate::update::tabs::{open_relation, reveal_schema};
 use crate::update::{update, workspace_mut};
 
 pub(crate) fn open(state: &mut AppState) -> Vec<Command> {
@@ -36,11 +36,7 @@ pub(crate) fn submit(state: &mut AppState, command_palette: &CommandPalette) -> 
             let Some(workspace) = workspace_mut(&mut state.screen) else {
                 return Vec::new();
             };
-            if workspace.schema_name != relation.schema {
-                workspace.schema_name = relation.schema.clone();
-                workspace.sidebar.selected_item_index = 0;
-                workspace.sidebar.filter.clear();
-            }
+            reveal_schema(workspace, &relation.schema);
             return open_relation(workspace, relation, page_size);
         }
         PaletteAction::NewQuery => Msg::Tabs(TabsMsg::NewQuery),

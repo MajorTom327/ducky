@@ -22,6 +22,8 @@ const TABLE_DATA_HINTS: &[KeyHint] = &[
     ("n/p", "page"),
     ("o", "sort"),
     ("/", "where"),
+    ("gd", "referenced"),
+    ("gr", "referencing"),
     ("Enter", "row"),
     ("y", "copy"),
     ("t", "structure"),
@@ -110,6 +112,7 @@ fn modal_hints(modal: &Modal) -> &'static [KeyHint] {
         Modal::Confirm(_) => &[("y/Enter", "confirm"), ("n/Esc", "cancel")],
         Modal::RowDetail(_) => &[("j/k", "move"), ("y", "copy value"), ("Esc", "close")],
         Modal::SchemaPicker { .. } => &[("j/k", "move"), ("Enter", "choose"), ("Esc", "cancel")],
+        Modal::ReferencePicker { .. } => &[("Enter", "open"), ("j/k", "move"), ("Esc", "cancel")],
         Modal::Help => &[
             ("j/k", "scroll"),
             ("g", "top"),

@@ -8,7 +8,7 @@ use ratatui::widgets::{Block, Clear, Paragraph, Wrap};
 use crate::keys::help::HELP_ROWS;
 use crate::theme::Palette;
 use crate::tui_state::TuiState;
-use crate::views::{palette as palette_view, parameters, row_detail};
+use crate::views::{palette as palette_view, parameters, reference_picker, row_detail};
 
 const HELP_COLUMN_SPACING: u16 = 2;
 
@@ -23,6 +23,10 @@ pub fn render(
     let area = match modal {
         Modal::RowDetail(detail) => row_detail::render(frame, screen, detail, palette),
         Modal::Parameters(form) => parameters::render(frame, screen, form, palette),
+        Modal::ReferencePicker {
+            links,
+            selected_link_index,
+        } => reference_picker::render(frame, screen, links, *selected_link_index, palette),
         Modal::Palette(command_palette) => match state.workspace() {
             Some(workspace) => palette_view::render(
                 frame,

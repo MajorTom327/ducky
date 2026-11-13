@@ -145,6 +145,8 @@ pub enum TableMsg {
     Reload,
     OpenRowDetail,
     CopyCell,
+    GoToReferenced,
+    FindReferencing,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

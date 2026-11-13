@@ -47,12 +47,14 @@ fn catalog() -> Catalog {
                         column("email", "text", false, false),
                         column("name", "text", true, false),
                     ],
+                    foreign_keys: Vec::new(),
                 },
                 Relation {
                     name: "order_totals".to_owned(),
                     kind: RelationKind::View,
                     estimated_row_count: None,
                     columns: vec![column("email", "text", true, false)],
+                    foreign_keys: Vec::new(),
                 },
             ],
         }],
@@ -244,6 +246,7 @@ fn render_small_grid(result_set: &ResultSet, cursor: GridCursor) -> Buffer {
                 sort: None,
                 first_row_number: 1,
                 is_focused: true,
+                linked_columns: &[],
             };
             render_grid(
                 frame,

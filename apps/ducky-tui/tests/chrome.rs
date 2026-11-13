@@ -30,6 +30,7 @@ fn relation(name: &str, kind: RelationKind, estimated_row_count: Option<i64>) ->
         kind,
         estimated_row_count,
         columns: Vec::new(),
+        foreign_keys: Vec::new(),
     }
 }
 
