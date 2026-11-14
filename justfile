@@ -37,3 +37,7 @@ dev *args:
     cargo run -p ducky-tui -- --config dev/ducky.dev.toml {{args}}
 
 ci: lint test release
+
+
+install: release
+  cp ./target/release/ducky ~/bin/ducky
