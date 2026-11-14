@@ -70,7 +70,7 @@ pub const HELP_ROWS: &[KeyHint] = &[
     ("V", "start / keep a visual row range"),
     ("e", "UPDATE preset for the selected rows"),
     (
-        "C",
+        "c",
         "change the cell (text, checkbox, enum list) on the selected rows",
     ),
     ("u", "revert the cell change"),

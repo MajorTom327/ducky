@@ -55,7 +55,7 @@ fn data_char_message(key: KeyEvent) -> Option<TableMsg> {
         ('v', TableMsg::ToggleRowMark),
         ('V', TableMsg::ToggleVisualSelection),
         ('e', TableMsg::EditSelectedRows),
-        ('C', TableMsg::ChangeCell),
+        ('c', TableMsg::ChangeCell),
         ('u', TableMsg::RevertCell),
         ('U', TableMsg::DiscardDrafts),
     ];

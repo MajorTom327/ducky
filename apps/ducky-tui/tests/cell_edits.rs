@@ -303,7 +303,7 @@ fn text_editor_renders_over_the_cursor_cell_with_the_terminal_cursor() {
     move_cursor(&mut state, 0, NAME);
     draw_screen(&state, &mut tui);
     let cell_area = tui.table_cursor_cells[&1];
-    press_char(&mut state, &mut tui, 'C');
+    press_char(&mut state, &mut tui, 'c');
     assert!(matches!(state.modal, Some(Modal::CellEditor(_))));
     let mut terminal = draw_screen(&state, &mut tui);
     let buffer = terminal.backend().buffer().clone();
@@ -342,7 +342,7 @@ fn dropdown_lists_labels_and_null_under_the_cell() {
     move_cursor(&mut state, 0, STATUS);
     draw_screen(&state, &mut tui);
     let cell_area = tui.table_cursor_cells[&1];
-    press_char(&mut state, &mut tui, 'C');
+    press_char(&mut state, &mut tui, 'c');
     assert_eq!(hints(&state)[0], ("j/k", "move"));
     let terminal = draw_screen(&state, &mut tui);
     let buffer = terminal.backend().buffer();
@@ -452,7 +452,7 @@ fn summary_shows_saving_while_the_save_runs() {
     let mut state = edit_state(ProfileKind::Local);
     let mut tui = TuiState::new(false);
     move_cursor(&mut state, 0, NAME);
-    press_char(&mut state, &mut tui, 'C');
+    press_char(&mut state, &mut tui, 'c');
     press_char(&mut state, &mut tui, 'x');
     press(
         &mut state,
@@ -496,7 +496,7 @@ fn table_keys_map_to_cell_edit_messages() {
     let mut tui = TuiState::new(false);
     let cases = [
         (
-            KeyCode::Char('C'),
+            KeyCode::Char('c'),
             KeyModifiers::SHIFT,
             TableMsg::ChangeCell,
         ),
@@ -579,7 +579,7 @@ fn warning_notices_are_yellow() {
     let mut state = edit_state(ProfileKind::Local);
     let mut tui = TuiState::new(false);
     move_cursor(&mut state, 0, NAME);
-    press_char(&mut state, &mut tui, 'C');
+    press_char(&mut state, &mut tui, 'c');
     press_char(&mut state, &mut tui, 'x');
     press(
         &mut state,

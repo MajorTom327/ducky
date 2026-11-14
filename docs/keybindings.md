@@ -97,7 +97,7 @@ Source of truth: `apps/ducky-tui/src/keys/help.rs` (`HELP_ROWS`, shown with `F1`
 |`v`|mark / unmark the row and move down|
 |`V`|start / keep a visual row range|
 |`e`|UPDATE preset for the selected rows|
-|`C`|change the cell (text, checkbox, enum list) on the selected rows|
+|`c`|change the cell (text, checkbox, enum list) on the selected rows|
 |`u`|revert the cell change|
 |`U`|discard every change|
 |`Ctrl+s`|save the changes|
