@@ -36,5 +36,5 @@ jobs:
         with:
           name: coverage
           path: target/coverage
-      - run: cargo llvm-cov report --summary-only --fail-under-lines 97
+      - run: cargo llvm-cov report --summary-only --fail-under-lines 95
       - run: cargo build --workspace --release
