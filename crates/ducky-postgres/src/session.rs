@@ -84,6 +84,10 @@ impl PgSession {
         crate::script::run_script(&self.script, statements, mode).await
     }
 
+    pub async fn apply_edits(&self, sql: &str) -> Result<Vec<u64>, PgError> {
+        crate::edits::apply_edits(&self.browse, sql).await
+    }
+
     pub async fn cancel_script(&self) -> Result<(), PgError> {
         self.script_cancel_token
             .cancel_query(self.tls_connector.clone())

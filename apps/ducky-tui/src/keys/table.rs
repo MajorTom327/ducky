@@ -1,7 +1,7 @@
 use crossterm::event::{KeyCode, KeyEvent};
 use ducky_app::{GridMove, Msg, TabContent, TableMsg, TableTab, TableView, Workspace};
 
-use crate::keys::is_plain_char;
+use crate::keys::{is_ctrl, is_plain_char};
 use crate::tui_state::TuiState;
 
 pub fn handle(workspace: &Workspace, tui: &mut TuiState, key: KeyEvent) -> Vec<Msg> {
@@ -30,6 +30,7 @@ fn data_message(table: &TableView, key: KeyEvent) -> Option<Msg> {
         KeyCode::Esc if table.has_selection() => TableMsg::ClearSelection,
         KeyCode::Esc if table.request.filter.is_some() => TableMsg::ClearFilter,
         KeyCode::Esc => return Some(Msg::ToggleFocus),
+        _ if is_ctrl(key, 's') => TableMsg::SaveDrafts,
         _ => data_char_message(key)?,
     };
     Some(Msg::Table(table_message))
@@ -54,6 +55,9 @@ fn data_char_message(key: KeyEvent) -> Option<TableMsg> {
         ('v', TableMsg::ToggleRowMark),
         ('V', TableMsg::ToggleVisualSelection),
         ('e', TableMsg::EditSelectedRows),
+        ('C', TableMsg::ChangeCell),
+        ('u', TableMsg::RevertCell),
+        ('U', TableMsg::DiscardDrafts),
     ];
     bindings
         .into_iter()

@@ -67,14 +67,21 @@ fn needs_confirmation(workspace: &Workspace, tab_id: TabId) -> bool {
 }
 
 fn confirmation_message(workspace: &Workspace, sql: &str) -> String {
+    format!(
+        "Run {} statement(s) on {}?",
+        split_statements(sql).len(),
+        profile_description(workspace)
+    )
+}
+
+pub(crate) fn profile_description(workspace: &Workspace) -> String {
     let kind_word = match workspace.profile.kind {
         ProfileKind::Local => "LOCAL",
         ProfileKind::Staging => "STAGING",
         ProfileKind::Prod => "PROD",
     };
     format!(
-        "Run {} statement(s) on {kind_word} · {} ({})?",
-        split_statements(sql).len(),
+        "{kind_word} · {} ({})",
         workspace.profile.display_name(),
         workspace.profile.target()
     )

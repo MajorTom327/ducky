@@ -376,6 +376,54 @@ async fn autocommit_failure_keeps_earlier_statements() {
     schema.drop_schema().await;
 }
 
+async fn seeded_edit_schema() -> TestSchema {
+    TestSchema::create(&[
+        "CREATE TABLE {schema}.entries (id integer PRIMARY KEY, label text NOT NULL)",
+        "INSERT INTO {schema}.entries VALUES (1, 'one'), (2, 'two')",
+    ])
+    .await
+}
+
+async fn label_of(schema: &TestSchema, id: i32) -> Option<String> {
+    let sql = format!("SELECT label FROM {{schema}}.entries WHERE id = {id}");
+    let report = schema
+        .run(&[sql.as_str()], TransactionMode::AutoCommit)
+        .await;
+    rows_of(&report, 0).rows[0][0].clone()
+}
+
+#[tokio::test]
+#[ignore]
+async fn apply_edits_returns_the_updated_row_count_of_each_statement() {
+    let schema = seeded_edit_schema().await;
+    let sql = format!(
+        "UPDATE {0}.entries SET label = 'uno' WHERE id = 1;\nUPDATE {0}.entries SET label = 'x' WHERE id = 99;",
+        schema.name
+    );
+    let updated_row_counts = schema.session.apply_edits(&sql).await.expect("edits apply");
+    assert_eq!(updated_row_counts, vec![1, 0]);
+    assert_eq!(label_of(&schema, 1).await.as_deref(), Some("uno"));
+    schema.drop_schema().await;
+}
+
+#[tokio::test]
+#[ignore]
+async fn apply_edits_rolls_back_earlier_statements_when_one_fails() {
+    let schema = seeded_edit_schema().await;
+    let sql = format!(
+        "UPDATE {0}.entries SET label = 'uno' WHERE id = 1;\nUPDATE {0}.entries SET label = NULL WHERE id = 2;",
+        schema.name
+    );
+    let error = schema
+        .session
+        .apply_edits(&sql)
+        .await
+        .expect_err("not-null violation");
+    assert!(error.to_string().starts_with("ERROR: "), "{error}");
+    assert_eq!(label_of(&schema, 1).await.as_deref(), Some("one"));
+    schema.drop_schema().await;
+}
+
 #[tokio::test]
 #[ignore]
 async fn large_results_are_truncated() {

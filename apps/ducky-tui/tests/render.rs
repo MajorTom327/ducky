@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use std::path::PathBuf;
 use std::time::{Duration, Instant};
 
@@ -290,9 +291,10 @@ fn render_result_set(
                     is_focused: true,
                     linked_columns: &[],
                     selected_row_indexes: &[],
+                    draft_cells: &BTreeMap::new(),
                 },
                 &grid_palette,
-            )
+            );
         })
         .expect("draw");
     screen_text(&terminal)
@@ -578,9 +580,10 @@ fn grid_in_an_empty_area_draws_nothing_and_keeps_the_viewport() {
                     is_focused: true,
                     linked_columns: &[],
                     selected_row_indexes: &[],
+                    draft_cells: &BTreeMap::new(),
                 },
                 &grid_palette,
-            )
+            );
         })
         .expect("draw");
     assert!(screen_text(&terminal).trim().is_empty());

@@ -1,17 +1,23 @@
+use std::collections::BTreeMap;
+
 use ducky_app::GridCursor;
-use ducky_core::{Cell, ResultSet, Sort, SortDirection};
+use ducky_core::{Cell, ResultSet, Sort};
 use ratatui::Frame;
 use ratatui::layout::Rect;
-use ratatui::style::{Modifier, Style};
+use ratatui::style::Style;
 use ratatui::text::{Line, Span};
 use ratatui::widgets::Paragraph;
 
 use crate::theme::Palette;
 
+mod cells;
 mod columns;
+mod header;
 mod viewport;
 
+use cells::{cell_area, cell_style, cell_text, displayed_cell, fit};
 use columns::{GridColumn, expand_truncated_columns, grid_column};
+use header::{header_line, rule_line};
 pub use viewport::GridViewport;
 use viewport::{scroll_columns, scroll_rows};
 
@@ -31,6 +37,7 @@ pub struct GridOptions<'a> {
     pub is_focused: bool,
     pub linked_columns: &'a [String],
     pub selected_row_indexes: &'a [usize],
+    pub draft_cells: &'a BTreeMap<GridCursor, Cell>,
 }
 
 pub fn render_grid(
@@ -40,9 +47,9 @@ pub fn render_grid(
     viewport: &mut GridViewport,
     options: GridOptions,
     palette: &Palette,
-) {
+) -> Option<Rect> {
     if area.height == 0 || area.width == 0 {
-        return;
+        return None;
     }
     let cursor = options.cursor;
     let reserved_rows = HEADER_ROW_COUNT + usize::from(result_set.is_truncated);
@@ -50,10 +57,11 @@ pub fn render_grid(
         .saturating_sub(reserved_rows)
         .max(1);
     scroll_rows(viewport, cursor.row_index, visible_row_count);
+    let first_row_index = viewport.first_row_index;
     let visible_rows: Vec<&Vec<Cell>> = result_set
         .rows
         .iter()
-        .skip(viewport.first_row_index)
+        .skip(first_row_index)
         .take(visible_row_count)
         .collect();
     let columns: Vec<GridColumn> = result_set
@@ -62,11 +70,18 @@ pub fn render_grid(
         .enumerate()
         .map(|(column_index, name)| {
             let is_linked = options.linked_columns.contains(name);
-            grid_column(name, column_index, options.sort, is_linked, &visible_rows)
+            let visible_cells = visible_rows.iter().enumerate().map(|(offset, row)| {
+                let cell_cursor = GridCursor {
+                    row_index: first_row_index + offset,
+                    column_index,
+                };
+                displayed_cell(options.draft_cells, row, cell_cursor)
+            });
+            grid_column(name, options.sort, is_linked, visible_cells)
         })
         .collect();
     let last_row_number =
-        options.first_row_number + viewport.first_row_index + visible_rows.len().saturating_sub(1);
+        options.first_row_number + first_row_index + visible_rows.len().saturating_sub(1);
     let gutter_width = last_row_number.to_string().len().max(GUTTER_HEADER.len());
     let marker_width = usize::from(!options.selected_row_indexes.is_empty());
     let full_gutter_width = gutter_width + marker_width;
@@ -90,8 +105,9 @@ pub fn render_grid(
     if result_set.rows.is_empty() {
         lines.push(Line::styled("No rows", palette.muted()));
     }
+    let mut cursor_cell_area = None;
     for (offset, row) in visible_rows.into_iter().enumerate() {
-        let row_index = viewport.first_row_index + offset;
+        let row_index = first_row_index + offset;
         let row_number = options.first_row_number + row_index;
         let cursor_column_index = (row_index == cursor.row_index).then_some(cursor.column_index);
         let is_selected = options
@@ -112,11 +128,18 @@ pub fn render_grid(
                 None => palette.muted(),
             },
         ));
+        let mut cell_offset_x = full_gutter_width;
         for (shown_offset, column) in shown_columns.iter().enumerate() {
             let column_index = viewport.first_column_index + shown_offset;
-            let cell = row.get(column_index).unwrap_or(&NULL_CELL);
+            let cell_cursor = GridCursor {
+                row_index,
+                column_index,
+            };
+            let is_draft = options.draft_cells.contains_key(&cell_cursor);
+            let cell = displayed_cell(options.draft_cells, row, cell_cursor);
             let style = cell_style(
                 cell,
+                is_draft,
                 cursor_column_index,
                 column_index,
                 is_selected,
@@ -132,6 +155,11 @@ pub fn render_grid(
                 fit(&cell_text(cell), column.width, column.is_numeric),
                 style,
             ));
+            cell_offset_x += COLUMN_GAP.len();
+            if cursor_column_index == Some(column_index) {
+                cursor_cell_area = Some(cell_area(area, cell_offset_x, offset, column.width));
+            }
+            cell_offset_x += column.width;
         }
         lines.push(Line::from(spans));
     }
@@ -142,106 +170,5 @@ pub fn render_grid(
         ));
     }
     frame.render_widget(Paragraph::new(lines), area);
-}
-
-fn header_line(columns: &[GridColumn], gutter_width: usize, palette: &Palette) -> Line<'static> {
-    let header_style = Style::new().add_modifier(Modifier::BOLD);
-    let mut spans = vec![Span::styled(
-        format!("{GUTTER_HEADER:>gutter_width$}"),
-        palette.muted(),
-    )];
-    for column in columns {
-        let suffix = if column.is_linked { LINK_SUFFIX } else { "" };
-        let suffix_width = suffix.chars().count();
-        let label = truncate(&column.header, column.width.saturating_sub(suffix_width));
-        let padding = " ".repeat(
-            column
-                .width
-                .saturating_sub(label.chars().count() + suffix_width),
-        );
-        let (leading_padding, trailing_padding) = match column.is_numeric {
-            true => (padding, String::new()),
-            false => (String::new(), padding),
-        };
-        spans.push(Span::raw(COLUMN_GAP));
-        spans.push(Span::raw(leading_padding));
-        spans.push(Span::styled(label, header_style));
-        spans.push(Span::styled(suffix, palette.muted()));
-        spans.push(Span::raw(trailing_padding));
-    }
-    Line::from(spans)
-}
-
-fn rule_line(columns: &[GridColumn], gutter_width: usize, palette: &Palette) -> Line<'static> {
-    let mut rule = "─".repeat(gutter_width);
-    for column in columns {
-        rule.push_str(COLUMN_GAP);
-        rule.push_str(&"─".repeat(column.width));
-    }
-    Line::styled(rule, palette.muted())
-}
-
-fn cell_style(
-    cell: &Cell,
-    cursor_column_index: Option<usize>,
-    column_index: usize,
-    is_selected: bool,
-    is_focused: bool,
-    palette: &Palette,
-) -> Style {
-    let Some(cursor_column_index) = cursor_column_index else {
-        let style = match cell {
-            Some(_) => Style::new(),
-            None => palette.null_cell(),
-        };
-        return match is_selected {
-            true => style.patch(palette.muted()).add_modifier(Modifier::BOLD),
-            false => style,
-        };
-    };
-    let mut style = palette.cursor_row();
-    if cell.is_none() {
-        style = style.add_modifier(Modifier::ITALIC);
-    }
-    match (column_index == cursor_column_index, is_focused) {
-        (true, true) => style.patch(palette.selected(true)),
-        (true, false) => style.add_modifier(Modifier::UNDERLINED),
-        (false, _) => style,
-    }
-}
-
-fn header_text(column: &str, sort: Option<&Sort>) -> String {
-    match sort {
-        Some(sort) if sort.column == column => match sort.direction {
-            SortDirection::Ascending => format!("{column} ↑"),
-            SortDirection::Descending => format!("{column} ↓"),
-        },
-        _ => column.to_owned(),
-    }
-}
-
-fn cell_text(cell: &Cell) -> String {
-    match cell {
-        Some(value) => value.replace(['\n', '\r', '\t'], " "),
-        None => "NULL".to_owned(),
-    }
-}
-
-fn truncate(text: &str, width: usize) -> String {
-    match text.chars().count() > width {
-        true => {
-            let mut truncated: String = text.chars().take(width.saturating_sub(1)).collect();
-            truncated.push('…');
-            truncated
-        }
-        false => text.to_owned(),
-    }
-}
-
-fn fit(text: &str, width: usize, is_right_aligned: bool) -> String {
-    let fitted = truncate(text, width);
-    match is_right_aligned {
-        true => format!("{fitted:>width$}"),
-        false => format!("{fitted:<width$}"),
-    }
+    cursor_cell_area
 }

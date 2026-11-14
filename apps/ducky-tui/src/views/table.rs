@@ -92,6 +92,11 @@ fn summary_text(table: &TableView) -> Option<String> {
     if selected_row_count > 0 {
         parts.push(format!("{selected_row_count} selected"));
     }
+    if table.is_saving_drafts {
+        parts.push("saving…".to_owned());
+    } else if !table.cell_drafts.is_empty() {
+        parts.push(format!("{} unsaved", table.cell_drafts.len()));
+    }
     match parts.is_empty() {
         true => None,
         false => Some(format!(" {} ", parts.join(" · "))),
@@ -152,8 +157,9 @@ fn render_data(
         is_focused: context.workspace.focus == Focus::Main,
         linked_columns: &linked_columns,
         selected_row_indexes: &selected_row_indexes,
+        draft_cells: &table.cell_drafts,
     };
-    render_grid(
+    let cursor_cell_area = render_grid(
         frame,
         area,
         &page.result_set,
@@ -161,4 +167,8 @@ fn render_data(
         options,
         context.palette,
     );
+    match cursor_cell_area {
+        Some(cell_area) => tui.table_cursor_cells.insert(tab_id, cell_area),
+        None => tui.table_cursor_cells.remove(&tab_id),
+    };
 }

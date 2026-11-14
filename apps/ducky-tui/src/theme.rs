@@ -56,6 +56,10 @@ impl Palette {
         Style::new().fg(Color::White).bg(Color::DarkGray)
     }
 
+    pub fn draft_cell(&self) -> Style {
+        Style::new().fg(Color::Yellow).add_modifier(Modifier::BOLD)
+    }
+
     pub fn null_cell(&self) -> Style {
         Style::new()
             .fg(Color::DarkGray)
@@ -66,6 +70,7 @@ impl Palette {
         match level {
             NoticeLevel::Info => Style::new(),
             NoticeLevel::Success => Style::new().fg(Color::Green),
+            NoticeLevel::Warning => self.warning(),
             NoticeLevel::Error => Style::new().fg(Color::Red).add_modifier(Modifier::BOLD),
         }
     }

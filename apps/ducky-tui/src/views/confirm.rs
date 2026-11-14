@@ -19,7 +19,7 @@ pub fn render(
     workspace_palette: &Palette,
 ) -> Rect {
     let popup_palette = match &confirm.kind {
-        ConfirmKind::RunScript { .. } => {
+        ConfirmKind::RunScript { .. } | ConfirmKind::SaveCellEdits { .. } => {
             palette(state.workspace().map(|workspace| workspace.profile.kind))
         }
         ConfirmKind::OverwriteFile | ConfirmKind::Restore { .. } => *workspace_palette,
@@ -54,13 +54,19 @@ pub fn render(
 
 fn confirm_lines<'a>(state: &AppState, confirm: &'a Confirm, palette: &Palette) -> Vec<Line<'a>> {
     let mut lines = vec![Line::raw(confirm.message.as_str())];
-    if let ConfirmKind::RunScript { tab_id, sql } = &confirm.kind {
+    let preview_sql = match &confirm.kind {
+        ConfirmKind::RunScript { sql, .. } | ConfirmKind::SaveCellEdits { sql, .. } => Some(sql),
+        ConfirmKind::OverwriteFile | ConfirmKind::Restore { .. } => None,
+    };
+    if let Some(sql) = preview_sql {
         lines.push(Line::default());
         lines.extend(
             sql_preview(sql)
                 .into_iter()
                 .map(|preview_line| Line::styled(preview_line, palette.muted())),
         );
+    }
+    if let ConfirmKind::RunScript { tab_id, .. } = &confirm.kind {
         let transaction_mode = state
             .workspace()
             .and_then(|workspace| workspace.query(*tab_id))

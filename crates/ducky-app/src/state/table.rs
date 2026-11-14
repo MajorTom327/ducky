@@ -1,10 +1,10 @@
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
-use ducky_core::{Page, PageRequest, RelationDetails, RelationRef};
+use ducky_core::{Cell, Page, PageRequest, RelationDetails, RelationRef};
 
 use crate::loadable::Loadable;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Default)]
 pub struct GridCursor {
     pub row_index: usize,
     pub column_index: usize,
@@ -26,6 +26,8 @@ pub struct TableView {
     pub details: Loadable<RelationDetails>,
     pub marked_row_indexes: BTreeSet<usize>,
     pub visual_anchor_row_index: Option<usize>,
+    pub cell_drafts: BTreeMap<GridCursor, Cell>,
+    pub is_saving_drafts: bool,
 }
 
 impl TableView {
@@ -45,6 +47,8 @@ impl TableView {
             details: Loadable::Idle,
             marked_row_indexes: BTreeSet::new(),
             visual_anchor_row_index: None,
+            cell_drafts: BTreeMap::new(),
+            is_saving_drafts: false,
         }
     }
 

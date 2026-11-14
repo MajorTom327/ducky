@@ -4,12 +4,14 @@ use ratatui::layout::{Constraint, Layout, Rect};
 use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Clear, Paragraph};
+use tui_input::Input;
 
 use crate::keys::help::HELP_ROWS;
 use crate::theme::Palette;
 use crate::tui_state::TuiState;
 use crate::views::{
-    confirm, palette as palette_view, parameters, profiles, reference_picker, row_detail,
+    cell_editor, confirm, palette as palette_view, parameters, profiles, reference_picker,
+    row_detail,
 };
 
 const HELP_COLUMN_SPACING: u16 = 2;
@@ -45,6 +47,13 @@ pub fn render(
             area
         }
         Modal::Confirm(confirm) => confirm::render(frame, screen, state, confirm, palette),
+        Modal::CellEditor(editor) => {
+            let anchor = state
+                .workspace()
+                .and_then(|workspace| workspace.active_tab())
+                .and_then(|tab| tui.table_cursor_cells.get(&tab.id).copied());
+            cell_editor::render(frame, screen, editor, anchor, palette)
+        }
         Modal::SchemaPicker {
             selected_schema_index,
         } => {
@@ -81,17 +90,22 @@ fn popup_block<'a>(title: &str, palette: &Palette) -> Block<'a> {
 fn render_prompt(frame: &mut Frame, area: Rect, prompt: &Prompt, palette: &Palette) {
     let block = popup_block(&prompt.title, palette);
     let inner_area = block.inner(area);
-    let width = usize::from(inner_area.width.max(1));
-    let scroll = prompt.input.visual_scroll(width);
-    let paragraph = Paragraph::new(prompt.input.value().to_owned())
-        .scroll((0, u16::try_from(scroll).unwrap_or(0)))
-        .block(block);
+    frame.render_widget(block, area);
+    render_input_line(frame, inner_area, &prompt.input, Style::new());
+}
+
+pub fn render_input_line(frame: &mut Frame, area: Rect, input: &Input, style: Style) {
+    let width = usize::from(area.width.max(1));
+    let scroll = input.visual_scroll(width);
+    let paragraph = Paragraph::new(input.value().to_owned())
+        .style(style)
+        .scroll((0, u16::try_from(scroll).unwrap_or(0)));
     frame.render_widget(paragraph, area);
-    let cursor_offset = prompt.input.visual_cursor().saturating_sub(scroll);
-    let cursor_x = inner_area
+    let cursor_offset = input.visual_cursor().saturating_sub(scroll);
+    let cursor_x = area
         .x
         .saturating_add(u16::try_from(cursor_offset).unwrap_or(u16::MAX));
-    frame.set_cursor_position((cursor_x, inner_area.y));
+    frame.set_cursor_position((cursor_x, area.y));
 }
 
 fn render_schema_picker(

@@ -68,6 +68,10 @@ pub enum Msg {
         job: JobKind,
         result: Result<String, String>,
     },
+    CellEditsSaved {
+        tab_id: TabId,
+        result: Result<Vec<u64>, String>,
+    },
     Notified(Notice),
 }
 
@@ -157,6 +161,10 @@ pub enum TableMsg {
     ToggleVisualSelection,
     ClearSelection,
     EditSelectedRows,
+    ChangeCell,
+    RevertCell,
+    DiscardDrafts,
+    SaveDrafts,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

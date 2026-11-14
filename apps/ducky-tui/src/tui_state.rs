@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
 use ducky_app::{TabContent, TabId, Workspace};
+use ratatui::layout::Rect;
 
 use crate::editor::panel::EditorPanel;
 use crate::effects::UiEffects;
@@ -17,6 +18,7 @@ pub struct TuiState {
     pub effects: UiEffects,
     pub editors: HashMap<TabId, EditorPanel>,
     pub table_viewports: HashMap<TabId, GridViewport>,
+    pub table_cursor_cells: HashMap<TabId, Rect>,
     pub results_viewports: HashMap<TabId, GridViewport>,
     pub structure_scrolls: HashMap<TabId, u16>,
     pub preview_scroll: u16,
@@ -32,6 +34,7 @@ impl TuiState {
             effects: UiEffects::new(are_effects_enabled),
             editors: HashMap::new(),
             table_viewports: HashMap::new(),
+            table_cursor_cells: HashMap::new(),
             results_viewports: HashMap::new(),
             structure_scrolls: HashMap::new(),
             preview_scroll: 0,
@@ -51,6 +54,7 @@ impl TuiState {
         let is_open = |tab_id: &TabId| open_tab_ids.contains(tab_id);
         self.editors.retain(|tab_id, _| is_open(tab_id));
         self.table_viewports.retain(|tab_id, _| is_open(tab_id));
+        self.table_cursor_cells.retain(|tab_id, _| is_open(tab_id));
         self.results_viewports.retain(|tab_id, _| is_open(tab_id));
         self.structure_scrolls.retain(|tab_id, _| is_open(tab_id));
         for tab in &workspace.tabs {

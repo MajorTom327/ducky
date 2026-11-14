@@ -16,6 +16,7 @@ Executes the `ducky_app::Command`s produced by `ducky_app::update` on tokio and 
 | `LoadCatalog`, `LoadPage`, `LoadDetails` | `CatalogLoaded`, `PageLoaded`, `DetailsLoaded` |
 | `RunScript` | splits with `ducky_sql::split_statements`; `ScriptFinished` carrying the command's `tab_id` |
 | `CancelScript` | `Notified(Error)` only when cancelling fails |
+| `SaveCellEdits` | `PgSession::apply_edits` on the browse connection; `CellEditsSaved` carrying the command's `tab_id` and one updated-row count per statement |
 | `ListSqlFiles`, `LoadFilePreview`, `OpenFile` | `SqlFilesListed`, `FilePreviewLoaded`, `FileOpened` |
 | `SaveFile` | `FileSaved` with the normalized name; an existing file without overwrite is `SaveFailure::AlreadyExists` |
 | `ListDumps` | `DumpsListed` |

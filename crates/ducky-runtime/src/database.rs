@@ -88,6 +88,26 @@ pub(crate) fn spawn_run_script(
     });
 }
 
+pub(crate) fn spawn_save_cell_edits(
+    active: &ActiveSlot,
+    messages: UnboundedSender<Msg>,
+    tab_id: TabId,
+    sql: String,
+) {
+    let connection = current_connection(active);
+    tokio::spawn(async move {
+        let result = match connection {
+            Some(connection) => connection
+                .session
+                .apply_edits(&sql)
+                .await
+                .map_err(|error| error.to_string()),
+            None => Err(NOT_CONNECTED.to_owned()),
+        };
+        let _ = messages.send(Msg::CellEditsSaved { tab_id, result });
+    });
+}
+
 pub(crate) fn spawn_cancel_script(active: &ActiveSlot, messages: UnboundedSender<Msg>) {
     let connection = current_connection(active);
     tokio::spawn(async move {

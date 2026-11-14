@@ -160,6 +160,16 @@ impl Workspace {
             })
     }
 
+    pub(crate) fn table_mut(&mut self, tab_id: TabId) -> Option<&mut TableView> {
+        self.tabs
+            .iter_mut()
+            .find(|tab| tab.id == tab_id)
+            .and_then(|tab| match &mut tab.content {
+                TabContent::Table(table) => Some(table),
+                _ => None,
+            })
+    }
+
     pub(crate) fn is_active_content(&self, is_matching: fn(&TabContent) -> bool) -> bool {
         self.active_tab()
             .is_some_and(|tab| is_matching(&tab.content))

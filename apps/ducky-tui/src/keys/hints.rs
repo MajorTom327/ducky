@@ -1,4 +1,6 @@
-use ducky_app::{AppState, Focus, Modal, PickerMode, QueryPane, Screen, TabContent, TableTab};
+use ducky_app::{
+    AppState, CellInput, Focus, Modal, PickerMode, QueryPane, Screen, TabContent, TableTab,
+};
 
 use crate::keys::help::KeyHint;
 
@@ -48,8 +50,18 @@ const TABLE_DATA_HINTS: &[KeyHint] = &[
     ("v", "mark"),
     ("V", "visual"),
     ("e", "edit"),
+    ("C", "change"),
     ("gd/gr", "references"),
     ("t", "structure"),
+    ("?", "help"),
+];
+const TABLE_DRAFT_HINTS: &[KeyHint] = &[
+    ("Ctrl+s", "save"),
+    ("U", "discard"),
+    ("u", "revert cell"),
+    ("C", "change"),
+    ("hjkl", "move"),
+    ("v", "mark"),
     ("?", "help"),
 ];
 const TABLE_VISUAL_HINTS: &[KeyHint] = &[
@@ -123,6 +135,7 @@ pub fn hints(state: &AppState) -> &'static [KeyHint] {
         None => NO_TAB_HINTS,
         Some(TabContent::Table(table)) => match table.tab {
             TableTab::Data if table.visual_anchor_row_index.is_some() => TABLE_VISUAL_HINTS,
+            TableTab::Data if !table.cell_drafts.is_empty() => TABLE_DRAFT_HINTS,
             TableTab::Data => TABLE_DATA_HINTS,
             TableTab::Structure => TABLE_STRUCTURE_HINTS,
         },
@@ -158,6 +171,10 @@ fn modal_hints(modal: &Modal) -> &'static [KeyHint] {
         Modal::ProfilePicker(picker) => match picker.mode {
             PickerMode::Filter => SWITCH_FILTER_HINTS,
             PickerMode::Navigate => SWITCH_LIST_HINTS,
+        },
+        Modal::CellEditor(editor) => match editor.input {
+            CellInput::Text(_) => &[("Enter", "set"), ("Esc", "cancel")],
+            CellInput::Choice { .. } => &[("j/k", "move"), ("Enter", "set"), ("Esc", "cancel")],
         },
         Modal::Parameters(_) => &[
             ("Tab/S-Tab", "field"),

@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use std::path::PathBuf;
 
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
@@ -87,6 +88,8 @@ fn orders_view() -> TableView {
         details: Loadable::Idle,
         marked_row_indexes: Default::default(),
         visual_anchor_row_index: None,
+        cell_drafts: BTreeMap::new(),
+        is_saving_drafts: false,
     }
 }
 

@@ -7,8 +7,9 @@ use crate::state::{
     AppState, Modal, NoticeLevel, Prompt, PromptKind, RowDetail, TabContent, TableTab, TableView,
     Workspace,
 };
+use crate::update::cell_edits::{self, unsaved_drafts_refusal};
 use crate::update::grid::{cell_text, clamp_cursor, move_cursor};
-use crate::update::{notice, references, selection, workspace_mut};
+use crate::update::{cell_editor, notice, references, selection, workspace_mut};
 
 pub(crate) fn update(state: &mut AppState, msg: TableMsg) -> Vec<Command> {
     let Some(workspace) = workspace_mut(&mut state.screen) else {
@@ -17,6 +18,19 @@ pub(crate) fn update(state: &mut AppState, msg: TableMsg) -> Vec<Command> {
     let Some(table) = workspace.active_table_mut() else {
         return Vec::new();
     };
+    let is_blocked_by_drafts = match msg {
+        TableMsg::NextPage
+        | TableMsg::PreviousPage
+        | TableMsg::CycleSort
+        | TableMsg::StartFilter
+        | TableMsg::Reload => true,
+        TableMsg::ClearFilter => table.request.filter.is_some(),
+        _ => false,
+    };
+    if is_blocked_by_drafts && let Some(refusal) = unsaved_drafts_refusal(table) {
+        state.notice = Some(refusal);
+        return Vec::new();
+    }
     match msg {
         TableMsg::GoToReferenced => references::go_to_referenced(state),
         TableMsg::FindReferencing => references::find_referencing(state),
@@ -27,6 +41,15 @@ pub(crate) fn update(state: &mut AppState, msg: TableMsg) -> Vec<Command> {
             Vec::new()
         }
         TableMsg::EditSelectedRows => selection::edit_selected_rows(state),
+        TableMsg::ChangeCell => cell_editor::change_cell(state),
+        TableMsg::RevertCell => cell_edits::revert(table),
+        TableMsg::DiscardDrafts => {
+            if let Some(discarded_notice) = cell_edits::discard(table) {
+                state.notice = Some(discarded_notice);
+            }
+            Vec::new()
+        }
+        TableMsg::SaveDrafts => cell_edits::save(state),
         TableMsg::ToggleTab => toggle_tab(table),
         TableMsg::Move(grid_move) => {
             if let Some(page) = table.page.ready() {
@@ -96,6 +119,7 @@ pub(crate) fn update(state: &mut AppState, msg: TableMsg) -> Vec<Command> {
 
 pub(crate) fn reload_page(table: &mut TableView) -> Command {
     table.page = Loadable::Loading;
+    table.cell_drafts.clear();
     table.clear_selection();
     Command::LoadPage(table.request.clone())
 }
@@ -177,7 +201,9 @@ pub(crate) fn page_loaded(
     let Some(workspace) = workspace_mut(&mut state.screen) else {
         return Vec::new();
     };
-    for table in table_views_mut(workspace).filter(|table| table.request == request) {
+    for table in table_views_mut(workspace)
+        .filter(|table| table.request == request && table.cell_drafts.is_empty())
+    {
         table.page = Loadable::from_result(result.clone());
         table.clear_selection();
         if let Some(page) = table.page.ready() {

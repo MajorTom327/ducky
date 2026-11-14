@@ -1,3 +1,5 @@
+mod cell_editor;
+mod cell_edits;
 mod connection;
 mod files;
 mod focus;
@@ -9,6 +11,7 @@ mod parameters;
 mod profiles;
 mod query;
 mod references;
+mod row_keys;
 mod run_confirmation;
 mod selection;
 mod sidebar;
@@ -74,6 +77,7 @@ pub fn update(state: &mut AppState, msg: Msg) -> Vec<Command> {
         Msg::JobLogged { job, line } => jobs::logged(state, job, line),
         Msg::JobFinished { job, result } => jobs::finished(state, job, result),
         Msg::Modal(modal_msg) => modal::update(state, modal_msg),
+        Msg::CellEditsSaved { tab_id, result } => cell_edits::saved(state, tab_id, result),
     }
 }
 

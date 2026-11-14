@@ -6,6 +6,7 @@ use crate::msg::TabsMsg;
 use crate::state::{
     AppState, Document, Focus, NoticeLevel, QueryPane, TabContent, TabId, TableView, Workspace,
 };
+use crate::update::cell_edits::unsaved_drafts_refusal;
 use crate::update::{notice, workspace_mut};
 
 pub(crate) fn update(state: &mut AppState, msg: TabsMsg) -> Vec<Command> {
@@ -40,6 +41,13 @@ pub(crate) fn update(state: &mut AppState, msg: TabsMsg) -> Vec<Command> {
                     NoticeLevel::Error,
                     "Cancel the running script before closing this tab",
                 );
+                return Vec::new();
+            }
+            if let Some(refusal) = workspace
+                .active_table_mut()
+                .and_then(|table| unsaved_drafts_refusal(table))
+            {
+                state.notice = Some(refusal);
                 return Vec::new();
             }
             close_active_tab(workspace);

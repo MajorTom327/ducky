@@ -1,3 +1,5 @@
+use std::collections::BTreeMap;
+
 use ducky_app::{Focus, NoticeLevel, QueryPane, QueryView, RunState, TabId};
 use ducky_core::{ScriptFailure, ScriptReport, StatementOutcome, StatementResult, TransactionMode};
 use ratatui::Frame;
@@ -116,21 +118,24 @@ fn render_report(
         failure_area,
     );
     match query.selected_result().map(|result| &result.outcome) {
-        Some(StatementOutcome::Rows(result_set)) => render_grid(
-            frame,
-            body_area,
-            result_set,
-            tui.results_viewports.entry(tab_id).or_default(),
-            GridOptions {
-                cursor: query.cursor,
-                sort: None,
-                first_row_number: 1,
-                is_focused,
-                linked_columns: &[],
-                selected_row_indexes: &[],
-            },
-            palette,
-        ),
+        Some(StatementOutcome::Rows(result_set)) => {
+            render_grid(
+                frame,
+                body_area,
+                result_set,
+                tui.results_viewports.entry(tab_id).or_default(),
+                GridOptions {
+                    cursor: query.cursor,
+                    sort: None,
+                    first_row_number: 1,
+                    is_focused,
+                    linked_columns: &[],
+                    selected_row_indexes: &[],
+                    draft_cells: &BTreeMap::new(),
+                },
+                palette,
+            );
+        }
         Some(StatementOutcome::Affected(affected_count)) => frame.render_widget(
             Paragraph::new(Line::styled(
                 format!(" {} affected ", row_count_label(*affected_count)),

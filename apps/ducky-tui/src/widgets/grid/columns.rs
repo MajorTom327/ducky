@@ -1,6 +1,8 @@
 use ducky_core::{Cell, Sort};
 
-use super::{COLUMN_GAP, LINK_SUFFIX, MAX_COLUMN_WIDTH, NULL_CELL, cell_text, header_text};
+use super::cells::cell_text;
+use super::header::header_text;
+use super::{COLUMN_GAP, LINK_SUFFIX, MAX_COLUMN_WIDTH};
 
 #[derive(Clone)]
 pub(super) struct GridColumn {
@@ -11,17 +13,13 @@ pub(super) struct GridColumn {
     pub(super) is_linked: bool,
 }
 
-pub(super) fn grid_column(
+pub(super) fn grid_column<'a>(
     name: &str,
-    column_index: usize,
     sort: Option<&Sort>,
     is_linked: bool,
-    visible_rows: &[&Vec<Cell>],
+    visible_cells: impl Iterator<Item = &'a Cell> + Clone,
 ) -> GridColumn {
     let header = header_text(name, sort);
-    let visible_cells = visible_rows
-        .iter()
-        .map(|row| row.get(column_index).unwrap_or(&NULL_CELL));
     let widest_cell = visible_cells
         .clone()
         .map(|cell| cell_text(cell).chars().count())

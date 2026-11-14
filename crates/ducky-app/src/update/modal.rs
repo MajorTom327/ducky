@@ -1,11 +1,13 @@
 use crate::command::Command;
 use crate::msg::ModalMsg;
 use crate::state::{
-    AppState, Confirm, ConfirmKind, JobState, Modal, NoticeLevel, PendingSave, Prompt, PromptKind,
+    AppState, CellEditor, CellInput, Confirm, ConfirmKind, JobState, Modal, NoticeLevel,
+    PendingSave, Prompt, PromptKind,
 };
 use crate::update::table::apply_filter;
 use crate::update::{
-    notice, palette, parameters, profiles, references, run_confirmation, step_index, workspace_mut,
+    cell_editor, cell_edits, notice, palette, parameters, profiles, references, run_confirmation,
+    step_index, workspace_mut,
 };
 
 pub(crate) fn update(state: &mut AppState, msg: ModalMsg) -> Vec<Command> {
@@ -20,6 +22,13 @@ pub(crate) fn update(state: &mut AppState, msg: ModalMsg) -> Vec<Command> {
                 }
                 Some(Modal::Parameters(form)) => {
                     parameters::input(form, request);
+                    return Vec::new();
+                }
+                Some(Modal::CellEditor(CellEditor {
+                    input: CellInput::Text(input),
+                    ..
+                })) => {
+                    input.handle(request);
                     return Vec::new();
                 }
                 _ => return Vec::new(),
@@ -61,6 +70,7 @@ pub(crate) fn update(state: &mut AppState, msg: ModalMsg) -> Vec<Command> {
                 links,
                 selected_link_index,
             }) => references::submit_picker(state, links, selected_link_index),
+            Some(Modal::CellEditor(editor)) => cell_editor::submit(state, editor),
             Some(Modal::RowDetail(_) | Modal::Help) | None => Vec::new(),
         },
         ModalMsg::Cancel => {
@@ -83,6 +93,10 @@ pub(crate) fn update(state: &mut AppState, msg: ModalMsg) -> Vec<Command> {
                     kind: ConfirmKind::RunScript { .. },
                     ..
                 })) => run_confirmation::cancelled(state),
+                Some(Modal::Confirm(Confirm {
+                    kind: ConfirmKind::SaveCellEdits { .. },
+                    ..
+                })) => cell_edits::cancelled(state),
                 _ => {}
             }
             Vec::new()
@@ -127,6 +141,17 @@ pub(crate) fn update(state: &mut AppState, msg: ModalMsg) -> Vec<Command> {
                         row_detail.columns.len(),
                         is_forward,
                     );
+                }
+                Some(Modal::CellEditor(CellEditor {
+                    input:
+                        CellInput::Choice {
+                            options,
+                            selected_option_index,
+                        },
+                    ..
+                })) => {
+                    *selected_option_index =
+                        step_index(*selected_option_index, options.len(), is_forward);
                 }
                 _ => {}
             }
@@ -208,6 +233,7 @@ fn submit_confirm(state: &mut AppState, confirm: Confirm) -> Vec<Command> {
             None => Vec::new(),
         },
         ConfirmKind::RunScript { tab_id, sql } => run_confirmation::confirmed(state, tab_id, sql),
+        ConfirmKind::SaveCellEdits { tab_id, sql } => cell_edits::run(state, tab_id, sql),
         ConfirmKind::Restore { file_name } => {
             let restore = &mut workspace.restore;
             restore.job = JobState::Running;

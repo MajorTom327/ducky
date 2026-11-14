@@ -22,6 +22,7 @@ pub enum Modal {
         links: Vec<(RelationRef, ForeignKeyLink)>,
         selected_link_index: usize,
     },
+    CellEditor(CellEditor),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -54,6 +55,7 @@ pub enum ConfirmKind {
     OverwriteFile,
     RunScript { tab_id: TabId, sql: String },
     Restore { file_name: String },
+    SaveCellEdits { tab_id: TabId, sql: String },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -67,4 +69,21 @@ pub struct RowDetail {
     pub columns: Vec<String>,
     pub values: Vec<Cell>,
     pub selected_field_index: usize,
+}
+
+#[derive(Debug, Clone)]
+pub struct CellEditor {
+    pub column_name: String,
+    pub column_index: usize,
+    pub row_indexes: Vec<usize>,
+    pub input: CellInput,
+}
+
+#[derive(Debug, Clone)]
+pub enum CellInput {
+    Text(Input),
+    Choice {
+        options: Vec<Cell>,
+        selected_option_index: usize,
+    },
 }

@@ -1,6 +1,6 @@
 use ducky_sql::CompletionItem;
 use ratatui::Frame;
-use ratatui::layout::Rect;
+use ratatui::layout::{Position, Rect, Size};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Clear, Paragraph};
 
@@ -28,15 +28,12 @@ pub fn render(frame: &mut Frame, editor_area: Rect, editor: &EditorPanel, palett
         .unwrap_or(u16::MAX)
         .min(bounds.width);
     let popup_height = u16::try_from(visible_item_count + 2).unwrap_or(u16::MAX);
-    let room_below = bounds.bottom().saturating_sub(cursor_position.y + 1);
-    let popup_y = match room_below >= popup_height {
-        true => cursor_position.y + 1,
-        false => cursor_position.y.saturating_sub(popup_height),
-    };
-    let popup_x = cursor_position
-        .x
-        .min(editor_area.right().saturating_sub(popup_width));
-    let popup_area = Rect::new(popup_x, popup_y, popup_width, popup_height).intersection(bounds);
+    let popup_area = anchored_popup_area(
+        cursor_position,
+        Size::new(popup_width, popup_height),
+        editor_area.right(),
+        bounds,
+    );
     let first_item_index = (popup.selected_item_index + 1).saturating_sub(visible_item_count);
     let lines: Vec<Line> = items
         .iter()
@@ -55,6 +52,21 @@ pub fn render(frame: &mut Frame, editor_area: Rect, editor: &EditorPanel, palett
     let block = Block::bordered().border_style(palette.border(true));
     frame.render_widget(Clear, popup_area);
     frame.render_widget(Paragraph::new(lines).block(block), popup_area);
+}
+
+pub fn anchored_popup_area(
+    anchor: Position,
+    popup_size: Size,
+    right_edge: u16,
+    bounds: Rect,
+) -> Rect {
+    let room_below = bounds.bottom().saturating_sub(anchor.y + 1);
+    let popup_y = match room_below >= popup_size.height {
+        true => anchor.y + 1,
+        false => anchor.y.saturating_sub(popup_size.height),
+    };
+    let popup_x = anchor.x.min(right_edge.saturating_sub(popup_size.width));
+    Rect::new(popup_x, popup_y, popup_size.width, popup_size.height).intersection(bounds)
 }
 
 fn item_width(item: &CompletionItem) -> usize {

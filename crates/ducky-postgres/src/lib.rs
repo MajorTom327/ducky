@@ -2,6 +2,7 @@ mod browse;
 mod catalog;
 mod connect;
 mod details;
+mod edits;
 mod error;
 mod foreign_keys;
 mod page_columns;

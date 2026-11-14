@@ -11,11 +11,11 @@ pub use msg::{
     RestoreMsg, SaveFailure, SidebarMsg, TableMsg, TabsMsg,
 };
 pub use state::{
-    AppState, CommandPalette, Confirm, ConfirmKind, Document, DumpView, FilesView, Focus,
-    GridCursor, JobKind, JobState, MAX_JOB_LOG_LINES, Modal, Notice, NoticeLevel, PaletteAction,
-    PaletteItem, ParameterField, ParameterForm, PendingSave, PickerMode, ProfilePicker, ProfileRow,
-    Prompt, PromptKind, QueryPane, QueryView, RestoreView, RowDetail, RunState, Screen, Sidebar,
-    SidebarItem, Tab, TabContent, TabId, TableTab, TableView, Workspace, profile_kind_name,
-    profile_rows,
+    AppState, CellEditor, CellInput, CommandPalette, Confirm, ConfirmKind, Document, DumpView,
+    FilesView, Focus, GridCursor, JobKind, JobState, MAX_JOB_LOG_LINES, Modal, Notice, NoticeLevel,
+    PaletteAction, PaletteItem, ParameterField, ParameterForm, PendingSave, PickerMode,
+    ProfilePicker, ProfileRow, Prompt, PromptKind, QueryPane, QueryView, RestoreView, RowDetail,
+    RunState, Screen, Sidebar, SidebarItem, Tab, TabContent, TabId, TableTab, TableView, Workspace,
+    profile_kind_name, profile_rows,
 };
 pub use update::update;

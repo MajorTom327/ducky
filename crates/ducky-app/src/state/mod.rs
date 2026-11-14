@@ -14,7 +14,9 @@ use ducky_core::{DEFAULT_PAGE_SIZE, Profile, StoragePaths};
 
 pub use files::FilesView;
 pub use jobs::{DumpView, JobKind, JobState, RestoreView};
-pub use modal::{Confirm, ConfirmKind, Modal, Prompt, PromptKind, RowDetail};
+pub use modal::{
+    CellEditor, CellInput, Confirm, ConfirmKind, Modal, Prompt, PromptKind, RowDetail,
+};
 pub use palette::{CommandPalette, PaletteAction, PaletteItem};
 pub use parameters::{ParameterField, ParameterForm};
 pub use profiles::{PickerMode, ProfilePicker, ProfileRow, profile_kind_name, profile_rows};
@@ -73,6 +75,7 @@ pub enum Screen {
 pub enum NoticeLevel {
     Info,
     Success,
+    Warning,
     Error,
 }
 

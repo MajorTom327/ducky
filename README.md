@@ -72,6 +72,12 @@ WHERE "id" IN ('17', '21', '25')
 ;
 ```
 
+Single cells can also be changed in place, Drizzle Studio style: `C` on a cell opens an inline editor over it (a dropdown for enum columns, an immediate `t` / `f` / NULL toggle for booleans, a text input otherwise) and applies to every selected row. Changes stay as drafts, shown in bold yellow and counted as `N unsaved` in the bottom border, until `Ctrl+s` saves them all in one transaction (with a confirmation on `staging` and `prod`); `u` reverts the cursor cell, `U` discards every change. Pages cannot be changed, filtered, reloaded or closed while drafts are pending. Views and `geometry` / `geography` columns are not editable. Saving sends one statement per edited row:
+
+```sql
+UPDATE "public"."orders" SET "status" = 'paid', "total" = NULL WHERE "id" = '5';
+```
+
 When browsing a table, PostGIS `geometry` and `geography` columns are shown as GeoJSON (`{"type":"Point","coordinates":[2.35,48.85]}`) in the grid, the row detail and copied values. Query tabs show exactly what your SQL returns; use `ST_AsGeoJSON` or `ST_AsText` there. Long values use the free width of the grid before being cut with `…`.
 
 ## Query parameters

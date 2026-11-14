@@ -1,5 +1,5 @@
 use crossterm::event::{KeyCode, KeyEvent};
-use ducky_app::{Modal, ModalMsg, Msg};
+use ducky_app::{CellInput, Modal, ModalMsg, Msg};
 use tui_input::InputRequest;
 
 use crate::keys::{is_ctrl, is_plain_char, profiles};
@@ -17,6 +17,10 @@ pub fn handle(modal: &Modal, tui: &mut TuiState, key: KeyEvent) -> Vec<Msg> {
         Modal::Help => help_message(tui, key),
         Modal::Palette(_) => palette_message(key),
         Modal::Parameters(_) => parameters_message(key),
+        Modal::CellEditor(editor) => match editor.input {
+            CellInput::Text(_) => prompt_message(key),
+            CellInput::Choice { .. } => picker_message(key),
+        },
     };
     modal_message.map(Msg::Modal).into_iter().collect()
 }

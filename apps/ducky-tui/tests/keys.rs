@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use std::path::PathBuf;
 
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
@@ -200,6 +201,8 @@ fn table_view(tab: TableTab) -> TableView {
         details: Loadable::Idle,
         marked_row_indexes: Default::default(),
         visual_anchor_row_index: None,
+        cell_drafts: BTreeMap::new(),
+        is_saving_drafts: false,
     }
 }
 

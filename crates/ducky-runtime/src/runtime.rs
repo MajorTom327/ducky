@@ -45,6 +45,9 @@ impl Runtime {
                 database::spawn_run_script(&self.active, messages, tab_id, sql, mode)
             }
             Command::CancelScript => database::spawn_cancel_script(&self.active, messages),
+            Command::SaveCellEdits { tab_id, sql } => {
+                database::spawn_save_cell_edits(&self.active, messages, tab_id, sql)
+            }
             Command::ListSqlFiles => files::spawn_list_sql_files(self.sql_store.clone(), messages),
             Command::LoadFilePreview { name } => {
                 files::spawn_load_preview(self.sql_store.clone(), messages, name)

@@ -40,4 +40,8 @@ pub enum Command {
         options: RestoreOptions,
     },
     CopyToClipboard(String),
+    SaveCellEdits {
+        tab_id: TabId,
+        sql: String,
+    },
 }

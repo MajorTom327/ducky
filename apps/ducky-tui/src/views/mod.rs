@@ -1,3 +1,4 @@
+pub mod cell_editor;
 pub mod completion;
 pub mod confirm;
 pub mod dump;

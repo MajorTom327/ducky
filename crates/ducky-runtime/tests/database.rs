@@ -102,6 +102,53 @@ async fn run_script_returns_one_result_per_statement() {
 }
 
 #[tokio::test]
+#[ignore = "needs DUCKY_TEST_DATABASE_URL"]
+async fn save_cell_edits_returns_one_count_per_statement() {
+    let directory = tempfile::tempdir().expect("tempdir");
+    let (mut runtime, mut receiver) = connected_runtime(&directory);
+    assert!(matches!(
+        next_message(&mut receiver).await,
+        Msg::Connected { result: Ok(_), .. }
+    ));
+
+    runtime.dispatch(Command::SaveCellEdits {
+        tab_id: 4,
+        sql: "CREATE TEMP TABLE ducky_rt_edits (id integer PRIMARY KEY, label text);\nINSERT INTO ducky_rt_edits VALUES (1, 'a'), (2, 'b');\nUPDATE ducky_rt_edits SET label = 'x' WHERE id = 1;\nUPDATE ducky_rt_edits SET label = 'y' WHERE id = 9;".to_owned(),
+    });
+    assert_eq!(
+        next_message(&mut receiver).await,
+        Msg::CellEditsSaved {
+            tab_id: 4,
+            result: Ok(vec![0, 2, 1, 0]),
+        }
+    );
+}
+
+#[tokio::test]
+async fn save_cell_edits_without_connection_fails() {
+    let (sender, mut receiver) = unbounded_channel();
+    let directory = tempfile::tempdir().expect("tempdir");
+    let mut runtime = Runtime::new(
+        StoragePaths {
+            sql_dir: directory.path().join("sql"),
+            dump_dir: directory.path().join("dumps"),
+        },
+        sender,
+    );
+    runtime.dispatch(Command::SaveCellEdits {
+        tab_id: 2,
+        sql: "UPDATE t SET a = '1' WHERE id = '1';".to_owned(),
+    });
+    assert_eq!(
+        next_message(&mut receiver).await,
+        Msg::CellEditsSaved {
+            tab_id: 2,
+            result: Err("Not connected".to_owned()),
+        }
+    );
+}
+
+#[tokio::test]
 async fn connect_with_unknown_env_var_fails() {
     let (sender, mut receiver) = unbounded_channel();
     let directory = tempfile::tempdir().expect("tempdir");

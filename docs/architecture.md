@@ -61,9 +61,11 @@ Before `RunScript`, `update/run_confirmation.rs` applies the connected profile's
 
 `TableView` keeps a row selection for the current page (`marked_row_indexes`, `visual_anchor_row_index`, `selected_row_indexes()` = marks ∪ the anchor-to-cursor range). `TableMsg::ToggleRowMark` / `ToggleVisualSelection` / `ClearSelection` (keys `v` / `V` / `Esc`) edit it; `reload_page` and `PageLoaded` clear it, so pagination, sort, filter and reload drop it. `TableMsg::EditSelectedRows` (key `e`) builds an `UPDATE` preset in `update/selection.rs`: key columns are the catalog primary key, else `id`; values come from the page cells through `ducky_sql::quote_literal`, the cursor column gets a `:<column>` (or `:value`) parameter, and the text opens in a new `Query` tab, so running it goes through the usual parameters form.
 
+Draft cell edits live in `TableView::cell_drafts` (`BTreeMap<GridCursor, Cell>`, row then column order) next to the page they modify, so the grid can show them over the original values and the original key values stay available for the `WHERE` clause. `update/cell_editor.rs` opens the editor (`TableMsg::ChangeCell`, key `C`) from the catalog column: enum labels become a `CellInput::Choice` list, `boolean` toggles without a modal, other types get a `CellInput::Text` input in `Modal::CellEditor`; it commits a value to every target row and drops drafts equal to the original cell. `update/cell_edits.rs` reverts, discards and saves: `SaveDrafts` (`Ctrl+s`) builds one `UPDATE` per drafted row with the key columns shared with the `e` preset in `update/row_keys.rs`, asks for confirmation on `staging` / `prod` and emits `Command::SaveCellEdits`. The runtime sends the whole text through `PgSession::apply_edits` on the browse connection: a multi-statement simple query is one implicit transaction, so one failing statement rolls back the others, and `Msg::CellEditsSaved` carries one updated-row count per statement. While a tab has drafts, everything that would reload its page (pagination, sort, filter, reload, close) is refused and `PageLoaded` skips it; `reload_page` clears drafts, so reconnecting or switching profile drops them.
+
 Table pages use `AppState::page_size` (set with `AppState::with_page_size` from the config's `page_size`, default `DEFAULT_PAGE_SIZE`).
 
-In `apps/ducky-tui`, `TuiState` keeps view-only state per tab in maps keyed by `TabId`: `editors` (one edtui `EditorPanel` per query tab), `table_viewports`, `results_viewports`, `structure_scrolls`.
+In `apps/ducky-tui`, `TuiState` keeps view-only state per tab in maps keyed by `TabId`: `editors` (one edtui `EditorPanel` per query tab), `table_viewports`, `table_cursor_cells` (on-screen area of the cursor cell, returned by `render_grid` and used to draw the cell editor over it), `results_viewports`, `structure_scrolls`.
 
 ## Adding a view
 
@@ -87,4 +89,4 @@ Scripts are split into statements by `ducky-sql::split_statements` and executed 
 - `Transaction` (default, ` one transaction `): `BEGIN`, statements, `COMMIT`; the first failure stops and issues `ROLLBACK`.
 - `AutoCommit` (` autocommit `, toggled with `Ctrl+t`): statements are sent as-is and stop at the first failure; earlier statements stay committed.
 
-After a script that affected rows, the catalog is reloaded. Table data is read-only; writes go through the editor.
+After a script that affected rows, the catalog is reloaded. Table data changes either through the editor or through draft cell edits saved from the data tab.
