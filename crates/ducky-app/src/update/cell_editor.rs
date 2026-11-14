@@ -14,6 +14,14 @@ const BOOLEAN_TRUE: &str = "t";
 const BOOLEAN_FALSE: &str = "f";
 const GEO_TYPE_PREFIXES: [&str; 2] = ["geometry", "geography"];
 
+struct EditTarget<'a> {
+    column: &'a Column,
+    column_name: &'a String,
+    column_index: usize,
+    row_indexes: Vec<usize>,
+    current_value: &'a Cell,
+}
+
 enum CellChange {
     Toggle {
         row_indexes: Vec<usize>,
@@ -49,6 +57,31 @@ pub(crate) fn change_cell(state: &mut AppState) -> Vec<Command> {
     Vec::new()
 }
 
+pub(crate) fn set_cell_null(state: &mut AppState) -> Vec<Command> {
+    let null_change = state.workspace().and_then(edit_target).map(|target| {
+        let target = target?;
+        match target.column.is_nullable {
+            true => Ok((target.column_index, target.row_indexes)),
+            false => Err(Notice::new(
+                NoticeLevel::Warning,
+                format!("{} is NOT NULL", target.column_name),
+            )),
+        }
+    });
+    match null_change {
+        None => {}
+        Some(Err(refusal)) => state.notice = Some(refusal),
+        Some(Ok((column_index, row_indexes))) => {
+            if let Some(table) =
+                workspace_mut(&mut state.screen).and_then(Workspace::active_table_mut)
+            {
+                commit(table, column_index, &row_indexes, None);
+            }
+        }
+    }
+    Vec::new()
+}
+
 pub(crate) fn submit(state: &mut AppState, editor: CellEditor) -> Vec<Command> {
     let draft_value = match editor.input {
         CellInput::Text(input) => Some(input.value().to_owned()),
@@ -68,7 +101,7 @@ pub(crate) fn submit(state: &mut AppState, editor: CellEditor) -> Vec<Command> {
     Vec::new()
 }
 
-fn cell_change(workspace: &Workspace) -> Option<Result<CellChange, Notice>> {
+fn edit_target(workspace: &Workspace) -> Option<Result<EditTarget<'_>, Notice>> {
     let TabContent::Table(table) = &workspace.active_tab()?.content else {
         return None;
     };
@@ -100,6 +133,24 @@ fn cell_change(workspace: &Workspace) -> Option<Result<CellChange, Notice>> {
     if let Err(message) = row_keys(workspace, table, result_set, &row_indexes) {
         return Some(Err(Notice::new(NoticeLevel::Error, message)));
     }
+    Some(Ok(EditTarget {
+        column,
+        column_name,
+        column_index,
+        row_indexes,
+        current_value: table
+            .cell_drafts
+            .get(&table.cursor)
+            .unwrap_or(original_value),
+    }))
+}
+
+fn cell_change(workspace: &Workspace) -> Option<Result<CellChange, Notice>> {
+    let target = match edit_target(workspace)? {
+        Ok(target) => target,
+        Err(refusal) => return Some(Err(refusal)),
+    };
+    let column = target.column;
     if GEO_TYPE_PREFIXES
         .iter()
         .any(|geo_type_prefix| column.data_type.starts_with(geo_type_prefix))
@@ -109,25 +160,21 @@ fn cell_change(workspace: &Workspace) -> Option<Result<CellChange, Notice>> {
             "Geometry columns cannot be edited inline",
         )));
     }
-    let current_value = table
-        .cell_drafts
-        .get(&table.cursor)
-        .unwrap_or(original_value);
     if column.enum_labels.is_empty() && column.data_type == BOOLEAN_TYPE {
         return Some(Ok(CellChange::Toggle {
-            row_indexes,
-            column_index,
-            draft_value: next_boolean(current_value, column.is_nullable),
+            row_indexes: target.row_indexes,
+            column_index: target.column_index,
+            draft_value: next_boolean(target.current_value, column.is_nullable),
         }));
     }
     let input = match column.enum_labels.is_empty() {
-        true => CellInput::Text(Input::new(current_value.clone().unwrap_or_default())),
-        false => choice_input(column, current_value),
+        true => CellInput::Text(Input::new(target.current_value.clone().unwrap_or_default())),
+        false => choice_input(column, target.current_value),
     };
     Some(Ok(CellChange::Edit(CellEditor {
-        column_name: column_name.clone(),
-        column_index,
-        row_indexes,
+        column_name: target.column_name.clone(),
+        column_index: target.column_index,
+        row_indexes: target.row_indexes,
         input,
     })))
 }

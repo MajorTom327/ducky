@@ -72,7 +72,7 @@ WHERE "id" IN ('17', '21', '25')
 ;
 ```
 
-Single cells can also be changed in place, Drizzle Studio style: `c` on a cell opens an inline editor over it (a dropdown for enum columns, an immediate `t` / `f` / NULL toggle for booleans, a text input otherwise) and applies to every selected row. Changes stay as drafts, shown in bold yellow and counted as `N unsaved` in the bottom border, until `Ctrl+s` saves them all in one transaction (with a confirmation on `staging` and `prod`); `u` reverts the cursor cell, `U` discards every change. Pages cannot be changed, filtered, reloaded or closed while drafts are pending. Views and `geometry` / `geography` columns are not editable. Saving sends one statement per edited row:
+Single cells can also be changed in place, Drizzle Studio style: `c` on a cell opens an inline editor over it (a dropdown for enum columns, an immediate `t` / `f` / NULL toggle for booleans, a text input otherwise) and applies to every selected row. Changes stay as drafts, shown in bold yellow and counted as `N unsaved` in the bottom border, until `Ctrl+s` saves them all in one transaction (with a confirmation on `staging` and `prod`); `x` sets the cell (or the selected rows) to NULL, `u` reverts the cursor cell, `U` discards every change. Pages cannot be changed, filtered, reloaded or closed while drafts are pending. Views and `geometry` / `geography` columns are not editable. Saving sends one statement per edited row:
 
 ```sql
 UPDATE "public"."orders" SET "status" = 'paid', "total" = NULL WHERE "id" = '5';

@@ -495,10 +495,11 @@ fn table_keys_map_to_cell_edit_messages() {
     let state = edit_state(ProfileKind::Local);
     let mut tui = TuiState::new(false);
     let cases = [
+        (KeyCode::Char('c'), KeyModifiers::NONE, TableMsg::ChangeCell),
         (
-            KeyCode::Char('c'),
-            KeyModifiers::SHIFT,
-            TableMsg::ChangeCell,
+            KeyCode::Char('x'),
+            KeyModifiers::NONE,
+            TableMsg::SetCellNull,
         ),
         (KeyCode::Char('u'), KeyModifiers::NONE, TableMsg::RevertCell),
         (

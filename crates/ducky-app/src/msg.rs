@@ -162,6 +162,7 @@ pub enum TableMsg {
     ClearSelection,
     EditSelectedRows,
     ChangeCell,
+    SetCellNull,
     RevertCell,
     DiscardDrafts,
     SaveDrafts,

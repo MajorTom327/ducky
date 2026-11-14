@@ -42,6 +42,7 @@ pub(crate) fn update(state: &mut AppState, msg: TableMsg) -> Vec<Command> {
         }
         TableMsg::EditSelectedRows => selection::edit_selected_rows(state),
         TableMsg::ChangeCell => cell_editor::change_cell(state),
+        TableMsg::SetCellNull => cell_editor::set_cell_null(state),
         TableMsg::RevertCell => cell_edits::revert(table),
         TableMsg::DiscardDrafts => {
             if let Some(discarded_notice) = cell_edits::discard(table) {

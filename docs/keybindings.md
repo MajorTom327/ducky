@@ -98,6 +98,7 @@ Source of truth: `apps/ducky-tui/src/keys/help.rs` (`HELP_ROWS`, shown with `F1`
 |`V`|start / keep a visual row range|
 |`e`|UPDATE preset for the selected rows|
 |`c`|change the cell (text, checkbox, enum list) on the selected rows|
+|`x`|set the cell to NULL on the selected rows|
 |`u`|revert the cell change|
 |`U`|discard every change|
 |`Ctrl+s`|save the changes|

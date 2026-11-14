@@ -58,6 +58,7 @@ const TABLE_DATA_HINTS: &[KeyHint] = &[
 const TABLE_DRAFT_HINTS: &[KeyHint] = &[
     ("Ctrl+s", "save"),
     ("U", "discard"),
+    ("x", "NULL"),
     ("u", "revert cell"),
     ("c", "change"),
     ("hjkl", "move"),

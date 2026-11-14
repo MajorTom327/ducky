@@ -363,6 +363,34 @@ fn change_applies_to_every_selected_row_and_clears_the_selection() {
 }
 
 #[test]
+fn set_null_drafts_null_on_every_selected_row_and_geometry_is_allowed() {
+    let mut state = edit_state();
+    let tab_id = active_tab_id(&state);
+    table_tab_mut(&mut state, tab_id).marked_row_indexes = [0, 1].into();
+    move_cursor_to(&mut state, 0, NAME);
+    table_message(&mut state, TableMsg::SetCellNull);
+    assert!(state.modal.is_none());
+    assert_eq!(drafts(&state), BTreeMap::from([draft_at(0, NAME, None)]));
+    assert!(!table_tab(&state, tab_id).has_selection());
+    move_cursor_to(&mut state, 0, SHAPE);
+    table_message(&mut state, TableMsg::SetCellNull);
+    assert_eq!(drafts(&state).len(), 1);
+    assert_eq!(state.notice, None);
+}
+
+#[test]
+fn set_null_is_refused_on_a_not_null_column() {
+    let mut state = edit_state();
+    move_cursor_to(&mut state, 0, STATUS);
+    table_message(&mut state, TableMsg::SetCellNull);
+    assert_eq!(
+        notice_of(&state),
+        (NoticeLevel::Warning, "status is NOT NULL".to_owned())
+    );
+    assert!(drafts(&state).is_empty());
+}
+
+#[test]
 fn views_are_refused() {
     let mut state = workspace_state();
     load_page(
