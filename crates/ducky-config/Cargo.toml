@@ -3,6 +3,7 @@ name = "ducky-config"
 edition.workspace = true
 version.workspace = true
 publish.workspace = true
+license.workspace = true
 
 [dependencies]
 ducky-core.workspace = true

@@ -41,3 +41,6 @@ ci: lint test release
 
 install: release
   cp ./target/release/ducky ~/bin/ducky
+
+screenshots: build db-up
+    vhs assets/tapes/screenshots.tape

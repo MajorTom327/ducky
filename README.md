@@ -1,6 +1,18 @@
 # ducky
 
+> [!NOTE]
+> This project is vibe coded. Its objective is local dev tooling. It is not reviewed for external usage.
+
 A terminal explorer for PostgreSQL, inspired by Adminer. Browse schemas, tables, structure and data; run SQL scripts in a vim-style editor with highlighting and completion; store SQL files; dump and restore databases with `pg_dump` / `pg_restore`.
+
+![Table data with draft edits](assets/draft-edits.png)
+
+| | |
+|---|---|
+| ![Enum dropdown](assets/enum-dropdown.png) | ![Structure tab](assets/structure.png) |
+| ![SQL editor and results](assets/query.png) | ![Profile picker](assets/profiles.png) |
+
+Screenshots are recorded with [VHS](https://github.com/charmbracelet/vhs) against the dev database: `just screenshots`.
 
 ## Run
 
@@ -125,3 +137,7 @@ The confirmation shows `Run <n> statement(s) on STAGING|PROD · <name> (<host:po
 CI (`.gitea/workflows/ci.yml`) runs on pushes to `main` and pull requests: fmt check, clippy, then every test including the ignored database tests under `cargo llvm-cov`, against an `imresamu/postgis:18-3.6-alpine` service (skipping `dump_then_restore`, the runner has no PostgreSQL 18 client tools), and a release build. The run uploads a `coverage` artifact (HTML report + `lcov.info`), prints the per-file summary in the log, and fails below 97% line coverage.
 
 Docs: [architecture](docs/architecture.md), [key bindings](docs/keybindings.md). Each crate has its own README.
+
+## License
+
+[MIT](LICENSE)
