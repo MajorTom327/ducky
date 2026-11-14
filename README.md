@@ -108,9 +108,10 @@ The confirmation shows `Run <n> statement(s) on STAGING|PROD · <name> (<host:po
 |`just test`|`cargo test --workspace`|
 |`just db-up` / `just db-down`|start / remove the PostgreSQL 18 + PostGIS compose database on port 5440 (seeded from `dev/seed.sql`)|
 |`just test-db`|`db-up`, then the ignored database tests with `DUCKY_TEST_DATABASE_URL`|
+|`just coverage`|`db-up`, every test (including ignored) under `cargo llvm-cov`, HTML report in `target/coverage/html`, fails below 97% line coverage|
 |`just dev *args`|run ducky against `dev/ducky.dev.toml`|
 |`just ci`|lint, test, release|
 
-CI (`.gitea/workflows/ci.yml`) runs on pushes to `main` and pull requests: fmt check, clippy, tests, ignored database tests against an `imresamu/postgis:18-3.6-alpine` service (skipping `dump_then_restore`, the runner has no PostgreSQL 18 client tools), release build.
+CI (`.gitea/workflows/ci.yml`) runs on pushes to `main` and pull requests: fmt check, clippy, then every test including the ignored database tests under `cargo llvm-cov`, against an `imresamu/postgis:18-3.6-alpine` service (skipping `dump_then_restore`, the runner has no PostgreSQL 18 client tools), and a release build. The run uploads a `coverage` artifact (HTML report + `lcov.info`), prints the per-file summary in the log, and fails below 97% line coverage.
 
 Docs: [architecture](docs/architecture.md), [key bindings](docs/keybindings.md). Each crate has its own README.
