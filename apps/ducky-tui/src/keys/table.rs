@@ -47,7 +47,7 @@ fn data_char_message(key: KeyEvent) -> Option<TableMsg> {
         ('$', TableMsg::Move(GridMove::LastColumn)),
         ('n', TableMsg::NextPage),
         ('p', TableMsg::PreviousPage),
-        ('o', TableMsg::CycleSort),
+        ('s', TableMsg::CycleSort),
         ('/', TableMsg::StartFilter),
         ('y', TableMsg::CopyCell),
         ('r', TableMsg::Reload),

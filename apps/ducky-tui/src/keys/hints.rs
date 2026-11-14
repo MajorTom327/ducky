@@ -45,7 +45,7 @@ const NO_TAB_HINTS: &[KeyHint] = &[
 const TABLE_DATA_HINTS: &[KeyHint] = &[
     ("hjkl", "move"),
     ("n/p", "page"),
-    ("o", "sort"),
+    ("s", "sort"),
     ("/", "where"),
     ("v", "mark"),
     ("V", "visual"),

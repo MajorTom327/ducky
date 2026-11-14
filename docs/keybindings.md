@@ -90,7 +90,7 @@ Source of truth: `apps/ducky-tui/src/keys/help.rs` (`HELP_ROWS`, shown with `F1`
 |`0 / $`|first / last column|
 |`n`|next page|
 |`p`|previous page|
-|`o`|cycle the sort of the column|
+|`s`|cycle the sort of the column|
 |`/`|edit the WHERE filter|
 |`gd`|go to referenced row|
 |`gr`|find referencing rows|

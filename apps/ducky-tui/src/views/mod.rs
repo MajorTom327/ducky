@@ -26,7 +26,9 @@ pub mod welcome;
 use ducky_app::{AppState, Screen, TabContent, TabId, TableView, Workspace};
 use ducky_core::StoragePaths;
 use ratatui::Frame;
+use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
+use ratatui::style::{Modifier, Style};
 
 use crate::layout::{FrameAreas, is_too_small};
 use crate::theme::{Palette, palette};
@@ -86,10 +88,18 @@ pub fn draw(frame: &mut Frame, state: &AppState, tui: &mut TuiState) {
         &workspace_palette,
     );
     if let Some(modal) = &state.modal {
+        fade(frame.buffer_mut());
         modal::render(frame, areas.screen, state, modal, tui, &workspace_palette);
     }
     tui.effects
         .apply(state, areas, &workspace_palette, frame.buffer_mut());
+}
+
+fn fade(buffer: &mut Buffer) {
+    let faded_style = Style::new().add_modifier(Modifier::DIM);
+    for cell in &mut buffer.content {
+        cell.set_style(faded_style);
+    }
 }
 
 fn render_main(frame: &mut Frame, area: Rect, context: &ViewContext, tui: &mut TuiState) {

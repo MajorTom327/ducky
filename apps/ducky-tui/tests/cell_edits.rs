@@ -596,3 +596,32 @@ fn warning_notices_are_yellow() {
     );
     assert_eq!(active_table(&state).cell_drafts.len(), 1);
 }
+
+#[test]
+fn an_open_modal_fades_the_rest_of_the_screen() {
+    let mut state = edit_state(ProfileKind::Local);
+    let mut tui = TuiState::new(false);
+    move_cursor(&mut state, 0, STATUS);
+    let unfaded_terminal = draw_screen(&state, &mut tui);
+    let unfaded_name = find_text(unfaded_terminal.backend().buffer(), "Ada");
+    assert!(
+        !unfaded_terminal.backend().buffer()[(unfaded_name.x, unfaded_name.y)]
+            .modifier
+            .contains(Modifier::DIM)
+    );
+    press_char(&mut state, &mut tui, 'c');
+    let terminal = draw_screen(&state, &mut tui);
+    let buffer = terminal.backend().buffer();
+    let name_position = find_text(buffer, "Ada");
+    assert!(
+        buffer[(name_position.x, name_position.y)]
+            .modifier
+            .contains(Modifier::DIM)
+    );
+    let option_position = find_text(buffer, "│ paid ");
+    assert!(
+        !buffer[(option_position.x + 2, option_position.y)]
+            .modifier
+            .contains(Modifier::DIM)
+    );
+}

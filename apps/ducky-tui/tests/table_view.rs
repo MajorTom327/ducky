@@ -491,7 +491,7 @@ fn data_keys_map_to_table_messages() {
         vec![Msg::Table(TableMsg::NextPage)]
     );
     assert_eq!(
-        press(&workspace, KeyCode::Char('o')),
+        press(&workspace, KeyCode::Char('s')),
         vec![Msg::Table(TableMsg::CycleSort)]
     );
     assert_eq!(
