@@ -1,7 +1,7 @@
 # ducky
 
 > [!NOTE]
-> This project is vibe coded. Its objective is local dev tooling. It is not reviewed for external usage.
+> ducky is a personal tool for local development, largely written with AI assistance ("vibe coded"). It has not been reviewed for security or production use: point it at databases you own, and use it at your own risk.
 
 A terminal explorer for PostgreSQL, inspired by Adminer. Browse schemas, tables, structure and data; run SQL scripts in a vim-style editor with highlighting and completion; store SQL files; dump and restore databases with `pg_dump` / `pg_restore`.
 
