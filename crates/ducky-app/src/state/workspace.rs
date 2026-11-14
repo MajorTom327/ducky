@@ -1,4 +1,4 @@
-use ducky_core::{Catalog, PgTools, Profile, RelationRef, SessionInfo};
+use ducky_core::{Catalog, PgTools, Profile, RelationRef, SessionInfo, Sort, SortDirection};
 
 use crate::loadable::Loadable;
 use crate::msg::Connection;
@@ -9,6 +9,8 @@ use crate::state::query::{Document, PendingSave, QueryView};
 use crate::state::sidebar::{Sidebar, SidebarItem};
 use crate::state::table::TableView;
 use crate::state::tabs::{Tab, TabContent, TabId};
+
+const DEFAULT_SORT_COLUMN: &str = "id";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Focus {
@@ -173,6 +175,24 @@ impl Workspace {
     pub(crate) fn is_active_content(&self, is_matching: fn(&TabContent) -> bool) -> bool {
         self.active_tab()
             .is_some_and(|tab| is_matching(&tab.content))
+    }
+
+    pub(crate) fn new_table_view(&self, relation: RelationRef, page_size: usize) -> TableView {
+        let has_id_column = self
+            .catalog
+            .ready()
+            .and_then(|catalog| catalog.relation(&relation))
+            .is_some_and(|catalog_relation| {
+                catalog_relation
+                    .columns
+                    .iter()
+                    .any(|column| column.name == DEFAULT_SORT_COLUMN)
+            });
+        let default_sort = has_id_column.then(|| Sort {
+            column: DEFAULT_SORT_COLUMN.to_owned(),
+            direction: SortDirection::Descending,
+        });
+        TableView::first_page(relation, page_size, default_sort)
     }
 
     pub(crate) fn push_tab(&mut self, content: TabContent) -> TabId {

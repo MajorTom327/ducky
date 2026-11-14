@@ -1,6 +1,6 @@
 use std::collections::{BTreeMap, BTreeSet};
 
-use ducky_core::{Cell, Page, PageRequest, RelationDetails, RelationRef};
+use ducky_core::{Cell, Page, PageRequest, RelationDetails, RelationRef, Sort};
 
 use crate::loadable::Loadable;
 
@@ -31,13 +31,17 @@ pub struct TableView {
 }
 
 impl TableView {
-    pub(crate) fn first_page(relation: RelationRef, page_size: usize) -> TableView {
+    pub(crate) fn first_page(
+        relation: RelationRef,
+        page_size: usize,
+        sort: Option<Sort>,
+    ) -> TableView {
         TableView {
             request: PageRequest {
                 relation: relation.clone(),
                 page_index: 0,
                 page_size,
-                sort: None,
+                sort,
                 filter: None,
             },
             relation,

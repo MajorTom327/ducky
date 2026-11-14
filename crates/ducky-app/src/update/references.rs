@@ -184,7 +184,7 @@ fn open_filtered(
         workspace.active_tab_index = tab_index;
         return Vec::new();
     }
-    let mut table = TableView::first_page(relation, page_size);
+    let mut table = workspace.new_table_view(relation, page_size);
     table.request.filter = Some(filter);
     let request = table.request.clone();
     workspace.push_tab(TabContent::Table(table));

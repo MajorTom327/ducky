@@ -3,7 +3,7 @@ mod support;
 use ducky_app::{
     Command, Focus, Loadable, Modal, Msg, PromptKind, SidebarItem, SidebarMsg, TableTab, TabsMsg,
 };
-use ducky_core::{DEFAULT_PAGE_SIZE, PageRequest, RelationKind, RelationRef};
+use ducky_core::{DEFAULT_PAGE_SIZE, PageRequest, RelationKind, RelationRef, Sort, SortDirection};
 use support::{
     activate_relation, active_table, connected_state, send, tools_available, workspace,
     workspace_mut, workspace_state,
@@ -97,7 +97,10 @@ fn activate_relation_loads_first_page() {
         },
         page_index: 0,
         page_size: DEFAULT_PAGE_SIZE,
-        sort: None,
+        sort: Some(Sort {
+            column: "id".to_owned(),
+            direction: SortDirection::Descending,
+        }),
         filter: None,
     };
     assert_eq!(commands, vec![Command::LoadPage(expected_request.clone())]);
@@ -112,6 +115,24 @@ fn activate_relation_loads_first_page() {
     assert_eq!(workspace.tabs[0].title(), "customers");
     assert_eq!(workspace.next_tab_id, 2);
     assert_eq!(workspace.focus, Focus::Main);
+}
+
+#[test]
+fn relation_without_an_id_column_opens_unsorted() {
+    let mut state = workspace_state();
+    let Loadable::Ready(catalog) = &mut workspace_mut(&mut state).catalog else {
+        panic!("catalog ready");
+    };
+    catalog
+        .schemas
+        .iter_mut()
+        .flat_map(|schema| schema.relations.iter_mut())
+        .find(|relation| relation.name == "customers")
+        .expect("customers relation")
+        .columns
+        .retain(|column| column.name != "id");
+    activate_relation(&mut state, "customers");
+    assert_eq!(active_table(&state).request.sort, None);
 }
 
 #[test]

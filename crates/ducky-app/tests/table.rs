@@ -340,9 +340,10 @@ fn table_messages_and_responses_are_ignored_on_the_profile_screen() {
 fn copy_and_sort_wait_for_the_page() {
     let mut state = workspace_state();
     activate_relation(&mut state, "customers");
+    let opening_sort = table(&state).request.sort.clone();
     assert!(send(&mut state, Msg::Table(TableMsg::CopyCell)).is_empty());
     assert!(send(&mut state, Msg::Table(TableMsg::CycleSort)).is_empty());
     assert!(state.notice.is_none());
-    assert_eq!(table(&state).request.sort, None);
+    assert_eq!(table(&state).request.sort, opening_sort);
     assert_eq!(table(&state).page, Loadable::Loading);
 }

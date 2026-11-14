@@ -4,7 +4,7 @@ use crate::command::Command;
 use crate::loadable::Loadable;
 use crate::msg::TabsMsg;
 use crate::state::{
-    AppState, Document, Focus, NoticeLevel, QueryPane, TabContent, TabId, TableView, Workspace,
+    AppState, Document, Focus, NoticeLevel, QueryPane, TabContent, TabId, Workspace,
 };
 use crate::update::cell_edits::unsaved_drafts_refusal;
 use crate::update::{notice, workspace_mut};
@@ -129,7 +129,7 @@ pub(crate) fn open_relation(
         workspace.active_tab_index = tab_index;
         return Vec::new();
     }
-    let table = TableView::first_page(relation, page_size);
+    let table = workspace.new_table_view(relation, page_size);
     let request = table.request.clone();
     workspace.push_tab(TabContent::Table(table));
     vec![Command::LoadPage(request)]
