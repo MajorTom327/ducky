@@ -131,6 +131,13 @@ impl Workspace {
         self.active_tab().map(|tab| tab.id)
     }
 
+    pub(crate) fn set_focus(&mut self, focus: Focus) {
+        self.focus = focus;
+        if focus == Focus::Sidebar {
+            self.sidebar.is_collapsed = false;
+        }
+    }
+
     pub(crate) fn active_content_mut(&mut self) -> Option<&mut TabContent> {
         self.tabs
             .get_mut(self.active_tab_index)

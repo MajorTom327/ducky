@@ -3,10 +3,10 @@ use std::path::PathBuf;
 
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use ducky_app::{
-    AppState, Confirm, ConfirmKind, Connection, Focus, GridCursor, GridMove, Loadable, Modal,
-    ModalMsg, Msg, Notice, NoticeLevel, PickerMode, ProfilePicker, ProfilesMsg, Prompt, PromptKind,
-    QueryMsg, QueryPane, QueryView, RowDetail, Screen, SidebarMsg, Tab, TabContent, TabId,
-    TableMsg, TableTab, TableView, TabsMsg, Workspace,
+    AppState, Confirm, ConfirmKind, Connection, DEFAULT_SIDEBAR_WIDTH, Focus, GridCursor, GridMove,
+    Loadable, Modal, ModalMsg, Msg, Notice, NoticeLevel, PickerMode, ProfilePicker, ProfilesMsg,
+    Prompt, PromptKind, QueryMsg, QueryPane, QueryView, RowDetail, Screen, SidebarMsg, Tab,
+    TabContent, TabId, TableMsg, TableTab, TableView, TabsMsg, Workspace,
 };
 use ducky_core::{
     Catalog, PageRequest, PgTools, Profile, ProfileKind, RelationRef, SessionInfo, StoragePaths,
@@ -496,7 +496,7 @@ fn comment_style_is_dark_gray_italic() {
 #[test]
 fn effects_start_for_workspace_entry_notices_modals_and_loading() {
     let screen = Rect::new(0, 0, 100, 30);
-    let areas = FrameAreas::new(screen);
+    let areas = FrameAreas::new(screen, DEFAULT_SIDEBAR_WIDTH);
     let accent = palette(Some(ProfileKind::Local));
     let mut buffer = Buffer::empty(screen);
     let mut effects = UiEffects::new(true);

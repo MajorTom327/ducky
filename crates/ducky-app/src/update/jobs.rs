@@ -62,6 +62,12 @@ pub(crate) fn update_restore(state: &mut AppState, msg: RestoreMsg) -> Vec<Comma
             }
             Vec::new()
         }
+        RestoreMsg::Select(entry_index) => {
+            if let Some(entry_count) = restore.entries.ready().map(Vec::len) {
+                restore.selected_entry_index = clamp_index(entry_index, entry_count);
+            }
+            Vec::new()
+        }
         RestoreMsg::ToggleClean => {
             restore.options.clean_before_restore = !restore.options.clean_before_restore;
             Vec::new()

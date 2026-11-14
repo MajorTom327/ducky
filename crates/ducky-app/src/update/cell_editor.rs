@@ -6,6 +6,7 @@ use crate::state::{
     AppState, CellEditor, CellInput, GridCursor, Modal, Notice, NoticeLevel, TabContent, TableTab,
     TableView, Workspace,
 };
+use crate::update::cell_edits::sql_expression;
 use crate::update::row_keys::{row_keys, target_row_indexes};
 use crate::update::workspace_mut;
 
@@ -84,7 +85,7 @@ pub(crate) fn set_cell_null(state: &mut AppState) -> Vec<Command> {
 
 pub(crate) fn submit(state: &mut AppState, editor: CellEditor) -> Vec<Command> {
     let draft_value = match editor.input {
-        CellInput::Text(input) => Some(input.value().to_owned()),
+        CellInput::Text(input) => text_draft(input.value()),
         CellInput::Choice {
             options,
             selected_option_index,
@@ -99,6 +100,13 @@ pub(crate) fn submit(state: &mut AppState, editor: CellEditor) -> Vec<Command> {
         commit(table, editor.column_index, &editor.row_indexes, draft_value);
     }
     Vec::new()
+}
+
+fn text_draft(text: &str) -> Cell {
+    match sql_expression(text) {
+        Some(expression) if expression.trim().eq_ignore_ascii_case("null") => None,
+        _ => Some(text.to_owned()),
+    }
 }
 
 fn edit_target(workspace: &Workspace) -> Option<Result<EditTarget<'_>, Notice>> {

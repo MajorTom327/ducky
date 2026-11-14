@@ -7,6 +7,8 @@ use ratatui::layout::{Constraint, Layout, Rect};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Paragraph, Wrap};
 
+use crate::keys::sequence::GridPane;
+use crate::mouse::MouseTarget;
 use crate::theme::Palette;
 use crate::tui_state::TuiState;
 use crate::views::ViewContext;
@@ -45,6 +47,8 @@ pub fn render(
     }
     let inner_area = block.inner(area);
     frame.render_widget(block, area);
+    tui.mouse_targets
+        .push((area, MouseTarget::Grid(GridPane::Results)));
     match &query.run {
         RunState::Idle => render_message(
             frame,
@@ -132,8 +136,10 @@ fn render_report(
                     linked_columns: &[],
                     selected_row_indexes: &[],
                     draft_cells: &BTreeMap::new(),
+                    pane: GridPane::Results,
                 },
                 palette,
+                &mut tui.mouse_targets,
             );
         }
         Some(StatementOutcome::Affected(affected_count)) => frame.render_widget(

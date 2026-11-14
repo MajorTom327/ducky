@@ -90,7 +90,7 @@ fn close_active_tab(workspace: &mut Workspace) {
     }
     workspace.active_tab_index = tab_index.min(workspace.tabs.len().saturating_sub(1));
     if workspace.tabs.is_empty() {
-        workspace.focus = Focus::Sidebar;
+        workspace.set_focus(Focus::Sidebar);
     }
 }
 

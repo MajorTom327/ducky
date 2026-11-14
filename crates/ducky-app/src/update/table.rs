@@ -4,11 +4,11 @@ use crate::command::Command;
 use crate::loadable::Loadable;
 use crate::msg::TableMsg;
 use crate::state::{
-    AppState, Modal, NoticeLevel, Prompt, PromptKind, RowDetail, TabContent, TableTab, TableView,
-    Workspace,
+    AppState, Focus, Modal, NoticeLevel, Prompt, PromptKind, RowDetail, TabContent, TableTab,
+    TableView, Workspace,
 };
 use crate::update::cell_edits::{self, unsaved_drafts_refusal};
-use crate::update::grid::{cell_text, clamp_cursor, move_cursor};
+use crate::update::grid::{cell_text, clamp_cursor, move_cursor, place_cursor};
 use crate::update::{cell_editor, notice, references, selection, workspace_mut};
 
 pub(crate) fn update(state: &mut AppState, msg: TableMsg) -> Vec<Command> {
@@ -56,6 +56,13 @@ pub(crate) fn update(state: &mut AppState, msg: TableMsg) -> Vec<Command> {
             if let Some(page) = table.page.ready() {
                 move_cursor(&mut table.cursor, &page.result_set, grid_move);
             }
+            Vec::new()
+        }
+        TableMsg::SelectCell(cell) => {
+            if let Some(page) = table.page.ready() {
+                place_cursor(&mut table.cursor, &page.result_set, cell);
+            }
+            workspace.focus = Focus::Main;
             Vec::new()
         }
         TableMsg::NextPage => {

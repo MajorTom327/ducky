@@ -12,6 +12,7 @@ use crate::update::table::reload_page;
 use crate::update::{notice, workspace_mut};
 
 const NULL_LITERAL: &str = "NULL";
+const SQL_EXPRESSION_QUOTE: char = '`';
 
 struct SaveRequest {
     tab_id: TabId,
@@ -212,7 +213,18 @@ fn save_sql(
 }
 
 fn sql_value(draft_value: &Cell) -> String {
-    draft_value
-        .as_deref()
-        .map_or_else(|| NULL_LITERAL.to_owned(), quote_literal)
+    match draft_value.as_deref() {
+        None => NULL_LITERAL.to_owned(),
+        Some(draft_text) => match sql_expression(draft_text) {
+            Some(expression) => expression.to_owned(),
+            None => quote_literal(draft_text),
+        },
+    }
+}
+
+pub(crate) fn sql_expression(draft_text: &str) -> Option<&str> {
+    draft_text
+        .strip_prefix(SQL_EXPRESSION_QUOTE)?
+        .strip_suffix(SQL_EXPRESSION_QUOTE)
+        .filter(|expression| !expression.trim().is_empty())
 }

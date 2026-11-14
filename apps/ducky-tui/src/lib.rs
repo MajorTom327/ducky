@@ -4,6 +4,7 @@ pub mod effects;
 pub mod event_loop;
 pub mod keys;
 pub mod layout;
+pub mod mouse;
 pub mod profile_lookup;
 pub mod theme;
 pub mod tui_state;

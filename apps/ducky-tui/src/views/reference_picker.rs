@@ -4,6 +4,7 @@ use ratatui::layout::{Constraint, Layout, Rect};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Clear, Paragraph};
 
+use crate::mouse::{MouseTarget, MouseTargets, list_row_targets};
 use crate::theme::Palette;
 
 const WIDTH_PERCENT: u16 = 60;
@@ -16,6 +17,7 @@ pub fn render(
     links: &[(RelationRef, ForeignKeyLink)],
     selected_link_index: usize,
     palette: &Palette,
+    mouse_targets: &mut MouseTargets,
 ) -> Rect {
     let height = u16::try_from(links.len() + CHROME_HEIGHT).unwrap_or(u16::MAX);
     let area = screen.centered(
@@ -50,6 +52,12 @@ pub fn render(
         Paragraph::new(lines).scroll((u16::try_from(scroll).unwrap_or(0), 0)),
         list_area,
     );
+    mouse_targets.extend(list_row_targets(
+        list_area,
+        scroll,
+        links.len(),
+        MouseTarget::ModalItem,
+    ));
     frame.render_widget(
         Paragraph::new(Line::styled(FOOTER, palette.muted())),
         footer_area,

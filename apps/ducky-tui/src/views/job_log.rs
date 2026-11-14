@@ -4,6 +4,7 @@ use ratatui::layout::Rect;
 use ratatui::text::Line;
 use ratatui::widgets::{Block, Borders, Paragraph};
 
+use crate::mouse::{MouseTarget, ScrollArea};
 use crate::theme::Palette;
 use crate::tui_state::TuiState;
 use crate::widgets::loading::{LoadSlot, render_error, render_loading};
@@ -12,7 +13,7 @@ pub fn render(
     frame: &mut Frame,
     area: Rect,
     log_lines: &[String],
-    scroll: Option<u16>,
+    tui: &mut TuiState,
     palette: &Palette,
 ) {
     let block = Block::default()
@@ -21,7 +22,7 @@ pub fn render(
         .title(Line::styled(" Log ", palette.title()));
     let visible_height = usize::from(block.inner(area).height);
     let max_offset = log_lines.len().saturating_sub(visible_height);
-    let first_line_index = match scroll {
+    let first_line_index = match tui.job_log_scroll {
         Some(offset) => usize::from(offset).min(max_offset),
         None => max_offset,
     };
@@ -32,6 +33,8 @@ pub fn render(
         .map(|line| Line::raw(line.clone()))
         .collect();
     frame.render_widget(Paragraph::new(lines).block(block), area);
+    tui.mouse_targets
+        .push((area, MouseTarget::Scroll(ScrollArea::JobLog)));
 }
 
 pub fn render_job_state(

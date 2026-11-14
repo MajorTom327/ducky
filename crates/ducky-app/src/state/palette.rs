@@ -29,6 +29,7 @@ pub enum PaletteAction {
     Dump,
     Restore,
     ChooseSchema,
+    ToggleSidebar,
     RefreshCatalog,
     Reconnect,
     Disconnect,
@@ -147,6 +148,7 @@ fn action_items(workspace: &Workspace) -> Vec<PaletteItem> {
             PaletteAction::Restore,
         ),
         ("Switch schema", None, PaletteAction::ChooseSchema),
+        ("Toggle sidebar", None, PaletteAction::ToggleSidebar),
         (
             "Switch profile…",
             Some(workspace.profile.display_name()),

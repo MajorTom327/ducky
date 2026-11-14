@@ -64,11 +64,5 @@ pub fn render(frame: &mut Frame, area: Rect, context: &ViewContext, tui: &mut Tu
         tui,
         palette,
     );
-    job_log::render(
-        frame,
-        log_area,
-        &workspace.dump.log_lines,
-        tui.job_log_scroll,
-        palette,
-    );
+    job_log::render(frame, log_area, &workspace.dump.log_lines, tui, palette);
 }

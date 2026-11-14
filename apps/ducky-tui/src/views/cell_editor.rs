@@ -1,11 +1,12 @@
 use ducky_app::{CellEditor, CellInput};
 use ducky_core::Cell;
 use ratatui::Frame;
-use ratatui::layout::{Constraint, Position, Rect, Size};
+use ratatui::layout::{Constraint, Margin, Position, Rect, Size};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Clear, Paragraph};
 use tui_input::Input;
 
+use crate::mouse::{MouseTarget, MouseTargets, list_row_targets};
 use crate::theme::Palette;
 use crate::views::completion::anchored_popup_area;
 use crate::views::modal::render_input_line;
@@ -23,22 +24,36 @@ pub fn render(
     editor: &CellEditor,
     anchor: Option<Rect>,
     palette: &Palette,
+    mouse_targets: &mut MouseTargets,
 ) -> Rect {
     match &editor.input {
         CellInput::Text(input) => render_text(frame, screen, input, anchor, palette),
         CellInput::Choice {
             options,
             selected_option_index,
-        } => render_choice(
-            frame,
-            screen,
-            &editor.column_name,
-            options,
-            *selected_option_index,
-            anchor,
-            palette,
-        ),
+        } => {
+            let area = render_choice(
+                frame,
+                screen,
+                &editor.column_name,
+                options,
+                *selected_option_index,
+                anchor,
+                palette,
+            );
+            mouse_targets.extend(list_row_targets(
+                area.inner(Margin::new(1, 1)),
+                first_visible_option_index(options.len(), *selected_option_index),
+                options.len(),
+                MouseTarget::ModalItem,
+            ));
+            area
+        }
     }
+}
+
+fn first_visible_option_index(option_count: usize, selected_option_index: usize) -> usize {
+    (selected_option_index + 1).saturating_sub(option_count.min(MAX_VISIBLE_OPTIONS))
 }
 
 fn render_text(
@@ -99,7 +114,7 @@ fn render_choice(
             Constraint::Length(popup_size.height),
         ),
     };
-    let first_option_index = (selected_option_index + 1).saturating_sub(visible_option_count);
+    let first_option_index = first_visible_option_index(options.len(), selected_option_index);
     let lines: Vec<Line> = options
         .iter()
         .enumerate()

@@ -17,15 +17,18 @@ pub(crate) fn update(state: &mut AppState, msg: FilesMsg) -> Vec<Command> {
     }
     let files = &mut workspace.files;
     match msg {
-        FilesMsg::Next | FilesMsg::Previous => {
+        FilesMsg::Next | FilesMsg::Previous | FilesMsg::Select(_) => {
             let Some(entry_count) = files.entries.ready().map(Vec::len) else {
                 return Vec::new();
             };
-            let next_index = step_index(
-                files.selected_entry_index,
-                entry_count,
-                msg == FilesMsg::Next,
-            );
+            let next_index = match msg {
+                FilesMsg::Select(entry_index) => clamp_index(entry_index, entry_count),
+                _ => step_index(
+                    files.selected_entry_index,
+                    entry_count,
+                    msg == FilesMsg::Next,
+                ),
+            };
             if next_index == files.selected_entry_index {
                 return Vec::new();
             }

@@ -1,5 +1,5 @@
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
-use ducky_app::{GridMove, ModalMsg, Msg, QueryMsg, TableMsg, TabsMsg};
+use ducky_app::{GridMove, ModalMsg, Msg, QueryMsg, SidebarMsg, TableMsg, TabsMsg};
 use tui_input::InputRequest;
 
 use crate::keys::help::KeyHint;
@@ -60,6 +60,7 @@ pub fn handle(tui: &mut TuiState, key: KeyEvent, grid_pane: Option<GridPane>) ->
             return Some(Vec::new());
         }
         (KeyPrefix::Leader, Some('p')) => Msg::OpenProfilePicker,
+        (KeyPrefix::Leader, Some('e')) => Msg::Sidebar(SidebarMsg::ToggleCollapsed),
         (KeyPrefix::LeaderBuffer, Some('d')) => Msg::Tabs(TabsMsg::Close),
         (KeyPrefix::LeaderQuit, Some('q')) => Msg::Quit,
         (KeyPrefix::Go(GridPane::TableData), Some('g')) => {
@@ -82,6 +83,7 @@ pub fn pending_hints(prefix: KeyPrefix) -> &'static [KeyHint] {
         KeyPrefix::Leader => &[
             ("Space", "…"),
             ("b", "tabs"),
+            ("e", "sidebar"),
             ("p", "profile"),
             ("q", "quit"),
             ("Esc", "cancel"),

@@ -8,16 +8,20 @@ use ratatui::style::Style;
 use ratatui::text::{Line, Span};
 use ratatui::widgets::Paragraph;
 
+use crate::keys::sequence::GridPane;
+use crate::mouse::{MouseTarget, MouseTargets};
 use crate::theme::Palette;
 
 mod cells;
 mod columns;
 mod header;
+mod targets;
 mod viewport;
 
 use cells::{cell_area, cell_style, cell_text, displayed_cell, fit};
 use columns::{GridColumn, expand_truncated_columns, grid_column};
 use header::{header_line, rule_line};
+use targets::header_targets;
 pub use viewport::GridViewport;
 use viewport::{scroll_columns, scroll_rows};
 
@@ -38,6 +42,7 @@ pub struct GridOptions<'a> {
     pub linked_columns: &'a [String],
     pub selected_row_indexes: &'a [usize],
     pub draft_cells: &'a BTreeMap<GridCursor, Cell>,
+    pub pane: GridPane,
 }
 
 pub fn render_grid(
@@ -47,6 +52,7 @@ pub fn render_grid(
     viewport: &mut GridViewport,
     options: GridOptions,
     palette: &Palette,
+    mouse_targets: &mut MouseTargets,
 ) -> Option<Rect> {
     if area.height == 0 || area.width == 0 {
         return None;
@@ -97,6 +103,14 @@ pub fn render_grid(
     let mut shown_columns = columns[viewport.first_column_index.min(columns.len())..].to_vec();
     expand_truncated_columns(&mut shown_columns, grid_width);
     let shown_columns = shown_columns.as_slice();
+    mouse_targets.push((area, MouseTarget::Grid(options.pane)));
+    mouse_targets.extend(header_targets(
+        area,
+        shown_columns,
+        full_gutter_width,
+        viewport.first_column_index,
+        options.pane,
+    ));
 
     let mut lines = vec![
         header_line(shown_columns, full_gutter_width, palette),
@@ -156,8 +170,15 @@ pub fn render_grid(
                 style,
             ));
             cell_offset_x += COLUMN_GAP.len();
+            let body_cell_area = cell_area(area, cell_offset_x, offset, column.width);
+            let cell_target = MouseTarget::GridCell {
+                pane: options.pane,
+                row_index,
+                column_index,
+            };
+            mouse_targets.push((body_cell_area.intersection(area), cell_target));
             if cursor_column_index == Some(column_index) {
-                cursor_cell_area = Some(cell_area(area, cell_offset_x, offset, column.width));
+                cursor_cell_area = Some(body_cell_area);
             }
             cell_offset_x += column.width;
         }

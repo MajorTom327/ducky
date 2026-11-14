@@ -4,10 +4,11 @@ use crate::state::{
     AppState, CellEditor, CellInput, Confirm, ConfirmKind, JobState, Modal, NoticeLevel,
     PendingSave, Prompt, PromptKind,
 };
+use crate::update::modal_selection::{SelectionMove, move_selection};
 use crate::update::table::apply_filter;
 use crate::update::{
     cell_editor, cell_edits, notice, palette, parameters, profiles, references, run_confirmation,
-    step_index, workspace_mut,
+    workspace_mut,
 };
 
 pub(crate) fn update(state: &mut AppState, msg: ModalMsg) -> Vec<Command> {
@@ -103,58 +104,11 @@ pub(crate) fn update(state: &mut AppState, msg: ModalMsg) -> Vec<Command> {
         }
         ModalMsg::Next | ModalMsg::Previous => {
             let is_forward = msg == ModalMsg::Next;
-            let schema_count = state
-                .workspace()
-                .and_then(|workspace| workspace.catalog.ready())
-                .map_or(0, |catalog| catalog.schemas.len());
-            let palette_item_count = match (&state.modal, state.workspace()) {
-                (Some(Modal::Palette(command_palette)), Some(workspace)) => {
-                    workspace.palette_items(command_palette.input.value()).len()
-                }
-                _ => 0,
-            };
-            match &mut state.modal {
-                Some(Modal::Palette(command_palette)) => {
-                    command_palette.selected_item_index = step_index(
-                        command_palette.selected_item_index,
-                        palette_item_count,
-                        is_forward,
-                    );
-                }
-                Some(Modal::SchemaPicker {
-                    selected_schema_index,
-                }) => {
-                    *selected_schema_index =
-                        step_index(*selected_schema_index, schema_count, is_forward);
-                }
-                Some(Modal::Parameters(form)) => parameters::step(form, is_forward),
-                Some(Modal::ReferencePicker {
-                    links,
-                    selected_link_index,
-                }) => {
-                    *selected_link_index =
-                        step_index(*selected_link_index, links.len(), is_forward);
-                }
-                Some(Modal::RowDetail(row_detail)) => {
-                    row_detail.selected_field_index = step_index(
-                        row_detail.selected_field_index,
-                        row_detail.columns.len(),
-                        is_forward,
-                    );
-                }
-                Some(Modal::CellEditor(CellEditor {
-                    input:
-                        CellInput::Choice {
-                            options,
-                            selected_option_index,
-                        },
-                    ..
-                })) => {
-                    *selected_option_index =
-                        step_index(*selected_option_index, options.len(), is_forward);
-                }
-                _ => {}
-            }
+            move_selection(state, SelectionMove::Step { is_forward });
+            Vec::new()
+        }
+        ModalMsg::Select(item_index) => {
+            move_selection(state, SelectionMove::To(item_index));
             Vec::new()
         }
         ModalMsg::ToggleRaw => {

@@ -12,7 +12,9 @@ use ducky_core::{
     Schema, SessionInfo, StoragePaths, ToolStatus,
 };
 use ducky_tui::keys::hints::hints;
+use ducky_tui::keys::sequence::GridPane;
 use ducky_tui::keys::{handle_key, modal};
+use ducky_tui::mouse::MouseTarget;
 use ducky_tui::theme::palette;
 use ducky_tui::tui_state::TuiState;
 use ducky_tui::views::{cell_editor, draw};
@@ -239,8 +241,10 @@ fn grid_shows_drafted_values_in_bold_yellow_and_returns_the_cursor_cell() {
                     linked_columns: &[],
                     selected_row_indexes: &[],
                     draft_cells: &draft_cells,
+                    pane: GridPane::TableData,
                 },
                 &grid_palette,
+                &mut Vec::new(),
             );
         })
         .expect("draw");
@@ -288,8 +292,10 @@ fn grid_without_rows_has_no_cursor_cell() {
                     linked_columns: &[],
                     selected_row_indexes: &[],
                     draft_cells: &BTreeMap::new(),
+                    pane: GridPane::TableData,
                 },
                 &grid_palette,
+                &mut Vec::new(),
             );
         })
         .expect("draw");
@@ -404,6 +410,7 @@ fn editor_falls_back_to_the_screen_center_and_opens_above_near_the_bottom() {
     };
     let mut terminal = Terminal::new(TestBackend::new(60, 20)).expect("terminal");
     let mut areas = Vec::new();
+    let mut mouse_targets = Vec::new();
     terminal
         .draw(|frame| {
             areas.push(cell_editor::render(
@@ -412,6 +419,7 @@ fn editor_falls_back_to_the_screen_center_and_opens_above_near_the_bottom() {
                 &text_editor,
                 None,
                 &editor_palette,
+                &mut mouse_targets,
             ));
             areas.push(cell_editor::render(
                 frame,
@@ -419,6 +427,7 @@ fn editor_falls_back_to_the_screen_center_and_opens_above_near_the_bottom() {
                 &choice_editor,
                 None,
                 &editor_palette,
+                &mut mouse_targets,
             ));
             areas.push(cell_editor::render(
                 frame,
@@ -426,6 +435,7 @@ fn editor_falls_back_to_the_screen_center_and_opens_above_near_the_bottom() {
                 &choice_editor,
                 Some(Rect::new(55, 18, 5, 1)),
                 &editor_palette,
+                &mut mouse_targets,
             ));
             areas.push(cell_editor::render(
                 frame,
@@ -433,6 +443,7 @@ fn editor_falls_back_to_the_screen_center_and_opens_above_near_the_bottom() {
                 &text_editor,
                 Some(Rect::new(50, 5, 5, 1)),
                 &editor_palette,
+                &mut mouse_targets,
             ));
         })
         .expect("draw");
@@ -445,6 +456,16 @@ fn editor_falls_back_to_the_screen_center_and_opens_above_near_the_bottom() {
     let buffer = terminal.backend().buffer();
     assert!(buffer_text(buffer).contains(" label9 "));
     assert!(!buffer_text(buffer).contains(" label0 "));
+    let centered_choice_targets: Vec<_> = mouse_targets.iter().take(8).collect();
+    assert_eq!(
+        centered_choice_targets[0],
+        &(
+            Rect::new(areas[1].x + 1, areas[1].y + 1, areas[1].width - 2, 1),
+            MouseTarget::ModalItem(2)
+        )
+    );
+    assert_eq!(centered_choice_targets[7].1, MouseTarget::ModalItem(9));
+    assert_eq!(mouse_targets.len(), 16);
 }
 
 #[test]

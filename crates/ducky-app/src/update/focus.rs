@@ -24,7 +24,7 @@ pub(crate) fn toggle(state: &mut AppState) -> Vec<Command> {
         (Some(_), Focus::Main) => Focus::Sidebar,
         (Some(_), Focus::Sidebar) => Focus::Main,
     };
-    workspace.focus = next_focus;
+    workspace.set_focus(next_focus);
     Vec::new()
 }
 
@@ -34,7 +34,7 @@ pub(crate) fn move_towards(state: &mut AppState, direction: PaneDirection) -> Ve
     };
     let is_main_focused = workspace.focus == Focus::Main;
     match (direction, workspace.active_content_mut()) {
-        (PaneDirection::Left, _) => workspace.focus = Focus::Sidebar,
+        (PaneDirection::Left, _) => workspace.set_focus(Focus::Sidebar),
         (PaneDirection::Right, Some(_)) => workspace.focus = Focus::Main,
         (PaneDirection::Up, Some(TabContent::Query(query))) if is_main_focused => {
             query.pane = QueryPane::Editor;

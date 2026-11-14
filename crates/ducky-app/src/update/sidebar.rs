@@ -1,6 +1,9 @@
 use crate::command::Command;
 use crate::msg::SidebarMsg;
-use crate::state::{AppState, Modal, Prompt, PromptKind, Workspace};
+use crate::state::{
+    AppState, Focus, MAX_SIDEBAR_WIDTH, MIN_SIDEBAR_WIDTH, Modal, Prompt, PromptKind,
+    SIDEBAR_WIDTH_STEP, Sidebar, Workspace,
+};
 use crate::update::tabs::open_relation;
 use crate::update::{clamp_index, step_index, workspace_mut};
 
@@ -18,15 +21,12 @@ pub(crate) fn update(state: &mut AppState, msg: SidebarMsg) -> Vec<Command> {
                 item_count,
                 msg == SidebarMsg::Next,
             );
-            Vec::new()
         }
-        SidebarMsg::First => {
-            sidebar.selected_item_index = 0;
-            Vec::new()
-        }
-        SidebarMsg::Last => {
-            sidebar.selected_item_index = clamp_index(usize::MAX, item_count);
-            Vec::new()
+        SidebarMsg::First => sidebar.selected_item_index = 0,
+        SidebarMsg::Last => sidebar.selected_item_index = clamp_index(usize::MAX, item_count),
+        SidebarMsg::Select(item_index) => {
+            sidebar.selected_item_index = clamp_index(item_index, item_count);
+            workspace.set_focus(Focus::Sidebar);
         }
         SidebarMsg::StartFilter => {
             state.modal = Some(Modal::Prompt(Prompt::new(
@@ -34,15 +34,38 @@ pub(crate) fn update(state: &mut AppState, msg: SidebarMsg) -> Vec<Command> {
                 "Filter tables",
                 sidebar.filter.clone(),
             )));
-            Vec::new()
         }
         SidebarMsg::ClearFilter => {
             sidebar.filter.clear();
             sidebar.selected_item_index = 0;
-            Vec::new()
         }
-        SidebarMsg::Activate => activate(workspace, page_size),
+        SidebarMsg::ToggleCollapsed => match sidebar.is_collapsed {
+            true => workspace.set_focus(Focus::Sidebar),
+            false => {
+                sidebar.is_collapsed = true;
+                workspace.focus = Focus::Main;
+            }
+        },
+        SidebarMsg::Widen | SidebarMsg::Narrow => resize(sidebar, msg == SidebarMsg::Widen),
+        SidebarMsg::SetWidth(width) => {
+            sidebar.width = width.clamp(MIN_SIDEBAR_WIDTH, MAX_SIDEBAR_WIDTH);
+            sidebar.is_collapsed = false;
+        }
+        SidebarMsg::Activate => return activate(workspace, page_size),
     }
+    Vec::new()
+}
+
+fn resize(sidebar: &mut Sidebar, is_widening: bool) {
+    if sidebar.is_collapsed {
+        sidebar.is_collapsed = false;
+        return;
+    }
+    let requested_width = match is_widening {
+        true => sidebar.width.saturating_add(SIDEBAR_WIDTH_STEP),
+        false => sidebar.width.saturating_sub(SIDEBAR_WIDTH_STEP),
+    };
+    sidebar.width = requested_width.clamp(MIN_SIDEBAR_WIDTH, MAX_SIDEBAR_WIDTH);
 }
 
 fn activate(workspace: &mut Workspace, page_size: usize) -> Vec<Command> {

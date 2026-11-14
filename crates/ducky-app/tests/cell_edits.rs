@@ -591,6 +591,30 @@ fn save_on_local_emits_one_update_per_row() {
 }
 
 #[test]
+fn backticked_text_is_saved_as_a_sql_expression() {
+    let mut state = edit_state();
+    let tab_id = active_tab_id(&state);
+    change_text(&mut state, 0, NAME, "`upper('ada')`");
+    change_text(&mut state, 1, NAME, "``");
+    change_text(&mut state, 2, NAME, "`unclosed");
+    assert_eq!(
+        table_message(&mut state, TableMsg::SaveDrafts),
+        vec![Command::SaveCellEdits {
+            tab_id,
+            sql: "UPDATE \"public\".\"customers\" SET \"name\" = upper('ada') WHERE \"id\" = '1';\nUPDATE \"public\".\"customers\" SET \"name\" = '``' WHERE \"id\" = '2';\nUPDATE \"public\".\"customers\" SET \"name\" = '`unclosed' WHERE \"id\" = '3';".to_owned(),
+        }]
+    );
+}
+
+#[test]
+fn backticked_null_drafts_a_null() {
+    let mut state = edit_state();
+    change_text(&mut state, 0, NAME, "` null `");
+    change_text(&mut state, 1, NAME, "`NULL`");
+    assert_eq!(drafts(&state), BTreeMap::from([draft_at(0, NAME, None)]));
+}
+
+#[test]
 fn save_with_a_composite_key_uses_the_original_key_values() {
     let mut state = edit_state();
     set_primary_key(&mut state, &["id", "status"]);

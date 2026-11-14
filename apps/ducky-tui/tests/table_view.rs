@@ -11,6 +11,7 @@ use ducky_core::{
     Relation, RelationDetails, RelationKind, RelationRef, ResultSet, Schema, SessionInfo, Sort,
     SortDirection, StoragePaths, ToolStatus,
 };
+use ducky_tui::keys::sequence::GridPane;
 use ducky_tui::keys::table::handle;
 use ducky_tui::theme::palette;
 use ducky_tui::tui_state::TuiState;
@@ -268,6 +269,7 @@ fn render_small_grid(
                 linked_columns: &[],
                 selected_row_indexes,
                 draft_cells: &BTreeMap::new(),
+                pane: GridPane::TableData,
             };
             render_grid(
                 frame,
@@ -276,6 +278,7 @@ fn render_small_grid(
                 &mut GridViewport::default(),
                 options,
                 &grid_palette,
+                &mut Vec::new(),
             );
         })
         .expect("draw");

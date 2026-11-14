@@ -59,6 +59,7 @@ fn empty_query_lists_tabs_then_actions_then_relations() {
             "Dump database",
             "Restore dump",
             "Switch schema",
+            "Toggle sidebar",
             "Switch profile…",
             "Refresh catalog",
             "Reconnect",
@@ -74,13 +75,14 @@ fn empty_query_lists_tabs_then_actions_then_relations() {
     assert_eq!(items[0].detail.as_deref(), Some("open tab"));
     assert_eq!(items[0].action, PaletteAction::SwitchTab(1));
     assert_eq!(items[3].detail, None);
-    assert_eq!(items[6].detail.as_deref(), Some("Local"));
-    assert_eq!(items[6].action, PaletteAction::SwitchProfile);
-    assert_eq!(items[11].command_alias, Some(":q"));
-    assert_eq!(items[12].detail.as_deref(), Some("table · ~10 rows"));
-    assert_eq!(items[13].detail.as_deref(), Some("view"));
+    assert_eq!(items[6].action, PaletteAction::ToggleSidebar);
+    assert_eq!(items[7].detail.as_deref(), Some("Local"));
+    assert_eq!(items[7].action, PaletteAction::SwitchProfile);
+    assert_eq!(items[12].command_alias, Some(":q"));
+    assert_eq!(items[13].detail.as_deref(), Some("table · ~10 rows"));
+    assert_eq!(items[14].detail.as_deref(), Some("view"));
     assert_eq!(
-        items[15].action,
+        items[16].action,
         PaletteAction::OpenRelation(RelationRef {
             schema: "analytics".to_owned(),
             name: "events".to_owned(),
@@ -189,7 +191,7 @@ fn relation_details_cover_every_kind() {
     let details: Vec<Option<String>> = workspace(&state)
         .palette_items("")
         .into_iter()
-        .skip(11)
+        .skip(12)
         .map(|item| item.detail)
         .collect();
     assert_eq!(
@@ -243,7 +245,7 @@ fn input_resets_selection_and_navigation_clamps() {
     for _ in 0..20 {
         send(&mut state, Msg::Modal(ModalMsg::Next));
     }
-    assert_eq!(selected_palette_index(&state), 14);
+    assert_eq!(selected_palette_index(&state), 15);
     type_query(&mut state, "o");
     assert_eq!(selected_palette_index(&state), 0);
 }

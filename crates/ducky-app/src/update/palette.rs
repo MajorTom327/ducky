@@ -1,5 +1,5 @@
 use crate::command::Command;
-use crate::msg::{Msg, TabsMsg};
+use crate::msg::{Msg, SidebarMsg, TabsMsg};
 use crate::state::{AppState, CommandPalette, Focus, Modal, PaletteAction};
 use crate::update::tabs::{open_relation, reveal_schema};
 use crate::update::{update, workspace_mut};
@@ -43,6 +43,7 @@ pub(crate) fn submit(state: &mut AppState, command_palette: &CommandPalette) -> 
         PaletteAction::Dump => Msg::Tabs(TabsMsg::OpenDump),
         PaletteAction::Restore => Msg::Tabs(TabsMsg::OpenRestore),
         PaletteAction::ChooseSchema => Msg::OpenSchemaPicker,
+        PaletteAction::ToggleSidebar => Msg::Sidebar(SidebarMsg::ToggleCollapsed),
         PaletteAction::RefreshCatalog => Msg::RefreshCatalog,
         PaletteAction::Reconnect => Msg::Reconnect,
         PaletteAction::Disconnect => Msg::Disconnect,

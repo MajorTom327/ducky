@@ -5,11 +5,13 @@ pub mod dump;
 pub mod editor;
 pub mod files;
 pub mod header;
+pub mod help;
 pub mod job_log;
 pub mod modal;
 pub mod palette;
 pub mod parameters;
 pub mod profile_picker;
+pub mod profile_rows;
 pub mod profiles;
 pub mod query;
 pub mod reference_picker;
@@ -30,7 +32,7 @@ use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
 use ratatui::style::{Modifier, Style};
 
-use crate::layout::{FrameAreas, is_too_small};
+use crate::layout::{FrameAreas, is_too_small, sidebar_width};
 use crate::theme::{Palette, palette};
 use crate::tui_state::{CursorShape, TuiState};
 use crate::widgets::loading::render_message;
@@ -54,6 +56,7 @@ impl ViewContext<'_> {
 pub fn draw(frame: &mut Frame, state: &AppState, tui: &mut TuiState) {
     tui.effects.begin_frame();
     tui.cursor_shape = CursorShape::Bar;
+    tui.mouse_targets.clear();
     let screen = frame.area();
     let workspace_palette = palette(state.workspace().map(|workspace| workspace.profile.kind));
     if is_too_small(screen) {
@@ -65,7 +68,10 @@ pub fn draw(frame: &mut Frame, state: &AppState, tui: &mut TuiState) {
         );
         return;
     }
-    let areas = FrameAreas::new(screen);
+    let sidebar_width = state.workspace().map_or(0, |workspace| {
+        sidebar_width(&workspace.sidebar, screen.width)
+    });
+    let areas = FrameAreas::new(screen, sidebar_width);
     header::render(frame, areas.header, state, &workspace_palette);
     match &state.screen {
         Screen::Profiles(picker) => profiles::render(frame, areas.body(), state, picker, tui),
@@ -75,7 +81,9 @@ pub fn draw(frame: &mut Frame, state: &AppState, tui: &mut TuiState) {
                 storage: &state.storage,
                 palette: &workspace_palette,
             };
-            sidebar::render(frame, areas.sidebar, &context, tui);
+            if !areas.sidebar.is_empty() {
+                sidebar::render(frame, areas.sidebar, &context, tui);
+            }
             tabs::render(frame, areas.tab_bar, &context, tui);
             render_main(frame, areas.main, &context, tui);
         }

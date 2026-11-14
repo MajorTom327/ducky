@@ -5,6 +5,7 @@ use ratatui::style::Style;
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Clear, Paragraph};
 
+use crate::mouse::{MouseTarget, MouseTargets, list_row_targets};
 use crate::theme::Palette;
 use crate::views::sidebar::spread_line;
 
@@ -18,6 +19,7 @@ pub fn render(
     workspace: &Workspace,
     command_palette: &CommandPalette,
     palette: &Palette,
+    mouse_targets: &mut MouseTargets,
 ) -> Rect {
     let query = command_palette.input.value();
     let palette_items = workspace.palette_items(query);
@@ -50,6 +52,7 @@ pub fn render(
             selected_item_index: command_palette.selected_item_index,
         },
         palette,
+        mouse_targets,
     );
     frame.render_widget(
         Paragraph::new(Line::styled(
@@ -107,7 +110,13 @@ struct ItemList<'a> {
     selected_item_index: usize,
 }
 
-fn render_items(frame: &mut Frame, area: Rect, item_list: &ItemList, palette: &Palette) {
+fn render_items(
+    frame: &mut Frame,
+    area: Rect,
+    item_list: &ItemList,
+    palette: &Palette,
+    mouse_targets: &mut MouseTargets,
+) {
     let palette_items = item_list.palette_items;
     if palette_items.is_empty() {
         frame.render_widget(
@@ -139,6 +148,12 @@ fn render_items(frame: &mut Frame, area: Rect, item_list: &ItemList, palette: &P
         })
         .collect();
     frame.render_widget(Paragraph::new(rows), area);
+    mouse_targets.extend(list_row_targets(
+        area,
+        first_item_index,
+        palette_items.len(),
+        MouseTarget::ModalItem,
+    ));
 }
 
 fn item_trailer(item: &PaletteItem, is_selected: bool, palette: &Palette) -> Vec<Span<'static>> {
@@ -164,6 +179,7 @@ pub fn action_shortcut(action: &PaletteAction) -> Option<&'static str> {
         PaletteAction::NewQuery => Some("Ctrl+n"),
         PaletteAction::SqlFiles => Some("Ctrl+o"),
         PaletteAction::ChooseSchema => Some("s"),
+        PaletteAction::ToggleSidebar => Some("Space e"),
         PaletteAction::RefreshCatalog => Some("r"),
         PaletteAction::Reconnect => Some("R"),
         PaletteAction::Disconnect => Some("D"),

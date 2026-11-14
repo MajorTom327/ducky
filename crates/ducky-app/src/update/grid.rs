@@ -1,7 +1,7 @@
-use ducky_core::ResultSet;
+use ducky_core::{ResultSet, StatementOutcome};
 
 use crate::msg::GridMove;
-use crate::state::GridCursor;
+use crate::state::{GridCursor, RunState};
 
 pub(crate) fn move_cursor(cursor: &mut GridCursor, result_set: &ResultSet, grid_move: GridMove) {
     let last_row_index = result_set.rows.len().saturating_sub(1);
@@ -26,6 +26,21 @@ pub(crate) fn clamp_cursor(cursor: &mut GridCursor, result_set: &ResultSet) {
     cursor.column_index = cursor
         .column_index
         .min(result_set.columns.len().saturating_sub(1));
+}
+
+pub(crate) fn place_cursor(cursor: &mut GridCursor, result_set: &ResultSet, cell: GridCursor) {
+    *cursor = cell;
+    clamp_cursor(cursor, result_set);
+}
+
+pub(crate) fn selected_rows(run: &RunState, selected_result_index: usize) -> Option<&ResultSet> {
+    let RunState::Finished(report) = run else {
+        return None;
+    };
+    match &report.results.get(selected_result_index)?.outcome {
+        StatementOutcome::Rows(result_set) => Some(result_set),
+        StatementOutcome::Affected(_) => None,
+    }
 }
 
 pub(crate) fn cell_text(result_set: &ResultSet, cursor: GridCursor) -> Option<String> {

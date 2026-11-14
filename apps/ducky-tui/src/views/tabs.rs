@@ -4,6 +4,7 @@ use ratatui::layout::{Constraint, Layout, Rect};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::Paragraph;
 
+use crate::mouse::MouseTarget;
 use crate::tui_state::TuiState;
 use crate::views::ViewContext;
 
@@ -64,6 +65,7 @@ pub fn render(frame: &mut Frame, area: Rect, context: &ViewContext, tui: &mut Tu
         );
     }
     let mut spans = Vec::new();
+    let mut label_x = tabs_area.x;
     let visible_labels = labels
         .into_iter()
         .enumerate()
@@ -72,7 +74,19 @@ pub fn render(frame: &mut Frame, area: Rect, context: &ViewContext, tui: &mut Tu
     for (tab_index, label) in visible_labels {
         if !spans.is_empty() {
             spans.push(Span::raw(" "));
+            label_x = label_x.saturating_add(1);
         }
+        let label_width = u16::try_from(label_widths[tab_index]).unwrap_or(u16::MAX);
+        let label_area = Rect {
+            x: label_x,
+            width: label_width,
+            ..tabs_area
+        };
+        tui.mouse_targets.push((
+            label_area.intersection(tabs_area),
+            MouseTarget::Tab(tab_index),
+        ));
+        label_x = label_x.saturating_add(label_width);
         let style = match tab_index == active_tab_index {
             true => palette.selected(true),
             false => palette.muted(),

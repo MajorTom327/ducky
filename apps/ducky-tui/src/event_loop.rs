@@ -12,7 +12,7 @@ use ratatui::backend::Backend;
 use tokio::sync::mpsc::UnboundedReceiver;
 
 use crate::tui_state::{CursorShape, TuiState};
-use crate::{keys, views};
+use crate::{keys, mouse, views};
 
 const ANIMATION_FRAME_PERIOD: Duration = Duration::from_millis(16);
 
@@ -58,6 +58,7 @@ where
                     keys::handle_key(&state, &mut tui, key)
                 }
                 Some(Ok(Event::Paste(pasted_text))) => keys::handle_paste(&state, &mut tui, pasted_text),
+                Some(Ok(Event::Mouse(mouse_event))) => mouse::handle_mouse(&state, &mut tui, mouse_event),
                 Some(Ok(_)) => Vec::new(),
                 Some(Err(error)) => return Err(error.into()),
                 None => return Ok(()),

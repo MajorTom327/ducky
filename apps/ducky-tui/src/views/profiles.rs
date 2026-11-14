@@ -4,9 +4,10 @@ use ratatui::layout::Rect;
 use ratatui::text::Span;
 use ratatui::widgets::{Block, Clear};
 
+use crate::mouse::MouseTarget;
 use crate::theme::{Palette, palette};
 use crate::tui_state::TuiState;
-use crate::views::profile_picker;
+use crate::views::profile_picker::{self, PickerView};
 
 pub fn render(
     frame: &mut Frame,
@@ -27,15 +28,13 @@ pub fn render(
         .border_style(neutral_palette.border(true));
     let inner_area = block.inner(picker_area);
     frame.render_widget(block, picker_area);
-    profile_picker::render(
-        frame,
-        inner_area,
-        &state.profiles,
+    let view = PickerView {
+        profiles: &state.profiles,
         picker,
-        None,
-        tui,
-        &neutral_palette,
-    );
+        connected_profile_index: None,
+        row_target: MouseTarget::ProfileRow,
+    };
+    profile_picker::render(frame, inner_area, &view, tui, &neutral_palette);
 }
 
 pub fn render_switch_popup(
@@ -53,14 +52,12 @@ pub fn render_switch_popup(
         .border_style(workspace_palette.border(true));
     let inner_area = block.inner(area);
     frame.render_widget(block, area);
-    profile_picker::render(
-        frame,
-        inner_area,
-        &state.profiles,
+    let view = PickerView {
+        profiles: &state.profiles,
         picker,
-        state.workspace().map(|workspace| workspace.profile_index),
-        tui,
-        &palette(None),
-    );
+        connected_profile_index: state.workspace().map(|workspace| workspace.profile_index),
+        row_target: MouseTarget::ModalItem,
+    };
+    profile_picker::render(frame, inner_area, &view, tui, &palette(None));
     area
 }

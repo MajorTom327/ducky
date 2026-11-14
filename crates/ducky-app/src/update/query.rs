@@ -1,12 +1,12 @@
-use ducky_core::{FileEntry, ResultSet, ScriptReport, StatementOutcome, TransactionMode};
+use ducky_core::{FileEntry, ScriptReport, StatementOutcome, TransactionMode};
 
 use crate::command::Command;
 use crate::msg::{QueryMsg, SaveFailure};
 use crate::state::{
-    AppState, Confirm, ConfirmKind, GridCursor, Modal, NoticeLevel, PendingSave, Prompt,
-    PromptKind, RowDetail, RunState, TabId,
+    AppState, Confirm, ConfirmKind, Focus, GridCursor, Modal, NoticeLevel, PendingSave, Prompt,
+    PromptKind, QueryPane, RowDetail, RunState, TabId,
 };
-use crate::update::grid::{cell_text, move_cursor};
+use crate::update::grid::{cell_text, move_cursor, place_cursor, selected_rows};
 use crate::update::parameters::request_run;
 use crate::update::{notice, step_index, workspace_mut};
 
@@ -50,6 +50,14 @@ pub(crate) fn update(state: &mut AppState, msg: QueryMsg) -> Vec<Command> {
             }
             Vec::new()
         }
+        QueryMsg::SelectCell(cell) => {
+            if let Some(result_set) = selected_rows(&query.run, query.selected_result_index) {
+                place_cursor(&mut query.cursor, result_set, cell);
+            }
+            query.pane = QueryPane::Results;
+            workspace.focus = Focus::Main;
+            Vec::new()
+        }
         QueryMsg::OpenRowDetail => {
             let cursor = query.cursor;
             if let Some(result_set) = selected_rows(&query.run, query.selected_result_index)
@@ -91,16 +99,6 @@ pub(crate) fn update(state: &mut AppState, msg: QueryMsg) -> Vec<Command> {
             let current_name = query.document.name.clone();
             open_save_as(state, current_name, content)
         }
-    }
-}
-
-fn selected_rows(run: &RunState, selected_result_index: usize) -> Option<&ResultSet> {
-    let RunState::Finished(report) = run else {
-        return None;
-    };
-    match &report.results.get(selected_result_index)?.outcome {
-        StatementOutcome::Rows(result_set) => Some(result_set),
-        StatementOutcome::Affected(_) => None,
     }
 }
 

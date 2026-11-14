@@ -13,6 +13,7 @@ use ducky_core::{
 };
 use ducky_sql::TokenKind;
 use ducky_tui::keys::handle_key;
+use ducky_tui::keys::sequence::GridPane;
 use ducky_tui::theme::{palette, token_style};
 use ducky_tui::tui_state::TuiState;
 use ducky_tui::views::draw;
@@ -292,8 +293,10 @@ fn render_result_set(
                     linked_columns: &[],
                     selected_row_indexes: &[],
                     draft_cells: &BTreeMap::new(),
+                    pane: GridPane::Results,
                 },
                 &grid_palette,
+                &mut Vec::new(),
             );
         })
         .expect("draw");
@@ -581,8 +584,10 @@ fn grid_in_an_empty_area_draws_nothing_and_keeps_the_viewport() {
                     linked_columns: &[],
                     selected_row_indexes: &[],
                     draft_cells: &BTreeMap::new(),
+                    pane: GridPane::TableData,
                 },
                 &grid_palette,
+                &mut Vec::new(),
             );
         })
         .expect("draw");

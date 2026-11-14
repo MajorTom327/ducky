@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::time::Instant;
 
 use ducky_app::{TabContent, TabId, Workspace};
 use ratatui::layout::Rect;
@@ -6,6 +7,7 @@ use ratatui::layout::Rect;
 use crate::editor::panel::EditorPanel;
 use crate::effects::UiEffects;
 use crate::keys::sequence::KeyPrefix;
+use crate::mouse::{MouseTarget, MouseTargets};
 use crate::widgets::grid::GridViewport;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -26,6 +28,9 @@ pub struct TuiState {
     pub help_scroll: u16,
     pub cursor_shape: CursorShape,
     pub pending_prefix: Option<KeyPrefix>,
+    pub mouse_targets: MouseTargets,
+    pub is_dragging_sidebar: bool,
+    pub last_click: Option<(MouseTarget, Instant)>,
 }
 
 impl TuiState {
@@ -42,6 +47,9 @@ impl TuiState {
             help_scroll: 0,
             cursor_shape: CursorShape::Bar,
             pending_prefix: None,
+            mouse_targets: Vec::new(),
+            is_dragging_sidebar: false,
+            last_click: None,
         }
     }
 

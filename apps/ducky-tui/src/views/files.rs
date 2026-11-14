@@ -6,6 +6,7 @@ use ratatui::style::Style;
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Borders, Paragraph, Wrap};
 
+use crate::mouse::{MouseTarget, MouseTargets, ScrollArea, list_row_targets};
 use crate::theme::Palette;
 use crate::tui_state::TuiState;
 use crate::views::ViewContext;
@@ -48,6 +49,7 @@ pub fn render(frame: &mut Frame, area: Rect, context: &ViewContext, tui: &mut Tu
                 entries,
                 files.selected_entry_index,
                 palette,
+                &mut tui.mouse_targets,
             ),
         }
     }
@@ -57,6 +59,8 @@ pub fn render(frame: &mut Frame, area: Rect, context: &ViewContext, tui: &mut Tu
         .title(Line::styled(" Preview ", palette.title()));
     let preview_inner = preview_block.inner(preview_area);
     frame.render_widget(preview_block, preview_area);
+    tui.mouse_targets
+        .push((preview_inner, MouseTarget::Scroll(ScrollArea::FilePreview)));
     if let Some(preview) = render_loadable(
         frame,
         preview_inner,
@@ -77,6 +81,7 @@ pub fn render_entries(
     entries: &[FileEntry],
     selected_entry_index: usize,
     palette: &Palette,
+    mouse_targets: &mut MouseTargets,
 ) {
     let visible_height = usize::from(area.height).max(1);
     let first_entry_index = selected_entry_index.saturating_sub(visible_height - 1);
@@ -94,6 +99,12 @@ pub fn render_entries(
         })
         .collect();
     frame.render_widget(Paragraph::new(lines), area);
+    mouse_targets.extend(list_row_targets(
+        area,
+        first_entry_index,
+        entries.len(),
+        MouseTarget::FileItem,
+    ));
 }
 
 fn entry_line(entry: &FileEntry, palette: &Palette) -> Line<'static> {

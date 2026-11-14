@@ -2,7 +2,10 @@ use std::io;
 use std::path::PathBuf;
 use std::time::Duration;
 
-use crossterm::event::{Event, KeyCode, KeyEvent, KeyEventKind, KeyEventState, KeyModifiers};
+use crossterm::event::{
+    Event, KeyCode, KeyEvent, KeyEventKind, KeyEventState, KeyModifiers, MouseButton, MouseEvent,
+    MouseEventKind,
+};
 use ducky_app::{
     AppState, Connection, Focus, Msg, Notice, NoticeLevel, QueryView, Screen, Tab, TabContent,
     Workspace,
@@ -301,4 +304,26 @@ async fn profiles_screen_uses_the_bar_cursor_once() {
     .await;
     assert!(loop_run.outcome.is_ok());
     assert_eq!(loop_run.cursor_bytes, STEADY_BAR);
+}
+
+#[tokio::test]
+async fn mouse_press_is_routed_and_dismisses_the_notice() {
+    let storage_dir = tempfile::tempdir().expect("creates a temporary directory");
+    let sidebar_click = Event::Mouse(MouseEvent {
+        kind: MouseEventKind::Down(MouseButton::Left),
+        column: 5,
+        row: 10,
+        modifiers: KeyModifiers::NONE,
+    });
+    let loop_run = run_loop(LoopSetup {
+        state: query_editor_state(&storage_dir),
+        events: ending(vec![Ok(sidebar_click)]),
+        startup_messages: vec![notice("startup notice")],
+        channel_messages: Vec::new(),
+    })
+    .await;
+    assert!(loop_run.outcome.is_ok());
+    assert!(!loop_run.screen.contains("startup notice"));
+    let status_line = loop_run.screen.lines().last().expect("a status line");
+    assert!(status_line.trim_end().ends_with("Sidebar"));
 }

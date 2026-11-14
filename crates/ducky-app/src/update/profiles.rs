@@ -67,7 +67,7 @@ pub(crate) fn connect_from_modal(state: &mut AppState) -> Vec<Command> {
     switch_profile(state, profile_index)
 }
 
-fn apply(picker: &mut ProfilePicker, profiles: &[Profile], msg: ProfilesMsg) {
+pub(crate) fn apply(picker: &mut ProfilePicker, profiles: &[Profile], msg: ProfilesMsg) {
     match msg {
         ProfilesMsg::Next | ProfilesMsg::Previous => {
             let visible_profile_indexes = picker.visible_profile_indexes(profiles);
@@ -91,6 +91,14 @@ fn apply(picker: &mut ProfilePicker, profiles: &[Profile], msg: ProfilesMsg) {
         ProfilesMsg::Last => {
             if let Some(profile_index) = picker.visible_profile_indexes(profiles).last() {
                 picker.selected_profile_index = *profile_index;
+            }
+        }
+        ProfilesMsg::Select(profile_index) => {
+            if picker
+                .visible_profile_indexes(profiles)
+                .contains(&profile_index)
+            {
+                picker.selected_profile_index = profile_index;
             }
         }
         ProfilesMsg::Filter(request) => {

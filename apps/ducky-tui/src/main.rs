@@ -3,7 +3,10 @@ use std::process::ExitCode;
 
 use clap::Parser;
 use crossterm::cursor::SetCursorStyle;
-use crossterm::event::{DisableBracketedPaste, EnableBracketedPaste, EventStream};
+use crossterm::event::{
+    DisableBracketedPaste, DisableMouseCapture, EnableBracketedPaste, EnableMouseCapture,
+    EventStream,
+};
 use crossterm::execute;
 use ducky_app::{
     AppState, Msg, ProfilePicker, ProfileRow, ProfilesMsg, Screen, profile_kind_name, profile_rows,
@@ -62,7 +65,7 @@ async fn main() -> anyhow::Result<ExitCode> {
     };
     let tui = TuiState::new(!args.no_effects);
     let mut terminal = ratatui::init();
-    let outcome = match execute!(stdout(), EnableBracketedPaste) {
+    let outcome = match execute!(stdout(), EnableBracketedPaste, EnableMouseCapture) {
         Ok(()) => {
             let terminal_io = TerminalIo {
                 terminal: &mut terminal,
@@ -74,6 +77,7 @@ async fn main() -> anyhow::Result<ExitCode> {
             let terminal_reset = execute!(
                 stdout(),
                 DisableBracketedPaste,
+                DisableMouseCapture,
                 SetCursorStyle::DefaultUserShape
             );
             outcome.and(terminal_reset.map_err(anyhow::Error::from))

@@ -128,7 +128,7 @@ fn close_vanished_tables(workspace: &mut Workspace, catalog: &Catalog) {
         .and_then(|tab_id| workspace.tab_index(tab_id))
         .unwrap_or_else(|| clamp_index(workspace.active_tab_index, workspace.tabs.len()));
     if workspace.tabs.is_empty() {
-        workspace.focus = Focus::Sidebar;
+        workspace.set_focus(Focus::Sidebar);
     }
 }
 

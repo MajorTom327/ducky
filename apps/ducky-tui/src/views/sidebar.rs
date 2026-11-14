@@ -6,6 +6,7 @@ use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Paragraph};
 
+use crate::mouse::{MouseTarget, list_row_targets};
 use crate::tui_state::TuiState;
 use crate::views::ViewContext;
 use crate::widgets::loading::{LoadSlot, render_loadable};
@@ -27,6 +28,15 @@ pub fn render(frame: &mut Frame, area: Rect, context: &ViewContext, tui: &mut Tu
         .border_style(palette.border(is_focused));
     let inner_area = block.inner(area);
     frame.render_widget(block, area);
+    let border_area = Rect {
+        x: area.right().saturating_sub(1),
+        width: area.width.min(1),
+        ..area
+    };
+    tui.mouse_targets.extend([
+        (area, MouseTarget::SidebarList),
+        (border_area, MouseTarget::SidebarBorder),
+    ]);
     if render_loadable(
         frame,
         inner_area,
@@ -80,6 +90,12 @@ pub fn render(frame: &mut Frame, area: Rect, context: &ViewContext, tui: &mut Tu
         })
         .collect();
     frame.render_widget(Paragraph::new(rows), inner_area);
+    tui.mouse_targets.extend(list_row_targets(
+        inner_area,
+        first_item_index,
+        sidebar_items.len(),
+        MouseTarget::SidebarItem,
+    ));
 }
 
 pub fn relation_meta(item: &SidebarItem) -> String {

@@ -17,7 +17,7 @@ Dependencies only point downwards. Nothing below `apps/ducky-tui` knows about th
 
 ## Event loop
 
-`ducky-app::update(&mut AppState, Msg) -> Vec<Command>` is pure. `ducky-runtime::Runtime::dispatch(Command)` spawns the IO on tokio and sends answers back as `Msg` over an unbounded channel. The TUI maps keys to `Msg` and renders `AppState`.
+`ducky-app::update(&mut AppState, Msg) -> Vec<Command>` is pure. `ducky-runtime::Runtime::dispatch(Command)` spawns the IO on tokio and sends answers back as `Msg` over an unbounded channel. The TUI maps keys and mouse events to `Msg` and renders `AppState`.
 
 ```mermaid
 sequenceDiagram
@@ -43,7 +43,9 @@ Responses carry their request (`PageLoaded { request }`, `DetailsLoaded { relati
 
 `Workspace` holds `tabs: Vec<Tab>` and `active_tab_index`. A `Tab` has a `TabId` and a `TabContent`: `Table(TableView)` (one per relation from the sidebar or the palette, reused when reopened; foreign-key navigation adds one per relation and filter), `Query(QueryView)` (numbered `Query N` unless named after a file), or the singletons `Files`, `Dump`, `Restore`. Per-tab state (page, cursor, document, run state) lives in the tab; `TabsMsg` opens, switches and closes tabs. The sidebar lists only the relations of `schema_name`.
 
-`Msg::OpenPalette` opens `Modal::Palette(CommandPalette)`; `Workspace::palette_items(query)` lists `PaletteItem`s whose `PaletteAction` switches to a tab, runs an action (new query, SQL files, dump, restore, schema, switch profile, refresh, reconnect, disconnect, help, quit) or opens a relation of any schema. An item may carry a `command_alias` (`Quit` has `:q`): a query starting with `:` lists only the items whose alias starts with it. `Msg::FocusPane(PaneDirection)` moves focus between sidebar, main pane, editor and results.
+`Msg::OpenPalette` opens `Modal::Palette(CommandPalette)`; `Workspace::palette_items(query)` lists `PaletteItem`s whose `PaletteAction` switches to a tab, runs an action (new query, SQL files, dump, restore, schema, toggle sidebar, switch profile, refresh, reconnect, disconnect, help, quit) or opens a relation of any schema. An item may carry a `command_alias` (`Quit` has `:q`): a query starting with `:` lists only the items whose alias starts with it. `Msg::FocusPane(PaneDirection)` moves focus between sidebar, main pane, editor and results.
+
+`Workspace::sidebar` holds the sidebar `width` (`DEFAULT_SIDEBAR_WIDTH` 32, `SidebarMsg::Widen` / `Narrow` / `SetWidth` within 20..=80) and `is_collapsed` (`SidebarMsg::ToggleCollapsed`). Focus changes go through `Workspace::set_focus`, which expands a collapsed sidebar when it receives the focus, so a collapsed sidebar is never focused. The TUI lays it out with `layout::sidebar_width` (0 when collapsed, otherwise capped so the main column keeps 40 columns).
 
 ## Switching profile
 
@@ -67,11 +69,31 @@ Table pages use `AppState::page_size` (set with `AppState::with_page_size` from 
 
 In `apps/ducky-tui`, `TuiState` keeps view-only state per tab in maps keyed by `TabId`: `editors` (one edtui `EditorPanel` per query tab), `table_viewports`, `table_cursor_cells` (on-screen area of the cursor cell, returned by `render_grid` and used to draw the cell editor over it), `results_viewports`, `structure_scrolls`.
 
+## Mouse
+
+`main.rs` enables mouse capture; `event_loop` passes `Event::Mouse` to `mouse::handle_mouse(&state, &mut tui, event) -> Vec<Msg>`. Hit testing uses `TuiState::mouse_targets: Vec<(Rect, MouseTarget)>`: `views::draw` clears it, and every view that draws something clickable pushes its areas in drawing order, so the handler takes the last target containing the point (the topmost one). `views::modal::render` inserts the modal's whole area before the targets its popup pushed, after the main UI's targets. The targets:
+
+|Target|Pushed by|Click|Wheel|
+|---|---|---|---|
+|`SidebarList`|`views::sidebar` (whole sidebar)|focus the sidebar|3 × `SidebarMsg::Next` / `Previous`|
+|`SidebarItem(index)`|`views::sidebar` (visible rows, scroll applied)|`SidebarMsg::Select(index)` then `Activate`|same as the list|
+|`SidebarBorder`|`views::sidebar` (right border column)|start a drag: `Drag` sends `SetWidth(column - sidebar.x + 1)`, `Up` ends it|—|
+|`Tab(index)`|`views::tabs` (visible labels)|`TabsMsg::Select(index)`|—|
+|`Grid(pane)`, `GridHeader { pane, column_index }`, `GridCell { pane, row_index, column_index }`|`widgets::grid::render_grid` (`GridOptions::pane`), the whole results block|cell: `TableMsg::SelectCell` / `QueryMsg::SelectCell`, double click `ChangeCell` / `OpenRowDetail`; table data header: `SelectCell` on the cursor row then `CycleSort`; elsewhere: focus the pane|3 × `Move(Down / Up)`|
+|`Editor(tab_id)`|`views::editor`|focus the editor, forward to edtui (cursor, drag selection)|edtui|
+|`Scroll(ScrollArea)`|`views::structure`, `views::help`, `views::files` (preview), `views::job_log`|focus the main pane|3 lines of the same scroll state the keys change|
+|`Modal`|`views::modal::render` (popup area)|nothing inside; a click outside any `Modal` area sends `ModalMsg::Cancel`|`ModalMsg::Next` / `Previous`|
+|`ModalItem(index)`|palette, schema picker, reference picker, profile switch popup, enum choice list|`ModalMsg::Select(index)` then `Submit`|same as the modal|
+|`ProfileRow(profile_index)`|start-screen profile picker|`ProfilesMsg::Select` then `Connect`|`ProfilesMsg::Next` / `Previous`|
+|`FileItem(index)`|`views::files::render_entries` (SQL files, dumps)|`FilesMsg::Select` / `RestoreMsg::Select`; double click `Open` / `Start`|`Next` / `Previous`|
+
+A double click is a second press on an equal target within 400 ms (`TuiState::last_click`). Any press dismisses the notice first; right and middle buttons are ignored.
+
 ## Adding a view
 
 1. Add state to `ducky-app/src/state`, a `TabContent` variant (and a `PaletteAction` to open it), a `Msg` family and its `update/` module; add `Command`s if IO is needed, with tests in `crates/ducky-app/tests`.
 2. Handle new commands in `ducky-runtime`, answering with `Msg`.
-3. In `apps/ducky-tui`: `views/<name>.rs` (`render(frame, area, &ViewContext, &mut TuiState)`), `keys/<name>.rs`, dispatch in `views/mod.rs` and `keys/mod.rs`, rows in `keys/help.rs` and `docs/keybindings.md`.
+3. In `apps/ducky-tui`: `views/<name>.rs` (`render(frame, area, &ViewContext, &mut TuiState)`, pushing a `MouseTarget` for each clickable area), `keys/<name>.rs`, dispatch in `views/mod.rs` and `keys/mod.rs` (and the click / wheel mapping in `mouse/`), rows in `keys/help.rs` and `docs/keybindings.md`.
 
 ## Another front-end
 

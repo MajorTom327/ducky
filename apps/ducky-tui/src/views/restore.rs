@@ -61,6 +61,7 @@ pub fn render(frame: &mut Frame, area: Rect, context: &ViewContext, tui: &mut Tu
                 entries,
                 restore.selected_entry_index,
                 palette,
+                &mut tui.mouse_targets,
             ),
         }
     }
@@ -85,13 +86,7 @@ pub fn render(frame: &mut Frame, area: Rect, context: &ViewContext, tui: &mut Tu
         tui,
         palette,
     );
-    job_log::render(
-        frame,
-        log_area,
-        &restore.log_lines,
-        tui.job_log_scroll,
-        palette,
-    );
+    job_log::render(frame, log_area, &restore.log_lines, tui, palette);
 }
 
 fn checkbox(is_checked: bool) -> &'static str {

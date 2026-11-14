@@ -4,7 +4,7 @@ use ducky_core::{
 };
 use tui_input::InputRequest;
 
-use crate::state::{JobKind, Notice, TabId};
+use crate::state::{GridCursor, JobKind, Notice, TabId};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Msg {
@@ -94,6 +94,7 @@ pub enum ProfilesMsg {
     First,
     Last,
     Connect,
+    Select(usize),
     Filter(InputRequest),
     ClearFilter,
     FocusFilter,
@@ -121,6 +122,11 @@ pub enum SidebarMsg {
     Activate,
     StartFilter,
     ClearFilter,
+    ToggleCollapsed,
+    Widen,
+    Narrow,
+    SetWidth(u16),
+    Select(usize),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -147,6 +153,7 @@ pub enum GridMove {
 pub enum TableMsg {
     ToggleTab,
     Move(GridMove),
+    SelectCell(GridCursor),
     NextPage,
     PreviousPage,
     CycleSort,
@@ -174,6 +181,7 @@ pub enum QueryMsg {
     Cancel,
     ToggleTransactionMode,
     Move(GridMove),
+    SelectCell(GridCursor),
     NextResult,
     PreviousResult,
     OpenRowDetail,
@@ -189,6 +197,7 @@ pub enum FilesMsg {
     Open,
     Execute,
     Reload,
+    Select(usize),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -205,6 +214,7 @@ pub enum RestoreMsg {
     ToggleSkipOwnership,
     Start,
     Reload,
+    Select(usize),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -214,6 +224,7 @@ pub enum ModalMsg {
     Cancel,
     Next,
     Previous,
+    Select(usize),
     CopyValue,
     ToggleRaw,
 }

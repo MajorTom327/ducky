@@ -5,6 +5,7 @@ use ratatui::layout::{Constraint, Layout, Rect};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::Paragraph;
 
+use crate::mouse::{MouseTarget, ScrollArea};
 use crate::theme::Palette;
 use crate::tui_state::TuiState;
 use crate::views::ViewContext;
@@ -55,6 +56,8 @@ pub fn render(
         }
     };
     let content_height = u16::try_from(lines.len()).unwrap_or(u16::MAX);
+    tui.mouse_targets
+        .push((area, MouseTarget::Scroll(ScrollArea::Structure(tab_id))));
     let scroll = tui.structure_scrolls.entry(tab_id).or_default();
     *scroll = (*scroll).min(content_height.saturating_sub(content_area.height));
     frame.render_widget(Paragraph::new(lines).scroll((*scroll, 0)), content_area);

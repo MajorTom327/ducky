@@ -5,6 +5,7 @@ use ratatui::layout::{Constraint, Layout, Rect};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Padding, Paragraph};
 
+use crate::keys::sequence::GridPane;
 use crate::theme::Palette;
 use crate::tui_state::TuiState;
 use crate::views::{ViewContext, structure};
@@ -158,6 +159,7 @@ fn render_data(
         linked_columns: &linked_columns,
         selected_row_indexes: &selected_row_indexes,
         draft_cells: &table.cell_drafts,
+        pane: GridPane::TableData,
     };
     let cursor_cell_area = render_grid(
         frame,
@@ -166,6 +168,7 @@ fn render_data(
         tui.table_viewports.entry(tab_id).or_default(),
         options,
         context.palette,
+        &mut tui.mouse_targets,
     );
     match cursor_cell_area {
         Some(cell_area) => tui.table_cursor_cells.insert(tab_id, cell_area),

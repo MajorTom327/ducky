@@ -21,7 +21,10 @@ pub use palette::{CommandPalette, PaletteAction, PaletteItem};
 pub use parameters::{ParameterField, ParameterForm};
 pub use profiles::{PickerMode, ProfilePicker, ProfileRow, profile_kind_name, profile_rows};
 pub use query::{Document, PendingSave, QueryPane, QueryView, RunState};
-pub use sidebar::{Sidebar, SidebarItem};
+pub use sidebar::{
+    DEFAULT_SIDEBAR_WIDTH, MAX_SIDEBAR_WIDTH, MIN_SIDEBAR_WIDTH, SIDEBAR_WIDTH_STEP, Sidebar,
+    SidebarItem,
+};
 pub use table::{GridCursor, TableTab, TableView};
 pub use tabs::{Tab, TabContent, TabId};
 pub use workspace::{Focus, Workspace};

@@ -6,6 +6,7 @@ mod focus;
 mod grid;
 mod jobs;
 mod modal;
+mod modal_selection;
 mod palette;
 mod parameters;
 mod profiles;

@@ -2,14 +2,13 @@ use std::path::PathBuf;
 
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use ducky_app::{
-    AppState, Connection, DumpMsg, FilesMsg, Focus, JobState, Loadable, Msg, RestoreMsg, Screen,
-    Tab, TabContent, Workspace,
+    AppState, Connection, DEFAULT_SIDEBAR_WIDTH, DumpMsg, FilesMsg, Focus, JobState, Loadable, Msg,
+    RestoreMsg, Screen, Tab, TabContent, Workspace,
 };
 use ducky_core::{
     FileEntry, PgTools, Profile, ProfileKind, RestoreOptions, SessionInfo, StoragePaths, ToolStatus,
 };
 use ducky_tui::keys::handle_key;
-use ducky_tui::layout::SIDEBAR_WIDTH;
 use ducky_tui::tui_state::TuiState;
 use ducky_tui::views::draw;
 use ratatui::Terminal;
@@ -81,7 +80,7 @@ fn screen_with(state: &AppState, tui: &mut TuiState) -> String {
     let buffer = terminal.backend().buffer();
     (0..buffer.area.height)
         .map(|y| {
-            (SIDEBAR_WIDTH..buffer.area.width)
+            (DEFAULT_SIDEBAR_WIDTH..buffer.area.width)
                 .map(|x| buffer[(x, y)].symbol().to_owned())
                 .collect::<String>()
         })

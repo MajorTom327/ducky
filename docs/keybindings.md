@@ -24,6 +24,7 @@ Source of truth: `apps/ducky-tui/src/keys/help.rs` (`HELP_ROWS`, shown with `F1`
 |---|---|
 |`[b / ]b`|previous / next tab|
 |`Space b d`|close the active tab|
+|`Space e`|show / hide the sidebar|
 |`Space p`|switch profile|
 |`Space q q`|quit|
 |`:`|go to anything, starting with :|
@@ -76,6 +77,7 @@ Source of truth: `apps/ducky-tui/src/keys/help.rs` (`HELP_ROWS`, shown with `F1`
 |`Enter / l / →`|open the table in a tab|
 |`/`|filter tables|
 |`Esc`|clear the filter|
+|`< / >`|narrow / widen the sidebar|
 |`s`|choose the schema|
 |`r`|refresh the catalog|
 |`R`|reconnect|
@@ -98,6 +100,7 @@ Source of truth: `apps/ducky-tui/src/keys/help.rs` (`HELP_ROWS`, shown with `F1`
 |`V`|start / keep a visual row range|
 |`e`|UPDATE preset for the selected rows|
 |`c`|change the cell (text, checkbox, enum list) on the selected rows|
+|`` `expr` (text) ``|save a SQL expression: `now()`, `NULL`|
 |`x`|set the cell to NULL on the selected rows|
 |`u`|revert the cell change|
 |`U`|discard every change|
@@ -239,10 +242,29 @@ Source of truth: `apps/ducky-tui/src/keys/help.rs` (`HELP_ROWS`, shown with `F1`
 |`Ctrl+d / Ctrl+u`|half a page down / up|
 |`Esc / q / ?`|close|
 
+## Mouse
+
+|Key|Action|
+|---|---|
+|`click table`|open it in a tab|
+|`drag sidebar edge`|resize the sidebar|
+|`click tab`|switch to the tab|
+|`click cell`|focus the grid, move the cursor|
+|`double click cell`|change the cell / row detail|
+|`click header`|cycle the sort of the column|
+|`click editor`|place the cursor, drag to select|
+|`click list item`|choose it in a popup or picker|
+|`click file`|select it, double click opens|
+|`click outside`|close the popup|
+|`wheel`|scroll the list, grid or text below|
+|`Shift / Option drag`|select terminal text|
+
 ## Rules
 
 - Global keys work in every pane, including the editor in insert mode.
-- `[b`, `]b`, `Space b d`, `Space p` and `Space q q` are key sequences, accepted everywhere except in editor insert mode. The pending prefix is shown in the status bar; any other key cancels it.
+- `[b`, `]b`, `Space b d`, `Space e`, `Space p` and `Space q q` are key sequences, accepted everywhere except in editor insert mode. The pending prefix is shown in the status bar; any other key cancels it.
+- The sidebar is 32 columns wide by default. `<` / `>` (sidebar focused) narrow / widen it by 4 columns between 20 and 80, and the main pane always keeps at least 40 columns. `Space e` (or `Toggle sidebar` in go to anything) hides it and focuses the main pane; showing it again, or any key that focuses the sidebar (`Tab`, `Ctrl+h`, `Esc` from a tab), brings it back.
+- Mouse: a left click focuses what it hits (sidebar, main pane, editor or results). A click on a sidebar table opens it, on a tab switches to it, on a grid cell moves the cursor there; a second click on the same cell within 400 ms changes the cell (table data) or opens the row detail (results). A click on a table data header selects that column and cycles its sort. Clicks and drags in the editor go to the editor (cursor, selection). Dragging the sidebar's right border resizes it. In popups a click on a list item selects and submits it (go to anything, schema, reference and profile pickers, enum choices); a click outside closes or cancels the popup. In the SQL files and restore lists a click selects, a double click opens / restores. The wheel moves the sidebar and grids 3 rows, scrolls the structure tab, the help, the file preview and the job logs 3 lines, and moves list selections one item. Right and middle buttons are ignored; any press dismisses the notice.
 - `gg`, `gd` and `gr` are `g` sequences of the table data tab (`gg` also in the results pane): `gd` (go to referenced row) opens the table referenced by the foreign key under the cursor in a new tab filtered on the referenced key, `gr` (find referencing rows) opens the rows of another table whose foreign key points at the current row, through a picker when several foreign keys do. Foreign-key columns end with a muted ` →` in the grid header.
 - Row selection works on the current page of the table data tab: `v` marks or unmarks the cursor row and moves down, `V` starts a visual range from the cursor row (the status bar shows `VISUAL`) and a second `V` keeps it, `Esc` clears the selection. Selected rows show a `▌` marker in the gutter and the bottom border counts them; any page change, reload, sort or filter clears the selection. `e` opens a new query tab with an `UPDATE` preset for the selected rows (the cursor row when nothing is selected), targeting them by primary key (or an `id` column) and setting the cursor column to `:<column>`; `F5` asks for the value through the query parameters form.
 - `:` opens go to anything with `:` already typed, everywhere except in editor insert mode (where it types `:`). A query starting with `:` lists only the items that have a command alias (`:q` quits); other queries match `Quit` by its label.

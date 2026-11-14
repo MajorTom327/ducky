@@ -1,21 +1,26 @@
-use ducky_app::{NoticeLevel, PickerMode, ProfilePicker, ProfileRow};
+use ducky_app::{NoticeLevel, PickerMode, ProfilePicker};
 use ducky_core::Profile;
 use ratatui::Frame;
 use ratatui::layout::{Constraint, Layout, Margin, Rect};
-use ratatui::style::Style;
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Paragraph, Wrap};
 
-use crate::theme::{Palette, kind_badge, palette as profile_palette};
+use crate::mouse::MouseTarget;
+use crate::theme::Palette;
 use crate::tui_state::TuiState;
+use crate::views::profile_rows::{first_visible_row_position, row_lines, row_targets};
 use crate::widgets::loading::LoadSlot;
 
 const INPUT_PREFIX: &str = " › ";
 const FILTER_PLACEHOLDER: &str = "type to filter";
-const CONNECTED_MARKER: &str = " ● ";
-const ROW_INDENT: &str = "   ";
-const BADGE_WIDTH: usize = 7;
 const CHROME_ROWS: u16 = 3;
+
+pub struct PickerView<'a> {
+    pub profiles: &'a [Profile],
+    pub picker: &'a ProfilePicker,
+    pub connected_profile_index: Option<usize>,
+    pub row_target: fn(usize) -> MouseTarget,
+}
 
 pub fn content_height(profiles: &[Profile], picker: &ProfilePicker, width: u16) -> u16 {
     let row_count = u16::try_from(picker.rows(profiles).len().max(1)).unwrap_or(u16::MAX);
@@ -36,12 +41,13 @@ pub fn fitted_area(container: Rect, profiles: &[Profile], picker: &ProfilePicker
 pub fn render(
     frame: &mut Frame,
     area: Rect,
-    profiles: &[Profile],
-    picker: &ProfilePicker,
-    connected_profile_index: Option<usize>,
+    view: &PickerView,
     tui: &mut TuiState,
     palette: &Palette,
 ) {
+    let PickerView {
+        profiles, picker, ..
+    } = *view;
     let [input_area, rule_area, list_area, footer_area, error_area] =
         area.layout(&Layout::vertical([
             Constraint::Length(1),
@@ -63,11 +69,19 @@ pub fn render(
         &rows,
         profiles,
         picker,
-        connected_profile_index,
+        view.connected_profile_index,
         list_area,
         palette,
     );
     frame.render_widget(Paragraph::new(profile_lines), list_area);
+    let first_row_position =
+        first_visible_row_position(&rows, profiles, picker, usize::from(list_area.height));
+    tui.mouse_targets.extend(row_targets(
+        list_area,
+        &rows,
+        first_row_position,
+        view.row_target,
+    ));
     render_footer(frame, footer_area, profiles, picker, tui, palette);
     if let Some(connection_error) = &picker.connection_error {
         frame.render_widget(
@@ -122,102 +136,6 @@ fn render_input(frame: &mut Frame, area: Rect, picker: &ProfilePicker, palette: 
         .saturating_add(prefix_width)
         .saturating_add(u16::try_from(cursor_offset).unwrap_or(u16::MAX));
     frame.set_cursor_position((cursor_x.min(area.right().saturating_sub(1)), area.y));
-}
-
-fn row_lines(
-    rows: &[ProfileRow],
-    profiles: &[Profile],
-    picker: &ProfilePicker,
-    connected_profile_index: Option<usize>,
-    area: Rect,
-    palette: &Palette,
-) -> Vec<Line<'static>> {
-    if rows.is_empty() {
-        return vec![Line::styled(" No matching profile", palette.muted())];
-    }
-    let selected_profile_index = picker.selected_visible_profile_index(profiles);
-    let selected_row_position = rows
-        .iter()
-        .position(|row| Some(row) == selected_profile_index.map(ProfileRow::Profile).as_ref())
-        .unwrap_or(0);
-    let visible_row_count = usize::from(area.height).max(1);
-    let first_row_position = (selected_row_position + 1).saturating_sub(visible_row_count);
-    let row_width = usize::from(area.width);
-    rows.iter()
-        .enumerate()
-        .skip(first_row_position)
-        .take(visible_row_count)
-        .filter_map(|(row_position, row)| match row {
-            ProfileRow::Project(project_name) => {
-                let member_count = rows[row_position + 1..]
-                    .iter()
-                    .take_while(|next_row| matches!(next_row, ProfileRow::Profile(_)))
-                    .count();
-                Some(Line::from(vec![
-                    Span::raw(" "),
-                    Span::styled(project_name.clone(), palette.title()),
-                    Span::styled(format!(" {member_count}"), palette.muted()),
-                ]))
-            }
-            ProfileRow::Profile(profile_index) => profiles.get(*profile_index).map(|profile| {
-                profile_line(
-                    profile,
-                    Some(*profile_index) == selected_profile_index,
-                    Some(*profile_index) == connected_profile_index,
-                    row_width,
-                    palette,
-                )
-            }),
-        })
-        .collect()
-}
-
-fn profile_line(
-    profile: &Profile,
-    is_selected: bool,
-    is_connected: bool,
-    row_width: usize,
-    palette: &Palette,
-) -> Line<'static> {
-    let kind_palette = profile_palette(Some(profile.kind));
-    let (badge_style, muted_style) = match is_selected {
-        true => (Style::new(), Style::new()),
-        false => (Style::new().fg(kind_palette.accent), palette.muted()),
-    };
-    let badge = kind_badge(profile.kind).trim_matches(['[', ']']);
-    let mut left_spans = vec![
-        Span::raw(match is_connected {
-            true => CONNECTED_MARKER,
-            false => ROW_INDENT,
-        }),
-        Span::styled(format!("{badge:<BADGE_WIDTH$}"), badge_style),
-        Span::raw(" "),
-        Span::raw(profile.label.clone()),
-    ];
-    if !profile.tags.is_empty() {
-        let tags_text = profile
-            .tags
-            .iter()
-            .map(|tag| format!("#{tag}"))
-            .collect::<Vec<_>>()
-            .join(" ");
-        left_spans.push(Span::styled(format!("  {tags_text}"), muted_style));
-    }
-    let target_span = Span::styled(profile.target(), muted_style);
-    let left_width: usize = left_spans.iter().map(Span::width).sum();
-    let right_width = target_span.width();
-    if left_width + right_width + 3 <= row_width {
-        left_spans.push(Span::raw(
-            " ".repeat(row_width - left_width - right_width - 1),
-        ));
-        left_spans.push(target_span);
-        left_spans.push(Span::raw(" "));
-    }
-    let line = Line::from(left_spans);
-    match is_selected {
-        true => line.style(kind_palette.selected(true)),
-        false => line,
-    }
 }
 
 fn render_footer(

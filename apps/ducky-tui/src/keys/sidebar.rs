@@ -27,6 +27,8 @@ fn char_message(key: KeyEvent) -> Option<Msg> {
         ('G', Msg::Sidebar(SidebarMsg::Last)),
         ('l', Msg::Sidebar(SidebarMsg::Activate)),
         ('/', Msg::Sidebar(SidebarMsg::StartFilter)),
+        ('<', Msg::Sidebar(SidebarMsg::Narrow)),
+        ('>', Msg::Sidebar(SidebarMsg::Widen)),
         ('s', Msg::OpenSchemaPicker),
         ('r', Msg::RefreshCatalog),
         ('R', Msg::Reconnect),

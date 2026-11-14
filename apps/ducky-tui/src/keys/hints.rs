@@ -33,6 +33,7 @@ const SIDEBAR_HINTS: &[KeyHint] = &[
     ("Enter", "open"),
     ("/", "filter"),
     ("s", "schema"),
+    ("< >", "width"),
     ("?", "help"),
 ];
 const NO_TAB_HINTS: &[KeyHint] = &[

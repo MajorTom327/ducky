@@ -8,6 +8,7 @@ use ratatui::text::{Line, Span};
 use ratatui::widgets::Block;
 
 use crate::editor::highlight::refresh_highlights;
+use crate::mouse::MouseTarget;
 use crate::theme::Palette;
 use crate::tui_state::{CursorShape, TuiState};
 use crate::views::{ViewContext, completion};
@@ -60,6 +61,7 @@ pub fn render(
             EditorMode::Normal | EditorMode::Visual => CursorShape::Block,
         };
     }
+    tui.mouse_targets.push((area, MouseTarget::Editor(tab_id)));
     completion::render(frame, area, tui.editor(tab_id), palette);
 }
 
