@@ -30,6 +30,14 @@ pub(super) fn click(
             Vec::new()
         }
         MouseTarget::Tab(tab_index) => vec![Msg::Tabs(TabsMsg::Select(tab_index))],
+        MouseTarget::TableTab(clicked_tab) => {
+            match workspace.active_tab().map(|tab| &tab.content) {
+                Some(TabContent::Table(table)) if table.tab != clicked_tab => {
+                    vec![Msg::Table(TableMsg::ToggleTab)]
+                }
+                _ => Vec::new(),
+            }
+        }
         MouseTarget::GridCell {
             pane,
             row_index,
@@ -103,6 +111,7 @@ pub(super) fn wheel(
         MouseTarget::FileItem(_) => file_wheel(workspace, tui, is_down),
         MouseTarget::SidebarBorder
         | MouseTarget::Tab(_)
+        | MouseTarget::TableTab(_)
         | MouseTarget::ModalItem(_)
         | MouseTarget::Modal
         | MouseTarget::ProfileRow(_) => Vec::new(),

@@ -88,6 +88,29 @@ fn clicking_a_tab_label_selects_that_tab() {
 const WIDTH_BEFORE_EDGE: u16 = mouse_support::WIDTH - 2;
 
 #[test]
+fn clicking_structure_then_data_switches_the_table_view() {
+    let mut state = table_state();
+    let mut tui = TuiState::new(false);
+    let rows = draw_rows(&state, &mut tui);
+    let data_label = position_of(&rows, "Data", MAIN_COLUMN);
+    assert!(click(&state, &mut tui, data_label).is_empty());
+    let structure_label = position_of(&rows, "Structure", MAIN_COLUMN);
+    let structure_end = (structure_label.0 + 8, structure_label.1);
+    let messages = click(&state, &mut tui, structure_end);
+    assert_eq!(messages, vec![Msg::Table(TableMsg::ToggleTab)]);
+    send(&mut state, messages);
+    let rows = draw_rows(&state, &mut tui);
+    let data_label = position_of(&rows, "Data", MAIN_COLUMN);
+    let messages = click(&state, &mut tui, data_label);
+    assert_eq!(messages, vec![Msg::Table(TableMsg::ToggleTab)]);
+    send(&mut state, messages);
+    let TabContent::Table(table) = &workspace(&state).tabs[0].content else {
+        panic!("table tab");
+    };
+    assert_eq!(table.tab, TableTab::Data);
+}
+
+#[test]
 fn clicking_a_cell_moves_the_cursor_and_a_double_click_changes_the_cell() {
     let mut state = table_state();
     workspace_mut(&mut state).focus = Focus::Sidebar;

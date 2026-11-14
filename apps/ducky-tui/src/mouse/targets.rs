@@ -1,4 +1,4 @@
-use ducky_app::TabId;
+use ducky_app::{TabId, TableTab};
 use ratatui::layout::{Position, Rect};
 
 use crate::keys::sequence::GridPane;
@@ -17,6 +17,7 @@ pub enum MouseTarget {
     SidebarList,
     SidebarBorder,
     Tab(usize),
+    TableTab(TableTab),
     GridCell {
         pane: GridPane,
         row_index: usize,

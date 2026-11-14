@@ -249,6 +249,7 @@ Source of truth: `apps/ducky-tui/src/keys/help.rs` (`HELP_ROWS`, shown with `F1`
 |`click table`|open it in a tab|
 |`drag sidebar edge`|resize the sidebar|
 |`click tab`|switch to the tab|
+|`click Data / Structure`|switch the table view|
 |`click cell`|focus the grid, move the cursor|
 |`double click cell`|change the cell / row detail|
 |`click header`|cycle the sort of the column|

@@ -6,6 +6,7 @@ use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Padding, Paragraph};
 
 use crate::keys::sequence::GridPane;
+use crate::mouse::MouseTarget;
 use crate::theme::Palette;
 use crate::tui_state::TuiState;
 use crate::views::{ViewContext, structure};
@@ -13,6 +14,10 @@ use crate::widgets::grid::{GridOptions, render_grid};
 use crate::widgets::loading::{LoadSlot, render_error, render_loadable};
 
 const FAILED_PAGE_HINT: &str = "/ edit filter · Esc clear filter · r reload";
+const DATA_LABEL_WIDTH: u16 = 4;
+const TAB_SEPARATOR_WIDTH: u16 = 3;
+const STRUCTURE_LABEL_WIDTH: u16 = 9;
+const TABS_LINE_WIDTH: u16 = DATA_LABEL_WIDTH + TAB_SEPARATOR_WIDTH + STRUCTURE_LABEL_WIDTH + 2;
 
 pub fn render(
     frame: &mut Frame,
@@ -46,6 +51,7 @@ pub fn render(
     }
     let inner_area = block.inner(area);
     frame.render_widget(block, area);
+    push_table_tab_targets(area, tui);
     match table.tab {
         TableTab::Data => render_data(frame, inner_area, tab_id, table, context, tui),
         TableTab::Structure => structure::render(frame, inner_area, tab_id, table, context, tui),
@@ -64,6 +70,19 @@ fn tabs_line(table: &TableView, palette: &Palette) -> Line<'static> {
         Span::styled("Structure", tab_style(TableTab::Structure)),
         Span::raw(" "),
     ])
+}
+
+fn push_table_tab_targets(area: Rect, tui: &mut TuiState) {
+    let data_label_x = area.right().saturating_sub(TABS_LINE_WIDTH);
+    let structure_label_x = data_label_x + DATA_LABEL_WIDTH + TAB_SEPARATOR_WIDTH;
+    tui.mouse_targets.push((
+        Rect::new(data_label_x, area.y, DATA_LABEL_WIDTH, 1),
+        MouseTarget::TableTab(TableTab::Data),
+    ));
+    tui.mouse_targets.push((
+        Rect::new(structure_label_x, area.y, STRUCTURE_LABEL_WIDTH, 1),
+        MouseTarget::TableTab(TableTab::Structure),
+    ));
 }
 
 fn summary_text(table: &TableView) -> Option<String> {
