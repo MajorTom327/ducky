@@ -25,6 +25,10 @@ SELECT n.nspname::text, c.relname::text, a.attname::text,
     EXISTS (
         SELECT 1 FROM pg_catalog.pg_index i
         WHERE i.indrelid = c.oid AND i.indisprimary AND a.attnum = ANY (i.indkey)
+    ),
+    ARRAY(
+        SELECT e.enumlabel::text FROM pg_catalog.pg_enum e
+        WHERE e.enumtypid = a.atttypid ORDER BY e.enumsortorder
     )
 FROM pg_catalog.pg_attribute a
 JOIN pg_catalog.pg_class c ON c.oid = a.attrelid
@@ -119,5 +123,6 @@ fn column_from_row(row: &Row) -> Result<Column, PgError> {
         is_nullable: column_value(row, 4)?,
         default_expression: column_value(row, 5)?,
         is_primary_key: column_value(row, 6)?,
+        enum_labels: column_value(row, 7)?,
     })
 }

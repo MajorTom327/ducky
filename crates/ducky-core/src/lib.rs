@@ -6,8 +6,8 @@ mod script;
 mod session;
 
 pub use catalog::{
-    Catalog, Column, ForeignKey, ForeignKeyLink, Index, Relation, RelationDetails, RelationKind,
-    RelationRef, Schema,
+    Catalog, Column, ConstraintDefinition, ForeignKeyLink, Index, Relation, RelationDetails,
+    RelationKind, RelationRef, Schema,
 };
 pub use data::{
     Cell, DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE, Page, PageRequest, ResultSet, Sort, SortDirection,

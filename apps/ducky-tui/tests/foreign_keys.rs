@@ -34,6 +34,7 @@ fn column(name: &str) -> Column {
         is_nullable: false,
         default_expression: None,
         is_primary_key: name == "id",
+        enum_labels: Vec::new(),
     }
 }
 

@@ -19,6 +19,7 @@ pub struct Column {
     pub is_nullable: bool,
     pub default_expression: Option<String>,
     pub is_primary_key: bool,
+    pub enum_labels: Vec<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -105,7 +106,7 @@ pub struct Index {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ForeignKey {
+pub struct ConstraintDefinition {
     pub name: String,
     pub definition: String,
 }
@@ -113,7 +114,8 @@ pub struct ForeignKey {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RelationDetails {
     pub indexes: Vec<Index>,
-    pub foreign_keys: Vec<ForeignKey>,
+    pub foreign_keys: Vec<ConstraintDefinition>,
+    pub check_constraints: Vec<ConstraintDefinition>,
     pub view_definition: Option<String>,
 }
 

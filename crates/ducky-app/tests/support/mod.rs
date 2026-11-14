@@ -71,6 +71,7 @@ fn column(name: &str) -> Column {
         is_nullable: true,
         default_expression: None,
         is_primary_key: false,
+        enum_labels: Vec::new(),
     }
 }
 

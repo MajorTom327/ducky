@@ -6,8 +6,8 @@ use ducky_app::{
     TableView, Workspace,
 };
 use ducky_core::{
-    Catalog, Column, ForeignKey, Index, Page, PageRequest, PgTools, Profile, ProfileKind, Relation,
-    RelationDetails, RelationKind, RelationRef, ResultSet, Schema, SessionInfo, Sort,
+    Catalog, Column, ConstraintDefinition, Index, Page, PageRequest, PgTools, Profile, ProfileKind,
+    Relation, RelationDetails, RelationKind, RelationRef, ResultSet, Schema, SessionInfo, Sort,
     SortDirection, StoragePaths, ToolStatus,
 };
 use ducky_tui::keys::table::handle;
@@ -30,6 +30,7 @@ fn column(name: &str, data_type: &str, is_nullable: bool, is_primary_key: bool) 
         is_nullable,
         default_expression: None,
         is_primary_key,
+        enum_labels: Vec::new(),
     }
 }
 
@@ -379,10 +380,11 @@ fn structure_tab_shows_columns_indexes_and_foreign_keys() {
             is_unique: true,
             is_primary: false,
         }],
-        foreign_keys: vec![ForeignKey {
+        foreign_keys: vec![ConstraintDefinition {
             name: "customers_owner_fkey".to_owned(),
             definition: "FOREIGN KEY (owner_id) REFERENCES owners(id)".to_owned(),
         }],
+        check_constraints: Vec::new(),
         view_definition: None,
     });
     let text = render_text(&workspace(view));
@@ -401,12 +403,51 @@ fn structure_tab_shows_columns_indexes_and_foreign_keys() {
 }
 
 #[test]
+fn structure_tab_lists_enum_labels_under_the_type_and_checks() {
+    let mut view = table_view("customers");
+    view.tab = TableTab::Structure;
+    view.details = Loadable::Ready(RelationDetails {
+        indexes: Vec::new(),
+        foreign_keys: Vec::new(),
+        check_constraints: vec![ConstraintDefinition {
+            name: "customers_tier_check".to_owned(),
+            definition: "CHECK (tier > 0)".to_owned(),
+        }],
+        view_definition: None,
+    });
+    let mut tiered_catalog = catalog();
+    tiered_catalog.schemas[0].relations[0].columns.push(Column {
+        enum_labels: vec!["bronze".to_owned(), "silver".to_owned()],
+        ..column("tier", "customer_tier", false, false)
+    });
+    let mut tiered_workspace = workspace(view);
+    tiered_workspace.catalog = Loadable::Ready(tiered_catalog);
+    let text = render_text(&tiered_workspace);
+    let lines: Vec<&str> = text.lines().collect();
+    let tier_line_index = lines
+        .iter()
+        .position(|line| line.contains("customer_tier"))
+        .expect("tier column listed");
+    let type_column = lines[tier_line_index]
+        .find("customer_tier")
+        .expect("type shown");
+    assert_eq!(
+        lines[tier_line_index + 1].find("bronze · silver"),
+        Some(type_column)
+    );
+    assert_contains(&text, "Checks");
+    assert_contains(&text, "customers_tier_check");
+    assert_contains(&text, "CHECK (tier > 0)");
+}
+
+#[test]
 fn structure_tab_shows_view_definition() {
     let mut view = table_view("order_totals");
     view.tab = TableTab::Structure;
     view.details = Loadable::Ready(RelationDetails {
         indexes: Vec::new(),
         foreign_keys: Vec::new(),
+        check_constraints: Vec::new(),
         view_definition: Some("SELECT email FROM customers".to_owned()),
     });
     let text = render_text(&workspace(view));
@@ -581,6 +622,7 @@ fn structure_tab_marks_empty_columns_and_unflagged_indexes() {
             is_primary: false,
         }],
         foreign_keys: Vec::new(),
+        check_constraints: Vec::new(),
         view_definition: None,
     });
     let text = render_text(&workspace(view));

@@ -1,5 +1,5 @@
 use ducky_app::{TabId, TableView};
-use ducky_core::{Column, RelationDetails};
+use ducky_core::{Column, ConstraintDefinition, RelationDetails};
 use ratatui::Frame;
 use ratatui::layout::{Constraint, Layout, Rect};
 use ratatui::text::{Line, Span};
@@ -83,7 +83,7 @@ fn column_lines(columns: &[Column], palette: &Palette) -> Vec<Line<'static>> {
     if columns.is_empty() {
         lines.push(empty_section(palette));
     }
-    lines.extend(columns.iter().map(|column| {
+    for column in columns {
         let nullability = match column.is_nullable {
             true => "NULL",
             false => NOT_NULL,
@@ -105,8 +105,15 @@ fn column_lines(columns: &[Column], palette: &Palette) -> Vec<Line<'static>> {
                 palette.muted(),
             ));
         }
-        Line::from(spans)
-    }));
+        lines.push(Line::from(spans));
+        if !column.enum_labels.is_empty() {
+            lines.push(Line::from(vec![
+                Span::raw(INDENT),
+                Span::raw(padded("", name_width)),
+                Span::styled(column.enum_labels.join(" · "), palette.muted()),
+            ]));
+        }
+    }
     lines
 }
 
@@ -129,24 +136,16 @@ fn detail_lines(details: &RelationDetails, palette: &Palette) -> Vec<Line<'stati
             Span::styled(index.definition.clone(), palette.muted()),
         ]));
     }
-    lines.push(Line::raw(""));
-    lines.push(section_title("Foreign keys", palette));
-    if details.foreign_keys.is_empty() {
-        lines.push(empty_section(palette));
-    }
-    let foreign_key_name_width = widest(
-        details
-            .foreign_keys
-            .iter()
-            .map(|foreign_key| foreign_key.name.as_str()),
-    );
-    for foreign_key in &details.foreign_keys {
-        lines.push(Line::from(vec![
-            Span::raw(INDENT),
-            Span::raw(padded(&foreign_key.name, foreign_key_name_width)),
-            Span::styled(foreign_key.definition.clone(), palette.muted()),
-        ]));
-    }
+    lines.extend(constraint_lines(
+        "Foreign keys",
+        &details.foreign_keys,
+        palette,
+    ));
+    lines.extend(constraint_lines(
+        "Checks",
+        &details.check_constraints,
+        palette,
+    ));
     if let Some(view_definition) = &details.view_definition {
         lines.push(Line::raw(""));
         lines.push(section_title("Definition", palette));
@@ -160,5 +159,29 @@ fn detail_lines(details: &RelationDetails, palette: &Palette) -> Vec<Line<'stati
                 }),
         );
     }
+    lines
+}
+
+fn constraint_lines(
+    title: &'static str,
+    constraints: &[ConstraintDefinition],
+    palette: &Palette,
+) -> Vec<Line<'static>> {
+    let mut lines = vec![Line::raw(""), section_title(title, palette)];
+    if constraints.is_empty() {
+        lines.push(empty_section(palette));
+    }
+    let name_width = widest(
+        constraints
+            .iter()
+            .map(|constraint| constraint.name.as_str()),
+    );
+    lines.extend(constraints.iter().map(|constraint| {
+        Line::from(vec![
+            Span::raw(INDENT),
+            Span::raw(padded(&constraint.name, name_width)),
+            Span::styled(constraint.definition.clone(), palette.muted()),
+        ])
+    }));
     lines
 }

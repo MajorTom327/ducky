@@ -1,17 +1,20 @@
 CREATE EXTENSION IF NOT EXISTS postgis;
 
+CREATE TYPE public.order_status AS ENUM ('pending', 'paid', 'shipped', 'cancelled');
+
 CREATE TABLE public.customers (
     id serial PRIMARY KEY,
     email text NOT NULL UNIQUE,
     name text,
+    is_active boolean NOT NULL DEFAULT true,
     created_at timestamptz NOT NULL DEFAULT now()
 );
 
 CREATE TABLE public.orders (
     id serial PRIMARY KEY,
     customer_id integer NOT NULL REFERENCES public.customers (id),
-    status text NOT NULL DEFAULT 'pending',
-    total numeric(10, 2)
+    status public.order_status NOT NULL DEFAULT 'pending',
+    total numeric(10, 2) CHECK (total >= 0)
 );
 
 CREATE INDEX orders_status_idx ON public.orders (status);
@@ -37,7 +40,7 @@ FROM generate_series(1, 250) AS n;
 INSERT INTO public.orders (customer_id, status, total)
 SELECT
     (n % 250) + 1,
-    (ARRAY['pending', 'paid', 'shipped', 'cancelled'])[(n % 4) + 1],
+    ((ARRAY['pending', 'paid', 'shipped', 'cancelled'])[(n % 4) + 1])::public.order_status,
     round((n * 7.31 % 500)::numeric, 2)
 FROM generate_series(1, 500) AS n;
 

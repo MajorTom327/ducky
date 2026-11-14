@@ -61,6 +61,7 @@ fn relation(name: &str, kind: RelationKind) -> Relation {
             is_nullable: false,
             default_expression: None,
             is_primary_key: true,
+            enum_labels: Vec::new(),
         }],
         foreign_keys: Vec::new(),
     }

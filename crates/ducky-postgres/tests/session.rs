@@ -144,6 +144,24 @@ async fn catalog_lists_tables_views_and_columns() {
 
 #[tokio::test]
 #[ignore]
+async fn catalog_lists_enum_labels_in_sort_order() {
+    let schema = TestSchema::create(&[
+        "CREATE TYPE {schema}.mood AS ENUM ('sad', 'happy')",
+        "ALTER TYPE {schema}.mood ADD VALUE 'neutral' BEFORE 'happy'",
+        "CREATE TABLE {schema}.moods (id serial PRIMARY KEY, current {schema}.mood NOT NULL)",
+    ])
+    .await;
+    let catalog = schema.session.load_catalog().await.expect("catalog");
+    let moods = catalog
+        .relation(&schema.relation("moods"))
+        .expect("moods listed");
+    assert!(moods.columns[0].enum_labels.is_empty());
+    assert_eq!(moods.columns[1].enum_labels, ["sad", "neutral", "happy"]);
+    schema.drop_schema().await;
+}
+
+#[tokio::test]
+#[ignore]
 async fn catalog_lists_foreign_key_links_in_key_order() {
     let schema = TestSchema::create(&[
         "CREATE TABLE {schema}.customers (id serial PRIMARY KEY, email text)",
@@ -192,7 +210,7 @@ async fn catalog_lists_foreign_key_links_in_key_order() {
 async fn details_return_indexes_foreign_keys_and_view_definition() {
     let schema = TestSchema::create(&[
         "CREATE TABLE {schema}.parents (id serial PRIMARY KEY, label text)",
-        "CREATE TABLE {schema}.children (id serial PRIMARY KEY, parent_id integer NOT NULL REFERENCES {schema}.parents (id))",
+        "CREATE TABLE {schema}.children (id serial PRIMARY KEY, parent_id integer NOT NULL REFERENCES {schema}.parents (id), rank integer CONSTRAINT children_rank_check CHECK (rank > 0))",
         "CREATE INDEX children_parent_idx ON {schema}.children (parent_id)",
         "CREATE VIEW {schema}.parent_labels AS SELECT label FROM {schema}.parents",
     ])
@@ -221,6 +239,16 @@ async fn details_return_indexes_foreign_keys_and_view_definition() {
         children_details.foreign_keys[0]
             .definition
             .contains("REFERENCES")
+    );
+    assert_eq!(children_details.check_constraints.len(), 1);
+    assert_eq!(
+        children_details.check_constraints[0].name,
+        "children_rank_check"
+    );
+    assert!(
+        children_details.check_constraints[0]
+            .definition
+            .contains("rank > 0")
     );
     assert_eq!(children_details.view_definition, None);
     let view_details = schema
@@ -651,6 +679,7 @@ async fn details_of_a_missing_relation_are_empty() {
         RelationDetails {
             indexes: Vec::new(),
             foreign_keys: Vec::new(),
+            check_constraints: Vec::new(),
             view_definition: None,
         }
     );

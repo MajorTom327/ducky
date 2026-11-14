@@ -1,6 +1,6 @@
-use ducky_core::{ForeignKey, Index, RelationDetails, RelationRef};
-use tokio_postgres::Client;
+use ducky_core::{ConstraintDefinition, Index, RelationDetails, RelationRef};
 use tokio_postgres::types::ToSql;
+use tokio_postgres::{Client, Row};
 
 use crate::error::{PgError, query_error};
 use crate::rows::column_value;
@@ -14,13 +14,16 @@ JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
 WHERE n.nspname = $1 AND c.relname = $2
 ORDER BY index_class.relname";
 
-const FOREIGN_KEYS_SQL: &str = "
+const CONSTRAINTS_SQL: &str = "
 SELECT con.conname::text, pg_catalog.pg_get_constraintdef(con.oid, true)
 FROM pg_catalog.pg_constraint con
 JOIN pg_catalog.pg_class c ON c.oid = con.conrelid
 JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
-WHERE con.contype = 'f' AND n.nspname = $1 AND c.relname = $2
+WHERE con.contype::text = $3 AND n.nspname = $1 AND c.relname = $2
 ORDER BY con.conname";
+
+const FOREIGN_KEY_TYPE: &str = "f";
+const CHECK_TYPE: &str = "c";
 
 const VIEW_DEFINITION_SQL: &str = "
 SELECT CASE WHEN c.relkind IN ('v', 'm') THEN pg_catalog.pg_get_viewdef(c.oid, true) END
@@ -33,9 +36,14 @@ pub(crate) async fn load_relation_details(
     relation: &RelationRef,
 ) -> Result<RelationDetails, PgError> {
     let parameters: [&(dyn ToSql + Sync); 2] = [&relation.schema, &relation.name];
-    let (index_rows, foreign_key_rows, view_definition_row) = tokio::try_join!(
+    let foreign_key_parameters: [&(dyn ToSql + Sync); 3] =
+        [&relation.schema, &relation.name, &FOREIGN_KEY_TYPE];
+    let check_parameters: [&(dyn ToSql + Sync); 3] =
+        [&relation.schema, &relation.name, &CHECK_TYPE];
+    let (index_rows, foreign_key_rows, check_rows, view_definition_row) = tokio::try_join!(
         client.query(INDEXES_SQL, &parameters),
-        client.query(FOREIGN_KEYS_SQL, &parameters),
+        client.query(CONSTRAINTS_SQL, &foreign_key_parameters),
+        client.query(CONSTRAINTS_SQL, &check_parameters),
         client.query_opt(VIEW_DEFINITION_SQL, &parameters)
     )
     .map_err(query_error)?;
@@ -50,15 +58,8 @@ pub(crate) async fn load_relation_details(
             })
         })
         .collect::<Result<Vec<_>, PgError>>()?;
-    let foreign_keys = foreign_key_rows
-        .iter()
-        .map(|row| {
-            Ok(ForeignKey {
-                name: column_value(row, 0)?,
-                definition: column_value(row, 1)?,
-            })
-        })
-        .collect::<Result<Vec<_>, PgError>>()?;
+    let foreign_keys = constraints_from_rows(&foreign_key_rows)?;
+    let check_constraints = constraints_from_rows(&check_rows)?;
     let view_definition = match &view_definition_row {
         Some(row) => column_value::<Option<String>>(row, 0)?,
         None => None,
@@ -66,6 +67,18 @@ pub(crate) async fn load_relation_details(
     Ok(RelationDetails {
         indexes,
         foreign_keys,
+        check_constraints,
         view_definition,
     })
+}
+
+fn constraints_from_rows(rows: &[Row]) -> Result<Vec<ConstraintDefinition>, PgError> {
+    rows.iter()
+        .map(|row| {
+            Ok(ConstraintDefinition {
+                name: column_value(row, 0)?,
+                definition: column_value(row, 1)?,
+            })
+        })
+        .collect()
 }

@@ -173,6 +173,7 @@ fn structure_tab_loads_details_once() {
     let details = RelationDetails {
         indexes: Vec::new(),
         foreign_keys: Vec::new(),
+        check_constraints: Vec::new(),
         view_definition: None,
     };
     send(
@@ -289,6 +290,7 @@ fn details_loaded_reaches_background_tab() {
     let details = RelationDetails {
         indexes: Vec::new(),
         foreign_keys: Vec::new(),
+        check_constraints: Vec::new(),
         view_definition: None,
     };
     send(
@@ -327,6 +329,7 @@ fn table_messages_and_responses_are_ignored_on_the_profile_screen() {
             result: Ok(RelationDetails {
                 indexes: Vec::new(),
                 foreign_keys: Vec::new(),
+                check_constraints: Vec::new(),
                 view_definition: None,
             }),
         },
