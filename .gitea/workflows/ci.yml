@@ -30,8 +30,8 @@ jobs:
       - run: cargo fmt --all --check
       - run: cargo clippy --workspace --all-targets -- -D warnings
       - run: cargo llvm-cov --workspace --no-report -- --include-ignored --skip dump_then_restore
-      - run: cargo llvm-cov report --lcov --output-path target/coverage/lcov.info
       - run: cargo llvm-cov report --html --output-dir target/coverage
+      - run: cargo llvm-cov report --lcov --output-path target/coverage/lcov.info
       - uses: actions/upload-artifact@v3
         with:
           name: coverage
