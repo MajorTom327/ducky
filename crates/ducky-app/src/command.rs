@@ -44,4 +44,8 @@ pub enum Command {
         tab_id: TabId,
         sql: String,
     },
+    DeleteRows {
+        tab_id: TabId,
+        sql: String,
+    },
 }

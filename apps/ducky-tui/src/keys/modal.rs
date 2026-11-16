@@ -1,5 +1,5 @@
 use crossterm::event::{KeyCode, KeyEvent};
-use ducky_app::{CellInput, Modal, ModalMsg, Msg};
+use ducky_app::{CellInput, Confirm, ConfirmKind, Modal, ModalMsg, Msg};
 use tui_input::InputRequest;
 
 use crate::keys::{is_ctrl, is_plain_char, profiles};
@@ -11,7 +11,7 @@ pub fn handle(modal: &Modal, tui: &mut TuiState, key: KeyEvent) -> Vec<Msg> {
     let modal_message = match modal {
         Modal::ProfilePicker(picker) => return profiles::handle(picker, key, true),
         Modal::Prompt(_) => prompt_message(key),
-        Modal::Confirm(_) => confirm_message(key),
+        Modal::Confirm(confirm) => confirm_message(confirm, key),
         Modal::RowDetail(_) => row_detail_message(key),
         Modal::SchemaPicker { .. } | Modal::ReferencePicker { .. } => picker_message(key),
         Modal::Help => help_message(tui, key),
@@ -68,7 +68,13 @@ fn parameters_message(key: KeyEvent) -> Option<ModalMsg> {
     }
 }
 
-fn confirm_message(key: KeyEvent) -> Option<ModalMsg> {
+fn confirm_message(confirm: &Confirm, key: KeyEvent) -> Option<ModalMsg> {
+    if let ConfirmKind::DeleteRows { .. } = confirm.kind {
+        return match is_plain_char(key, 'y') {
+            true => Some(ModalMsg::Submit),
+            false => Some(ModalMsg::Cancel),
+        };
+    }
     match key.code {
         KeyCode::Enter => Some(ModalMsg::Submit),
         KeyCode::Esc => Some(ModalMsg::Cancel),

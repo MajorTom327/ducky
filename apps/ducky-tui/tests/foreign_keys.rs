@@ -261,7 +261,7 @@ fn visual_anchor_switches_the_status_hints() {
     let mut tui = TuiState::new(false);
     let status_row = screen_rows(&state, &mut tui).pop().unwrap_or_default();
     assert!(
-        status_row.contains("VISUAL  j/k extend · V keep · e edit · Esc clear"),
+        status_row.contains("VISUAL  j/k extend · V keep · e edit · d delete · Esc clear"),
         "{status_row}"
     );
 }

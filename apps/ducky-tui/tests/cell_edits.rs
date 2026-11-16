@@ -512,6 +512,29 @@ fn save_confirmation_previews_the_sql_without_a_mode_line() {
 }
 
 #[test]
+fn delete_confirmation_previews_the_sql_and_says_only_y_deletes() {
+    let mut state = edit_state(ProfileKind::Local);
+    let mut tui = TuiState::new(false);
+    state.modal = Some(Modal::Confirm(Confirm {
+        kind: ConfirmKind::DeleteRows {
+            tab_id: 1,
+            sql: "DELETE FROM \"public\".\"customers\" WHERE \"id\" IN ('1', '2');".to_owned(),
+        },
+        message: "You are going to delete 2 rows. Are you sure?".to_owned(),
+    }));
+    let screen = buffer_text(draw_screen(&state, &mut tui).backend().buffer());
+    assert!(
+        screen.contains("You are going to delete 2 rows. Are you sure?"),
+        "{screen}"
+    );
+    assert!(screen.contains("WHERE \"id\" IN ('1', '2');"), "{screen}");
+    assert!(
+        screen.contains("y confirm · any other key cancel"),
+        "{screen}"
+    );
+}
+
+#[test]
 fn table_keys_map_to_cell_edit_messages() {
     let state = edit_state(ProfileKind::Local);
     let mut tui = TuiState::new(false);

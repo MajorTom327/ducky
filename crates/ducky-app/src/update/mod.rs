@@ -12,6 +12,7 @@ mod parameters;
 mod profiles;
 mod query;
 mod references;
+mod row_deletion;
 mod row_keys;
 mod run_confirmation;
 mod selection;
@@ -79,6 +80,7 @@ pub fn update(state: &mut AppState, msg: Msg) -> Vec<Command> {
         Msg::JobFinished { job, result } => jobs::finished(state, job, result),
         Msg::Modal(modal_msg) => modal::update(state, modal_msg),
         Msg::CellEditsSaved { tab_id, result } => cell_edits::saved(state, tab_id, result),
+        Msg::RowsDeleted { tab_id, result } => row_deletion::deleted(state, tab_id, result),
     }
 }
 

@@ -1,5 +1,6 @@
 use ducky_app::{
-    AppState, CellInput, Focus, Modal, PickerMode, QueryPane, Screen, TabContent, TableTab,
+    AppState, CellInput, ConfirmKind, Focus, Modal, PickerMode, QueryPane, Screen, TabContent,
+    TableTab,
 };
 
 use crate::keys::help::KeyHint;
@@ -51,6 +52,7 @@ const TABLE_DATA_HINTS: &[KeyHint] = &[
     ("v", "mark"),
     ("V", "visual"),
     ("e", "edit"),
+    ("d", "delete"),
     ("c", "change"),
     ("gd/gr", "references"),
     ("t", "structure"),
@@ -70,6 +72,7 @@ const TABLE_VISUAL_HINTS: &[KeyHint] = &[
     ("j/k", "extend"),
     ("V", "keep"),
     ("e", "edit"),
+    ("d", "delete"),
     ("Esc", "clear"),
 ];
 const TABLE_STRUCTURE_HINTS: &[KeyHint] = &[
@@ -159,7 +162,10 @@ fn modal_hints(modal: &Modal) -> &'static [KeyHint] {
             ("Ctrl+w", "delete word"),
             ("Ctrl+u", "clear"),
         ],
-        Modal::Confirm(_) => &[("y/Enter", "confirm"), ("n/Esc", "cancel")],
+        Modal::Confirm(confirm) => match confirm.kind {
+            ConfirmKind::DeleteRows { .. } => &[("y", "delete"), ("any key", "cancel")],
+            _ => &[("y/Enter", "confirm"), ("n/Esc", "cancel")],
+        },
         Modal::RowDetail(_) => &[("j/k", "move"), ("y", "copy value"), ("Esc", "close")],
         Modal::SchemaPicker { .. } => &[("j/k", "move"), ("Enter", "choose"), ("Esc", "cancel")],
         Modal::ReferencePicker { .. } => &[("Enter", "open"), ("j/k", "move"), ("Esc", "cancel")],

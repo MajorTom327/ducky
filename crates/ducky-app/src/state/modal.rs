@@ -56,6 +56,7 @@ pub enum ConfirmKind {
     RunScript { tab_id: TabId, sql: String },
     Restore { file_name: String },
     SaveCellEdits { tab_id: TabId, sql: String },
+    DeleteRows { tab_id: TabId, sql: String },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

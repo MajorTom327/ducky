@@ -19,7 +19,9 @@ pub fn render(
     workspace_palette: &Palette,
 ) -> Rect {
     let popup_palette = match &confirm.kind {
-        ConfirmKind::RunScript { .. } | ConfirmKind::SaveCellEdits { .. } => {
+        ConfirmKind::RunScript { .. }
+        | ConfirmKind::SaveCellEdits { .. }
+        | ConfirmKind::DeleteRows { .. } => {
             palette(state.workspace().map(|workspace| workspace.profile.kind))
         }
         ConfirmKind::OverwriteFile | ConfirmKind::Restore { .. } => *workspace_palette,
@@ -55,7 +57,9 @@ pub fn render(
 fn confirm_lines<'a>(state: &AppState, confirm: &'a Confirm, palette: &Palette) -> Vec<Line<'a>> {
     let mut lines = vec![Line::raw(confirm.message.as_str())];
     let preview_sql = match &confirm.kind {
-        ConfirmKind::RunScript { sql, .. } | ConfirmKind::SaveCellEdits { sql, .. } => Some(sql),
+        ConfirmKind::RunScript { sql, .. }
+        | ConfirmKind::SaveCellEdits { sql, .. }
+        | ConfirmKind::DeleteRows { sql, .. } => Some(sql),
         ConfirmKind::OverwriteFile | ConfirmKind::Restore { .. } => None,
     };
     if let Some(sql) = preview_sql {
@@ -78,10 +82,11 @@ fn confirm_lines<'a>(state: &AppState, confirm: &'a Confirm, palette: &Palette) 
         lines.push(Line::styled(format!("Mode: {mode_label}"), palette.muted()));
     }
     lines.push(Line::default());
-    lines.push(Line::styled(
-        "y / Enter confirm · n / Esc cancel",
-        palette.muted(),
-    ));
+    let key_hint = match confirm.kind {
+        ConfirmKind::DeleteRows { .. } => "y confirm · any other key cancel",
+        _ => "y / Enter confirm · n / Esc cancel",
+    };
+    lines.push(Line::styled(key_hint, palette.muted()));
     lines
 }
 

@@ -72,6 +72,10 @@ pub enum Msg {
         tab_id: TabId,
         result: Result<Vec<u64>, String>,
     },
+    RowsDeleted {
+        tab_id: TabId,
+        result: Result<Vec<u64>, String>,
+    },
     Notified(Notice),
 }
 
@@ -168,6 +172,7 @@ pub enum TableMsg {
     ToggleVisualSelection,
     ClearSelection,
     EditSelectedRows,
+    DeleteSelectedRows,
     ChangeCell,
     SetCellNull,
     RevertCell,

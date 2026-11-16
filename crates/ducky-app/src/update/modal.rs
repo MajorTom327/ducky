@@ -7,8 +7,8 @@ use crate::state::{
 use crate::update::modal_selection::{SelectionMove, move_selection};
 use crate::update::table::apply_filter;
 use crate::update::{
-    cell_editor, cell_edits, notice, palette, parameters, profiles, references, run_confirmation,
-    workspace_mut,
+    cell_editor, cell_edits, notice, palette, parameters, profiles, references, row_deletion,
+    run_confirmation, workspace_mut,
 };
 
 pub(crate) fn update(state: &mut AppState, msg: ModalMsg) -> Vec<Command> {
@@ -98,6 +98,10 @@ pub(crate) fn update(state: &mut AppState, msg: ModalMsg) -> Vec<Command> {
                     kind: ConfirmKind::SaveCellEdits { .. },
                     ..
                 })) => cell_edits::cancelled(state),
+                Some(Modal::Confirm(Confirm {
+                    kind: ConfirmKind::DeleteRows { .. },
+                    ..
+                })) => row_deletion::cancelled(state),
                 _ => {}
             }
             Vec::new()
@@ -188,6 +192,7 @@ fn submit_confirm(state: &mut AppState, confirm: Confirm) -> Vec<Command> {
         },
         ConfirmKind::RunScript { tab_id, sql } => run_confirmation::confirmed(state, tab_id, sql),
         ConfirmKind::SaveCellEdits { tab_id, sql } => cell_edits::run(state, tab_id, sql),
+        ConfirmKind::DeleteRows { tab_id, sql } => vec![Command::DeleteRows { tab_id, sql }],
         ConfirmKind::Restore { file_name } => {
             let restore = &mut workspace.restore;
             restore.job = JobState::Running;

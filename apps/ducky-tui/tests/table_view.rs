@@ -533,8 +533,12 @@ fn selection_keys_map_to_table_messages() {
         vec![Msg::Table(TableMsg::ToggleVisualSelection)]
     );
     assert_eq!(
-        press(&workspace(view), KeyCode::Char('e')),
+        press(&workspace(view.clone()), KeyCode::Char('e')),
         vec![Msg::Table(TableMsg::EditSelectedRows)]
+    );
+    assert_eq!(
+        press(&workspace(view), KeyCode::Char('d')),
+        vec![Msg::Table(TableMsg::DeleteSelectedRows)]
     );
 }
 

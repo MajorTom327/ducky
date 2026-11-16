@@ -46,7 +46,14 @@ impl Runtime {
             }
             Command::CancelScript => database::spawn_cancel_script(&self.active, messages),
             Command::SaveCellEdits { tab_id, sql } => {
-                database::spawn_save_cell_edits(&self.active, messages, tab_id, sql)
+                database::spawn_apply_edits(&self.active, messages, sql, move |result| {
+                    Msg::CellEditsSaved { tab_id, result }
+                })
+            }
+            Command::DeleteRows { tab_id, sql } => {
+                database::spawn_apply_edits(&self.active, messages, sql, move |result| {
+                    Msg::RowsDeleted { tab_id, result }
+                })
             }
             Command::ListSqlFiles => files::spawn_list_sql_files(self.sql_store.clone(), messages),
             Command::LoadFilePreview { name } => {

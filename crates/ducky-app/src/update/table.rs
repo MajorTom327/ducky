@@ -9,7 +9,7 @@ use crate::state::{
 };
 use crate::update::cell_edits::{self, unsaved_drafts_refusal};
 use crate::update::grid::{cell_text, clamp_cursor, move_cursor, place_cursor};
-use crate::update::{cell_editor, notice, references, selection, workspace_mut};
+use crate::update::{cell_editor, notice, references, row_deletion, selection, workspace_mut};
 
 pub(crate) fn update(state: &mut AppState, msg: TableMsg) -> Vec<Command> {
     let Some(workspace) = workspace_mut(&mut state.screen) else {
@@ -23,7 +23,8 @@ pub(crate) fn update(state: &mut AppState, msg: TableMsg) -> Vec<Command> {
         | TableMsg::PreviousPage
         | TableMsg::CycleSort
         | TableMsg::StartFilter
-        | TableMsg::Reload => true,
+        | TableMsg::Reload
+        | TableMsg::DeleteSelectedRows => true,
         TableMsg::ClearFilter => table.request.filter.is_some(),
         _ => false,
     };
@@ -41,6 +42,7 @@ pub(crate) fn update(state: &mut AppState, msg: TableMsg) -> Vec<Command> {
             Vec::new()
         }
         TableMsg::EditSelectedRows => selection::edit_selected_rows(state),
+        TableMsg::DeleteSelectedRows => row_deletion::confirm(state),
         TableMsg::ChangeCell => cell_editor::change_cell(state),
         TableMsg::SetCellNull => cell_editor::set_cell_null(state),
         TableMsg::RevertCell => cell_edits::revert(table),

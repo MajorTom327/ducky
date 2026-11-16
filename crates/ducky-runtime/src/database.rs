@@ -88,11 +88,11 @@ pub(crate) fn spawn_run_script(
     });
 }
 
-pub(crate) fn spawn_save_cell_edits(
+pub(crate) fn spawn_apply_edits(
     active: &ActiveSlot,
     messages: UnboundedSender<Msg>,
-    tab_id: TabId,
     sql: String,
+    finished_message: impl FnOnce(Result<Vec<u64>, String>) -> Msg + Send + 'static,
 ) {
     let connection = current_connection(active);
     tokio::spawn(async move {
@@ -104,7 +104,7 @@ pub(crate) fn spawn_save_cell_edits(
                 .map_err(|error| error.to_string()),
             None => Err(NOT_CONNECTED.to_owned()),
         };
-        let _ = messages.send(Msg::CellEditsSaved { tab_id, result });
+        let _ = messages.send(finished_message(result));
     });
 }
 

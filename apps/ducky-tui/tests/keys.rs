@@ -75,6 +75,28 @@ fn confirm_ignores_unbound_keys() {
 }
 
 #[test]
+fn delete_confirm_runs_only_on_y() {
+    let modal = Modal::Confirm(Confirm {
+        kind: ConfirmKind::DeleteRows {
+            tab_id: 1,
+            sql: "DELETE FROM t WHERE id IN ('1');".to_owned(),
+        },
+        message: "You are going to delete 1 row. Are you sure?".to_owned(),
+    });
+    let mut tui = TuiState::new(false);
+    let cases = [
+        (KeyCode::Char('y'), ModalMsg::Submit),
+        (KeyCode::Enter, ModalMsg::Cancel),
+        (KeyCode::Char('Y'), ModalMsg::Cancel),
+        (KeyCode::Char('z'), ModalMsg::Cancel),
+        (KeyCode::Esc, ModalMsg::Cancel),
+    ];
+    for (code, modal_msg) in cases {
+        assert_eq!(press(&modal, &mut tui, code), vec![Msg::Modal(modal_msg)]);
+    }
+}
+
+#[test]
 fn row_detail_keys_map_to_modal_messages() {
     let modal = Modal::RowDetail(RowDetail {
         columns: vec!["id".to_owned()],
